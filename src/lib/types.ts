@@ -322,6 +322,8 @@ export interface WorkOrderDto {
   costSource: string;
   lines: WorkOrderLineDto[];
   documents: WorkOrderDocumentDto[];
+  vendorName?: string;
+  vendorAddress?: string;
 }
 
 export interface ChatMessage {

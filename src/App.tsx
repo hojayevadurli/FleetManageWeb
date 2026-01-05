@@ -17,7 +17,7 @@ import Equipment from "./pages/Equipment";
 import WorkOrders from "./pages/WorkOrders";
 import HistoryTrucks from "./pages/HistoryTrucks";
 import RepairHistoryPage from "./pages/RepairHistoryPage";
-import ServiceHistoryPage from "./pages/ServiceHistoryPage";
+
 import UpcomingMaintenance from "./pages/UpcomingMaintenance";
 import InspectionsPage from "./pages/InspectionsPage";
 import ShopsPage from "./pages/ShopsPage";
@@ -163,7 +163,7 @@ const App = () => (
                           <Route path="/service" element={<WorkOrders />} />
                           <Route path="/history/trucks" element={<HistoryTrucks />} />
                           <Route path="/history/repairs" element={<RepairHistoryPage />} />
-                          <Route path="/maintenance/service-history" element={<ServiceHistoryPage />} />
+
                           <Route path="/maintenance/service-history/:id" element={<ServiceRecordDetailPage />} />
                           <Route path="/maintenance/upcoming" element={<UpcomingMaintenance />} />
                           <Route path="/inspections" element={<InspectionsPage />} />
