@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Clock, AlertTriangle, Plus, Filter, RefreshCw } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+// import { supabase } from "@/integrations/supabase/client"; // Removed - using backend API
 import { useAuth } from "@/components/auth/AuthContext";
 import { toast } from "sonner";
 import UpcomingMaintenanceFilters from "@/components/maintenance/UpcomingMaintenanceFilters";

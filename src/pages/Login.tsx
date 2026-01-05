@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { api } from "@/lib/Api";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { industriesApi, Industry } from "@/lib/industriesApi";
 
 export default function Login() {
   const { signIn, signUp } = useAuth();
@@ -9,10 +10,15 @@ export default function Login() {
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
 
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [industryId, setIndustryId] = useState("");
+
+  const [industries, setIndustries] = useState<Industry[]>([]);
+  const [industriesLoading, setIndustriesLoading] = useState(true);
 
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -23,6 +29,20 @@ export default function Login() {
 
   const isSignUp = mode === "signup";
   const isForgotPassword = mode === "forgot";
+
+  useEffect(() => {
+    const loadIndustries = async () => {
+      try {
+        const data = await industriesApi.list();
+        setIndustries(data);
+      } catch (e) {
+        console.error("Failed to load industries", e);
+      } finally {
+        setIndustriesLoading(false);
+      }
+    };
+    loadIndustries();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +62,7 @@ export default function Login() {
           return;
         }
 
-        const res = await signUp(companyName, fullName, email, password);
+        const res = await signUp(companyName, fullName, email, phoneNumber, password, industryId);
 
         if (res.error) {
           // 🔥 show exact backend message from signUp
@@ -106,21 +126,23 @@ export default function Login() {
             {isForgotPassword
               ? "Reset your password"
               : isSignUp
-              ? "Create your company account"
-              : "Sign in to FleetManage"}
+                ? "Create your company account"
+                : "Sign in to FleetManage"}
           </h1>
           <p className="text-sm text-gray-600">
             {isForgotPassword
               ? "Enter your email and we’ll send you a reset link."
               : isSignUp
-              ? "Create a company and your first admin user."
-              : "Use your work email to log in."}
+                ? "Create a company and your first admin user."
+                : "Use your work email to log in."}
           </p>
         </div>
 
         <LoginForm
           email={email}
           setEmail={setEmail}
+          phoneNumber={phoneNumber}
+          setPhoneNumber={setPhoneNumber}
           password={password}
           setPassword={setPassword}
           fullName={fullName}
@@ -138,6 +160,10 @@ export default function Login() {
           setCompanyName={setCompanyName}
           confirmPassword={confirmPassword}
           setConfirmPassword={setConfirmPassword}
+          industryId={industryId}
+          setIndustryId={setIndustryId}
+          industries={industries}
+          industriesLoading={industriesLoading}
         />
 
         {error && (

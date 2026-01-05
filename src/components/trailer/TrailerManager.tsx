@@ -29,28 +29,28 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import AddTrailerDialog from "./AddTrailerDialog";
 import EditTrailerDialog from "./EditTrailerDialog";
-import {
-  listTrailers,
-  deleteTrailer,
-  bulkDeleteTrailers,
-  type Trailer,
-} from "@/api/trailers";
+import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
+import { Equipment } from "@/lib/types";
 
 const TrailerManager = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [trailers, setTrailers] = useState<Trailer[]>([]);
+  const [trailers, setTrailers] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [editingTrailer, setEditingTrailer] = useState<Trailer | null>(null);
+  const [editingTrailer, setEditingTrailer] = useState<Equipment | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchTrailers = async () => {
     try {
       setLoading(true);
-      const data = await listTrailers();
-      setTrailers(data ?? []);
+      // Fetch specifically trailers
+      const data = await equipmentApi.list("trailer");
+      const mapped = data.map(mapDtoToEquipment);
+      // Fallback client-side filter just in case API returns all (mapped uses internal type 'truck'/'trailer')
+      const filtered = mapped.filter(e => e.type?.toLowerCase() === 'trailer');
+      setTrailers(filtered);
       setSelectedIds([]);
     } catch (error) {
       toast({
@@ -98,9 +98,9 @@ const TrailerManager = () => {
     const search = searchTerm.toLowerCase();
 
     const matchesSearch =
-      trailer.number.toLowerCase().includes(search) ||
+      trailer.unitNumber.toLowerCase().includes(search) || // changed from number
       (trailer.make ?? "").toLowerCase().includes(search) ||
-      trailer.vin.toLowerCase().includes(search);
+      (trailer.vin ?? "").toLowerCase().includes(search);
 
     const s = trailer.status?.toLowerCase();
     const matchesStatus =
@@ -116,7 +116,7 @@ const TrailerManager = () => {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this trailer?")) return;
     try {
-      await deleteTrailer(id);
+      await equipmentApi.delete(id);
       toast({
         title: "Deleted",
         description: "Trailer removed successfully",
@@ -147,7 +147,7 @@ const TrailerManager = () => {
       return;
 
     try {
-      await bulkDeleteTrailers(selectedIds);
+      await equipmentApi.bulkDelete(selectedIds);
       toast({
         title: "Deleted",
         description: "Selected trailers removed successfully",
@@ -162,7 +162,7 @@ const TrailerManager = () => {
     }
   };
 
-  const openEdit = (trailer: Trailer) => {
+  const openEdit = (trailer: Equipment) => {
     setEditingTrailer(trailer);
     setEditOpen(true);
   };
@@ -278,24 +278,23 @@ const TrailerManager = () => {
             return (
               <Card
                 key={trailer.id}
-                className={`hover:shadow-lg transition-shadow ${
-                  isSelected ? "ring-2 ring-red-400" : ""
-                }`}
+                className={`hover:shadow-lg transition-shadow ${isSelected ? "ring-2 ring-red-400" : ""
+                  }`}
               >
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex items-start gap-2">
-                    <input
+                      <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleSelected(trailer.id)}
                         className="mt-1"
-                        aria-label={`Select trailer ${trailer.number}`}
+                        aria-label={`Select trailer ${trailer.unitNumber}`}
                       />
                       <div>
                         <CardTitle className="text-lg flex items-center gap-2">
                           <Truck className="h-5 w-5 text-blue-600" />
-                          {trailer.number}
+                          {trailer.unitNumber}
                         </CardTitle>
                         <CardDescription>
                           {trailer.year} {trailer.make}
@@ -321,6 +320,7 @@ const TrailerManager = () => {
                     <span className="text-sm text-gray-600">Type:</span>
                     <span className="font-medium text-sm">
                       {trailer.type ?? "-"}
+                      {/* You might want to show trailerType if stored separately in specs or new field */}
                     </span>
                   </div>
 
@@ -374,7 +374,7 @@ const TrailerManager = () => {
                       variant="outline"
                       size="sm"
                       className="flex-1"
-                      // hook to service screen later
+                    // hook to service screen later
                     >
                       <Wrench className="h-4 w-4 mr-2" />
                       Service

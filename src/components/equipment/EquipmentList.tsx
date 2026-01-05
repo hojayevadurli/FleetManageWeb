@@ -16,9 +16,17 @@ import {
     ChevronRight,
     Trash2
 } from 'lucide-react';
-import { Equipment, EquipmentStatus, EquipmentType, WorkOrder, WorkOrderStatus } from '@/lib/types';
+import { equipmentApi, EquipmentCreatePayload } from '@/lib/equipmentApi';
+import { fleetCategoriesApi, FleetCategory } from '@/lib/fleetCategoriesApi';
+import { equipmentTypesApi } from '@/lib/equipmentTypesApi';
+import { tenantsApi } from '@/lib/tenantsApi';
+import { Equipment, EquipmentStatus, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource, EquipmentTypeDto } from '@/lib/types';
+
 import { verifyVendorAddress, searchVendorSuggestions } from '@/lib/gemini';
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -51,10 +59,44 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
     initialStatusFilter = 'ALL'
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [typeFilter, setTypeFilter] = useState<'ALL' | EquipmentType>('ALL');
+    const [typeFilter, setTypeFilter] = useState<'ALL' | string>('ALL');
     const [statusFilter, setStatusFilter] = useState<'ALL' | EquipmentStatus>(initialStatusFilter);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
+
+    const [fleetCategories, setFleetCategories] = useState<FleetCategory[]>([]);
+    const [equipmentTypes, setEquipmentTypes] = useState<EquipmentTypeDto[]>([]);
+    const [loadingConfig, setLoadingConfig] = useState(false);
+
+
+
+    useEffect(() => {
+        if (isAddModalOpen) {
+            setLoadingConfig(true);
+            const loadData = async () => {
+                try {
+                    // 1. Get current tenant to find industry
+                    const tenant = await tenantsApi.getCurrent();
+                    const industryId = tenant?.industryId;
+
+                    if (industryId !== undefined && industryId !== null) {
+                        // 2. Fetch fleet categories filtered by industry
+                        const cats = await fleetCategoriesApi.list(industryId);
+                        setFleetCategories(cats);
+                    } else {
+                        setFleetCategories([]);
+                    }
+                } catch (err) {
+                    console.error("Failed to load config data", err);
+                } finally {
+                    setLoadingConfig(false);
+                }
+            };
+            loadData();
+        }
+    }, [isAddModalOpen]);
+
+
 
     // Bulk Selection
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -62,18 +104,22 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
 
     // New Work Order Modal State
     const [isWOModalOpen, setIsWOModalOpen] = useState(false);
-    const [woFormData, setWoFormData] = useState<Partial<WorkOrder>>({
+    const [woFormData, setWoFormData] = useState<Partial<WorkOrder> & { unitNumber?: string }>({
         woNumber: '',
-        status: WorkOrderStatus.OPEN,
+        status: WorkOrderStatus.Open,
+        priority: WorkOrderPriority.Medium,
         date: new Date().toISOString().split('T')[0],
         totalCost: 0,
         partsCost: 0,
         laborCost: 0,
         description: '',
+        title: '',
+        complaint: '',
         vendor: '',
         vendorAddress: '',
         technician: '',
-        equipmentId: ''
+        equipmentId: '',
+        unitNumber: ''
     });
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
@@ -129,16 +175,20 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
     const handleOpenWOModal = (equip: Equipment) => {
         setWoFormData({
             woNumber: `WO-${Math.floor(Math.random() * 10000)}`,
-            status: WorkOrderStatus.OPEN,
+            status: WorkOrderStatus.Open,
+            priority: WorkOrderPriority.Medium,
             date: new Date().toISOString().split('T')[0],
             totalCost: 0,
             partsCost: 0,
             laborCost: 0,
             description: '',
+            title: `Service for ${equip.unitNumber}`,
+            complaint: `Standard service for unit ${equip.unitNumber}`,
             vendor: '',
             vendorAddress: '',
             technician: '',
-            equipmentId: equip.id
+            equipmentId: equip.id,
+            unitNumber: equip.unitNumber
         });
         setIsVerified(false);
         setMapsLink(null);
@@ -160,33 +210,93 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
 
     const handleWOSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onAddWorkOrder(woFormData as any, selectedFiles);
+
+        // Map to WorkOrderUpsertDto expected by backend
+        const payload: any = {
+            equipmentId: woFormData.equipmentId,
+            vendorId: null, // Would need vendor lookup
+            workOrderNumber: woFormData.woNumber,
+            openedAt: new Date(woFormData.date || '').toISOString(),
+            title: woFormData.title || woFormData.description?.slice(0, 50) || 'New WO',
+            complaint: woFormData.complaint || woFormData.description || 'Manual Entry',
+            status: woFormData.status,
+            priority: woFormData.priority,
+            costSource: WorkOrderCostSource.Invoiced,
+            estimatedTotal: woFormData.totalCost,
+            manualActualTotal: woFormData.totalCost,
+            lines: [
+                {
+                    type: 'labor',
+                    description: woFormData.description || 'Service Labor',
+                    qty: 1,
+                    unitPrice: woFormData.laborCost || 0
+                },
+                {
+                    type: 'part',
+                    description: 'Parts',
+                    qty: 1,
+                    unitPrice: woFormData.partsCost || 0
+                }
+            ]
+        };
+
+        onAddWorkOrder(payload, selectedFiles);
         setIsWOModalOpen(false);
         setSelectedFiles([]);
     };
 
-    const [newEquip, setNewEquip] = useState<Partial<Equipment>>({
+    const [newEquip, setNewEquip] = useState<Partial<EquipmentCreatePayload>>({
         unitNumber: '',
-        type: EquipmentType.TRUCK,
+        type: 'Truck',
         make: '',
         model: '',
         year: new Date().getFullYear(),
         status: EquipmentStatus.ACTIVE,
         vin: '',
+        serialNumber: '',
         licensePlate: '',
         lastServiceDate: new Date().toISOString().split('T')[0],
         mileage: 0,
         engineType: '',
-        trailerType: 'Dry Van',
         length: 53,
-        weightCapacity: 45000
+        weightCapacity: 45000,
+        fleetCategoryId: undefined,
+        initialOdometer: 0,
+        initialHours: 0
     });
+
+    // Fetch Equipment Types when Fleet Category changes (and we know industry)
+    useEffect(() => {
+        const fetchTypes = async () => {
+            if (newEquip.fleetCategoryId) {
+                try {
+                    console.log("Fetching types for Category:", newEquip.fleetCategoryId);
+                    const tenant = await tenantsApi.getCurrent();
+                    console.log("Current Tenant Industry:", tenant?.industryId);
+
+                    if (tenant?.industryId) {
+                        const types = await equipmentTypesApi.list(tenant.industryId, newEquip.fleetCategoryId);
+                        console.log("Fetched Equipment Types:", types);
+                        setEquipmentTypes(types);
+                    } else {
+                        console.warn("No industry ID found on tenant");
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch equipment types", e);
+                }
+            } else {
+                setEquipmentTypes([]);
+            }
+        };
+        fetchTypes();
+    }, [newEquip.fleetCategoryId]);
 
     const getStatusColor = (status: string) => {
         const s = status?.toLowerCase();
-        if (s === 'active') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-        if (s === 'in shop' || s === 'in_shop') return 'bg-amber-100 text-amber-700 border-amber-200';
-        if (s === 'out of service' || s === 'out_of_service' || s === 'oos') return 'bg-rose-100 text-rose-700 border-rose-200';
+        if (s === EquipmentStatus.ACTIVE) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+        if (s === EquipmentStatus.IN_SHOP) return 'bg-amber-100 text-amber-700 border-amber-200';
+        if (s === EquipmentStatus.OUT_OF_SERVICE) return 'bg-rose-100 text-rose-700 border-rose-200';
+        if (s === EquipmentStatus.SOLD) return 'bg-slate-100 text-slate-700 border-slate-200';
         return 'bg-slate-100 text-slate-700 border-slate-200';
     };
 
@@ -198,7 +308,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                 e.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 e.model.toLowerCase().includes(searchTerm.toLowerCase())
             );
-            const matchesType = typeFilter === 'ALL' || e.type === typeFilter;
+            const matchesType = typeFilter === 'ALL' || e.type.toLowerCase().includes(typeFilter.toLowerCase());
             const matchesStatus = statusFilter === 'ALL' || e.status === statusFilter;
             return matchesSearch && matchesType && matchesStatus;
         });
@@ -229,19 +339,22 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
         setIsAddModalOpen(false);
         setNewEquip({
             unitNumber: '',
-            type: EquipmentType.TRUCK,
+            type: 'Truck',
             make: '',
             model: '',
             year: new Date().getFullYear(),
             status: EquipmentStatus.ACTIVE,
             vin: '',
+            serialNumber: '',
             licensePlate: '',
             lastServiceDate: new Date().toISOString().split('T')[0],
             mileage: 0,
             engineType: '',
-            trailerType: 'Dry Van',
             length: 53,
-            weightCapacity: 45000
+            weightCapacity: 45000,
+            fleetCategoryId: undefined,
+            initialOdometer: 0,
+            initialHours: 0
         });
         setShowAdvanced(false);
     };
@@ -308,7 +421,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
 
                     <div className="flex flex-wrap items-center gap-3">
                         <div className="flex items-center bg-slate-50 border border-slate-200 rounded-2xl p-1">
-                            {(['ALL', EquipmentType.TRUCK, EquipmentType.TRAILER] as const).map(type => (
+                            {(['ALL', 'truck', 'trailer'] as const).map(type => (
                                 <button
                                     key={type}
                                     onClick={() => setTypeFilter(type)}
@@ -363,7 +476,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                                 <div className="p-6 pb-2 flex justify-between items-start">
                                     <div className="flex items-center gap-3">
                                         <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 group-hover:bg-blue-50 transition-colors">
-                                            {e.type === EquipmentType.TRUCK ? <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> : <Container className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />}
+                                            {e.type === 'truck' ? <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> : <Container className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />}
                                         </div>
                                         <h3 className="font-black text-xl text-slate-900 tracking-tight">{e.unitNumber}</h3>
                                     </div>
@@ -421,8 +534,8 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
 
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-                    <div className="bg-white rounded-[3rem] w-full max-w-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-                        <div className="flex items-center justify-between px-10 py-8 border-b border-slate-100 bg-slate-50/50">
+                    <div className="bg-white rounded-[3rem] w-full max-w-xl shadow-2xl flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-300">
+                        <div className="flex-none flex items-center justify-between px-10 py-8 border-b border-slate-100 bg-slate-50/50">
                             <div className="flex items-center gap-3">
                                 <div className="bg-blue-600 p-2.5 rounded-2xl shadow-lg">
                                     <TruckIcon className="w-6 h-6 text-white" />
@@ -434,24 +547,103 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                             </div>
                             <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-all"><X className="w-6 h-6" /></button>
                         </div>
+                        <div className="overflow-y-auto flex-1">
+                            <form className="p-10 space-y-6" onSubmit={handleAddSubmit}>
+                                <div className="grid grid-cols-2 gap-6 mb-6">
+                                    <div className="space-y-2">
+                                        <Label>Fleet Category <span className="text-red-500">*</span></Label>
+                                        <Select
+                                            value={newEquip.fleetCategoryId?.toString()}
+                                            onValueChange={(val) => setNewEquip({ ...newEquip, fleetCategoryId: parseInt(val) })}
+                                            disabled={loadingConfig}
+                                        >
+                                            <SelectTrigger className="w-full bg-slate-50 border-slate-200 py-4 h-auto text-sm font-bold">
+                                                <SelectValue placeholder={loadingConfig ? "Loading..." : "Select Category"} />
+                                            </SelectTrigger>
+                                            <SelectContent className="z-[200] max-h-[300px]">
+                                                {fleetCategories.length > 0 ? fleetCategories.map(c => (
+                                                    <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                                                )) : (
+                                                    <SelectItem value="none" disabled>No categories found for your industry</SelectItem>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
 
-                        <form className="p-10 space-y-6" onSubmit={handleAddSubmit}>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit Number</label>
-                                    <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="T-100" value={newEquip.unitNumber} onChange={e => setNewEquip({ ...newEquip, unitNumber: e.target.value })} />
+                                    <div className="space-y-2">
+                                        <Label>Equipment Type <span className="text-red-500">*</span></Label>
+                                        <Select
+                                            value={newEquip.equipmentTypeId?.toString()}
+                                            onValueChange={(val) => {
+                                                const selectedType = equipmentTypes.find(t => t.id.toString() === val);
+                                                setNewEquip({
+                                                    ...newEquip,
+                                                    equipmentTypeId: val,
+                                                    equipmentTypeName: selectedType?.name,
+                                                    // Auto-set asset type 'Truck' or 'Trailer' based on name/code if possible, otherwise default
+                                                    // For now assume "Truck" unless name contains Trailer
+                                                    type: selectedType?.name.toLowerCase().includes('trailer') ? 'Trailer' : 'Truck'
+                                                });
+                                            }}
+                                            disabled={!newEquip.fleetCategoryId}
+                                        >
+                                            <SelectTrigger className="w-full bg-slate-50 border-slate-200 py-4 h-auto text-sm font-bold">
+                                                <SelectValue placeholder={!newEquip.fleetCategoryId ? "Select Category First" : "Select Type"} />
+                                            </SelectTrigger>
+                                            <SelectContent className="z-[200] max-h-[300px]">
+                                                {equipmentTypes.length > 0 ? equipmentTypes.map(t => (
+                                                    <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
+                                                )) : (
+                                                    <SelectItem value="none" disabled>No types found for this category</SelectItem>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">VIN (17 Digits)</label>
-                                    <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Required" value={newEquip.vin} onChange={e => setNewEquip({ ...newEquip, vin: e.target.value })} />
+
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit Number</label>
+                                        <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="T-100" value={newEquip.unitNumber} onChange={e => setNewEquip({ ...newEquip, unitNumber: e.target.value })} />
+                                    </div>
+
+                                    {/* Dynamic Fields based on Equipment Type */}
+                                    {(() => {
+                                        const selectedType = equipmentTypes.find(t => t.id.toString() === newEquip.equipmentTypeId?.toString());
+                                        const showVin = selectedType ? selectedType.hasVin : true; // Default to showing VIN if no type selected yet
+                                        const showSerial = selectedType ? selectedType.hasSerial : false;
+
+                                        return (
+                                            <>
+                                                {showVin && (
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">VIN (17 Digits)</label>
+                                                        <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Required" value={newEquip.vin} onChange={e => setNewEquip({ ...newEquip, vin: e.target.value })} />
+                                                    </div>
+                                                )}
+                                                {showSerial && (
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Serial Number</label>
+                                                        <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Required" value={newEquip.serialNumber || ''} onChange={e => setNewEquip({ ...newEquip, serialNumber: e.target.value })} />
+                                                    </div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asset Type</label>
-                                    <select className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" value={newEquip.type} onChange={e => setNewEquip({ ...newEquip, type: e.target.value as EquipmentType })}>
-                                        <option value={EquipmentType.TRUCK}>Truck</option>
-                                        <option value={EquipmentType.TRAILER}>Trailer</option>
-                                    </select>
+
+
+
+                                <div className="space-y-2">
+                                    <Label>Make</Label>
+                                    <Input
+                                        value={newEquip.make || ''}
+                                        onChange={e => setNewEquip({ ...newEquip, make: e.target.value })}
+                                        placeholder="e.g. Kenworth"
+                                    />
                                 </div>
+
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Status</label>
                                     <select
@@ -466,10 +658,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                                         ))}
                                     </select>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Make</label>
-                                    <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Freightliner" value={newEquip.make} onChange={e => setNewEquip({ ...newEquip, make: e.target.value })} />
-                                </div>
+
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model</label>
                                     <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Cascadia" value={newEquip.model} onChange={e => setNewEquip({ ...newEquip, model: e.target.value })} />
@@ -478,218 +667,211 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model Year</label>
                                     <input required type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="2025" value={newEquip.year} onChange={e => setNewEquip({ ...newEquip, year: parseInt(e.target.value) || new Date().getFullYear() })} />
                                 </div>
-                            </div>
 
-                            <div className="pt-4 border-t border-slate-100/50 mt-6">
-                                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Type Specific Specifications</h3>
-                                <div className="grid grid-cols-2 gap-6">
-                                    {newEquip.type === EquipmentType.TRUCK ? (
-                                        <>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">License Plate</label>
-                                                <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="ABC-1234" value={newEquip.licensePlate} onChange={e => setNewEquip({ ...newEquip, licensePlate: e.target.value })} />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Engine Type</label>
-                                                <input type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Cummins X15" value={newEquip.engineType} onChange={e => setNewEquip({ ...newEquip, engineType: e.target.value })} />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Mileage</label>
-                                                <input type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0" value={newEquip.mileage} onChange={e => setNewEquip({ ...newEquip, mileage: parseInt(e.target.value) || 0 })} />
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Trailer Category</label>
-                                                <select className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" value={newEquip.trailerType} onChange={e => setNewEquip({ ...newEquip, trailerType: e.target.value })}>
-                                                    <option value="Dry Van">Dry Van</option>
-                                                    <option value="Reefer">Reefer</option>
-                                                    <option value="Flatbed">Flatbed</option>
-                                                    <option value="Step Deck">Step Deck</option>
-                                                    <option value="Tanker">Tanker</option>
-                                                    <option value="Chassis">Chassis</option>
-                                                </select>
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Length (ft)</label>
-                                                <input type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="53" value={newEquip.length} onChange={e => setNewEquip({ ...newEquip, length: parseInt(e.target.value) || 0 })} />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Capacity (lbs)</label>
-                                                <input type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="45000" value={newEquip.weightCapacity} onChange={e => setNewEquip({ ...newEquip, weightCapacity: parseInt(e.target.value) || 0 })} />
-                                            </div>
-                                        </>
-                                    )}
+
+                                <div className="pt-4 border-t border-slate-100/50 mt-6">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Type Specific Specifications</h3>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        {newEquip.type === 'truck' ? (
+                                            <>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">License Plate</label>
+                                                    <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="ABC-1234" value={newEquip.licensePlate} onChange={e => setNewEquip({ ...newEquip, licensePlate: e.target.value })} />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Engine Type</label>
+                                                    <input type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Cummins X15" value={newEquip.engineType} onChange={e => setNewEquip({ ...newEquip, engineType: e.target.value })} />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Mileage</label>
+                                                    <input type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0" value={newEquip.mileage} onChange={e => setNewEquip({ ...newEquip, mileage: parseInt(e.target.value) || 0 })} />
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Length (ft)</label>
+                                                    <input type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="53" value={newEquip.length} onChange={e => setNewEquip({ ...newEquip, length: parseInt(e.target.value) || 0 })} />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Capacity (lbs)</label>
+                                                    <input type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="45000" value={newEquip.weightCapacity} onChange={e => setNewEquip({ ...newEquip, weightCapacity: parseInt(e.target.value) || 0 })} />
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div className="flex justify-end gap-4 pt-8 border-t border-slate-100">
-                                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-8 py-4 text-sm font-black text-slate-400 hover:text-slate-800 transition-colors">Cancel</button>
-                                <button type="submit" className="px-12 py-4 text-sm font-black text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-xl shadow-blue-500/20 transition-all active:scale-95">Onboard Asset</button>
-                            </div>
-                        </form>
+                                <div className="flex justify-end gap-4 pt-8 border-t border-slate-100">
+                                    <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-8 py-4 text-sm font-black text-slate-400 hover:text-slate-800 transition-colors">Cancel</button>
+                                    <button type="submit" className="px-12 py-4 text-sm font-black text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-xl shadow-blue-500/20 transition-all active:scale-95">Onboard Asset</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
+                </div >
             )}
 
-            {isWOModalOpen && (
-                <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-                    <div className="bg-white rounded-[3rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-                        <div className="flex items-center justify-between px-10 py-8 border-b border-slate-100 bg-slate-50/50">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-amber-500 p-2.5 rounded-2xl shadow-lg">
-                                    <ClipboardList className="w-6 h-6 text-white" />
+            {
+                isWOModalOpen && (
+                    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+                        <div className="bg-white rounded-[3rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+                            <div className="flex items-center justify-between px-10 py-8 border-b border-slate-100 bg-slate-50/50">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-amber-500 p-2.5 rounded-2xl shadow-lg">
+                                        <ClipboardList className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-black text-slate-800 tracking-tight">New Maintenance Record</h2>
+                                        <p className="text-[10px] text-amber-600 font-black uppercase tracking-widest mt-0.5">Quick creation for {woFormData.unitNumber}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">New Maintenance Record</h2>
-                                    <p className="text-[10px] text-amber-600 font-black uppercase tracking-widest mt-0.5">Quick creation for {equipment.find(e => e.id === woFormData.equipmentId)?.unitNumber}</p>
-                                </div>
+                                <button onClick={() => setIsWOModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-all"><X className="w-6 h-6" /></button>
                             </div>
-                            <button onClick={() => setIsWOModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-all"><X className="w-6 h-6" /></button>
-                        </div>
 
-                        <form className="p-10 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar" onSubmit={handleWOSubmit}>
-                            <div className="grid grid-cols-2 gap-8">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit Number</label>
-                                    <input readOnly type="text" className="w-full px-5 py-4 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-black text-slate-500 cursor-not-allowed outline-none" value={equipment.find(e => e.id === woFormData.equipmentId)?.unitNumber || ''} />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Service Date</label>
-                                    <input type="date" required className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" value={woFormData.date} onChange={e => setWoFormData({ ...woFormData, date: e.target.value })} />
-                                </div>
-                                <div className="space-y-1.5 relative">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Partner Vendor</label>
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            required
-                                            autoComplete="off"
-                                            className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                            placeholder="Search Shop Name..."
-                                            value={woFormData.vendor}
-                                            onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-                                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                                            onChange={e => {
-                                                setWoFormData({ ...woFormData, vendor: e.target.value });
-                                                setIsVerified(false);
-                                            }}
-                                        />
-                                        {isSearchingSuggestions && (
-                                            <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                                                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                            <form className="p-10 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar" onSubmit={handleWOSubmit}>
+                                <div className="grid grid-cols-2 gap-8">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit Number</label>
+                                        <input readOnly type="text" className="w-full px-5 py-4 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-black text-slate-500 cursor-not-allowed outline-none" value={woFormData.unitNumber || ''} />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Service Date</label>
+                                        <input type="date" required className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" value={woFormData.date} onChange={e => setWoFormData({ ...woFormData, date: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-1.5 relative">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Partner Vendor</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                required
+                                                autoComplete="off"
+                                                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                                placeholder="Search Shop Name..."
+                                                value={woFormData.vendor}
+                                                onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                                                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                                onChange={e => {
+                                                    setWoFormData({ ...woFormData, vendor: e.target.value });
+                                                    setIsVerified(false);
+                                                }}
+                                            />
+                                            {isSearchingSuggestions && (
+                                                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                                    <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        {showSuggestions && suggestions.length > 0 && (
+                                            <div className="absolute top-full left-0 right-0 z-[120] mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                                <div className="max-h-60 overflow-y-auto">
+                                                    {suggestions.map((s, idx) => (
+                                                        <button
+                                                            key={idx}
+                                                            type="button"
+                                                            onClick={() => handleSelectSuggestion(s)}
+                                                            className="w-full text-left px-5 py-4 hover:bg-blue-50 border-b border-slate-50 last:border-0 transition-all flex items-start gap-3 group"
+                                                        >
+                                                            <MapPin className="w-4 h-4 text-slate-300 mt-0.5 group-hover:text-blue-500" />
+                                                            <div className="flex-1">
+                                                                <div className="text-xs font-black text-slate-800 group-hover:text-blue-700">{s.title}</div>
+                                                            </div>
+                                                            <ChevronRight className="w-4 h-4 text-slate-200 group-hover:text-blue-400 self-center" />
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
-                                    {showSuggestions && suggestions.length > 0 && (
-                                        <div className="absolute top-full left-0 right-0 z-[120] mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
-                                            <div className="max-h-60 overflow-y-auto">
-                                                {suggestions.map((s, idx) => (
-                                                    <button
-                                                        key={idx}
-                                                        type="button"
-                                                        onClick={() => handleSelectSuggestion(s)}
-                                                        className="w-full text-left px-5 py-4 hover:bg-blue-50 border-b border-slate-50 last:border-0 transition-all flex items-start gap-3 group"
-                                                    >
-                                                        <MapPin className="w-4 h-4 text-slate-300 mt-0.5 group-hover:text-blue-500" />
-                                                        <div className="flex-1">
-                                                            <div className="text-xs font-black text-slate-800 group-hover:text-blue-700">{s.title}</div>
-                                                        </div>
-                                                        <ChevronRight className="w-4 h-4 text-slate-200 group-hover:text-blue-400 self-center" />
-                                                    </button>
-                                                ))}
-                                            </div>
+                                    <div className="space-y-1.5 relative">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Location</label>
+                                            {mapsLink && <a href={mapsLink} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 font-black flex items-center gap-1 hover:underline"><MapIcon className="w-3 h-3" /> View</a>}
+                                        </div>
+                                        <input type="text" className={`w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all ${isVerified ? 'border-emerald-200' : ''}`} placeholder="Address" value={woFormData.vendorAddress} onChange={e => { setWoFormData({ ...woFormData, vendorAddress: e.target.value }); setIsVerified(false); }} />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Technician</label>
+                                    <input type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Assigned Tech Name" value={woFormData.technician} onChange={e => setWoFormData({ ...woFormData, technician: e.target.value })} />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Service Description</label>
+                                    <textarea required className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] transition-all" placeholder="Details of the service performed..." value={woFormData.description} onChange={e => setWoFormData({ ...woFormData, description: e.target.value })} />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Attachments (Images/PDF)</label>
+                                    <div className="p-8 border-2 border-dashed border-slate-200 rounded-[2.5rem] bg-slate-50 hover:bg-white hover:border-blue-400 transition-all group flex flex-col items-center justify-center text-center cursor-pointer relative overflow-hidden">
+                                        <div className="bg-white p-4 rounded-2xl shadow-sm mb-4 group-hover:scale-110 transition-transform">
+                                            <Plus className="w-6 h-6 text-slate-400 group-hover:text-blue-500" />
+                                        </div>
+                                        <p className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                                            {selectedFiles.length > 0 ? `${selectedFiles.length} files selected` : 'Click or drag files to upload'}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Receipts, photos of damage, etc.</p>
+
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept="image/*,application/pdf"
+                                            className="absolute inset-0 opacity-0 cursor-pointer z-[20]"
+                                            onChange={(e) => {
+                                                if (e.target.files) {
+                                                    setSelectedFiles(Array.from(e.target.files));
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    {selectedFiles.length > 0 && (
+                                        <div className="mt-4 flex flex-wrap gap-2">
+                                            {selectedFiles.map((f, i) => (
+                                                <div key={i} className="px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-xl text-[10px] font-black text-blue-600 flex items-center gap-2">
+                                                    <span className="truncate max-w-[120px]">{f.name}</span>
+                                                    <X className="w-3 h-3 cursor-pointer hover:text-blue-800" onClick={(e) => { e.stopPropagation(); setSelectedFiles(prev => prev.filter((_, idx) => idx !== i)); }} />
+                                                </div>
+                                            ))}
                                         </div>
                                     )}
                                 </div>
-                                <div className="space-y-1.5 relative">
-                                    <div className="flex justify-between items-center">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Location</label>
-                                        {mapsLink && <a href={mapsLink} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 font-black flex items-center gap-1 hover:underline"><MapIcon className="w-3 h-3" /> View</a>}
+
+                                <div className="grid grid-cols-3 gap-6 p-8 bg-slate-900 rounded-[2.5rem] shadow-xl">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Parts Cost</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-black text-sm">$</span>
+                                            <input type="number" step="0.01" className="w-full pl-8 pr-4 py-4 bg-slate-800 border border-slate-700 rounded-2xl text-sm font-mono text-white font-black focus:ring-2 focus:ring-blue-500 outline-none" value={woFormData.partsCost} onChange={e => setWoFormData({ ...woFormData, partsCost: parseFloat(e.target.value) || 0 })} />
+                                        </div>
                                     </div>
-                                    <input type="text" className={`w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all ${isVerified ? 'border-emerald-200' : ''}`} placeholder="Address" value={woFormData.vendorAddress} onChange={e => { setWoFormData({ ...woFormData, vendorAddress: e.target.value }); setIsVerified(false); }} />
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Technician</label>
-                                <input type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Assigned Tech Name" value={woFormData.technician} onChange={e => setWoFormData({ ...woFormData, technician: e.target.value })} />
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Service Description</label>
-                                <textarea required className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] transition-all" placeholder="Details of the service performed..." value={woFormData.description} onChange={e => setWoFormData({ ...woFormData, description: e.target.value })} />
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Attachments (Images/PDF)</label>
-                                <div className="p-8 border-2 border-dashed border-slate-200 rounded-[2.5rem] bg-slate-50 hover:bg-white hover:border-blue-400 transition-all group flex flex-col items-center justify-center text-center cursor-pointer relative overflow-hidden">
-                                    <div className="bg-white p-4 rounded-2xl shadow-sm mb-4 group-hover:scale-110 transition-transform">
-                                        <Plus className="w-6 h-6 text-slate-400 group-hover:text-blue-500" />
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Labor Cost</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-black text-sm">$</span>
+                                            <input type="number" step="0.01" className="w-full pl-8 pr-4 py-4 bg-slate-800 border border-slate-700 rounded-2xl text-sm font-mono text-white font-black focus:ring-2 focus:ring-blue-500 outline-none" value={woFormData.laborCost} onChange={e => setWoFormData({ ...woFormData, laborCost: parseFloat(e.target.value) || 0 })} />
+                                        </div>
                                     </div>
-                                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                                        {selectedFiles.length > 0 ? `${selectedFiles.length} files selected` : 'Click or drag files to upload'}
-                                    </p>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Receipts, photos of damage, etc.</p>
-
-                                    <input
-                                        type="file"
-                                        multiple
-                                        accept="image/*,application/pdf"
-                                        className="absolute inset-0 opacity-0 cursor-pointer z-[20]"
-                                        onChange={(e) => {
-                                            if (e.target.files) {
-                                                setSelectedFiles(Array.from(e.target.files));
-                                            }
-                                        }}
-                                    />
-                                </div>
-                                {selectedFiles.length > 0 && (
-                                    <div className="mt-4 flex flex-wrap gap-2">
-                                        {selectedFiles.map((f, i) => (
-                                            <div key={i} className="px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-xl text-[10px] font-black text-blue-600 flex items-center gap-2">
-                                                <span className="truncate max-w-[120px]">{f.name}</span>
-                                                <X className="w-3 h-3 cursor-pointer hover:text-blue-800" onClick={(e) => { e.stopPropagation(); setSelectedFiles(prev => prev.filter((_, idx) => idx !== i)); }} />
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-6 p-8 bg-slate-900 rounded-[2.5rem] shadow-xl">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Parts Cost</label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-black text-sm">$</span>
-                                        <input type="number" step="0.01" className="w-full pl-8 pr-4 py-4 bg-slate-800 border border-slate-700 rounded-2xl text-sm font-mono text-white font-black focus:ring-2 focus:ring-blue-500 outline-none" value={woFormData.partsCost} onChange={e => setWoFormData({ ...woFormData, partsCost: parseFloat(e.target.value) || 0 })} />
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Total Cost</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500/50 font-black text-sm">$</span>
+                                            <input type="number" step="0.01" className="w-full pl-8 pr-4 py-4 bg-slate-800 border border-amber-900/30 rounded-2xl text-sm font-mono font-black text-amber-500 focus:ring-2 focus:ring-blue-500 outline-none" value={woFormData.totalCost} onChange={e => setWoFormData({ ...woFormData, totalCost: parseFloat(e.target.value) || 0 })} />
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Labor Cost</label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-black text-sm">$</span>
-                                        <input type="number" step="0.01" className="w-full pl-8 pr-4 py-4 bg-slate-800 border border-slate-700 rounded-2xl text-sm font-mono text-white font-black focus:ring-2 focus:ring-blue-500 outline-none" value={woFormData.laborCost} onChange={e => setWoFormData({ ...woFormData, laborCost: parseFloat(e.target.value) || 0 })} />
-                                    </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Total Cost</label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500/50 font-black text-sm">$</span>
-                                        <input type="number" step="0.01" className="w-full pl-8 pr-4 py-4 bg-slate-800 border border-amber-900/30 rounded-2xl text-sm font-mono font-black text-amber-500 focus:ring-2 focus:ring-blue-500 outline-none" value={woFormData.totalCost} onChange={e => setWoFormData({ ...woFormData, totalCost: parseFloat(e.target.value) || 0 })} />
-                                    </div>
-                                </div>
-                            </div>
 
-                            <div className="flex justify-end gap-4 pt-8 border-t border-slate-100">
-                                <button type="button" onClick={() => setIsWOModalOpen(false)} className="px-8 py-4 text-sm font-black text-slate-400 hover:text-slate-800 transition-colors">Discard</button>
-                                <button type="submit" className="px-12 py-4 text-sm font-black text-white bg-amber-500 hover:bg-amber-600 rounded-2xl shadow-xl shadow-amber-500/20 transition-all active:scale-95">Create Record</button>
-                            </div>
-                        </form>
+                                <div className="flex justify-end gap-4 pt-8 border-t border-slate-100">
+                                    <button type="button" onClick={() => setIsWOModalOpen(false)} className="px-8 py-4 text-sm font-black text-slate-400 hover:text-slate-800 transition-colors">Discard</button>
+                                    <button type="submit" className="px-12 py-4 text-sm font-black text-white bg-amber-500 hover:bg-amber-600 rounded-2xl shadow-xl shadow-amber-500/20 transition-all active:scale-95">Create Record</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

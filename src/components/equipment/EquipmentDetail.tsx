@@ -18,7 +18,7 @@ import {
     FileText
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Equipment, EquipmentStatus, EquipmentType, WorkOrder, ChatMessage } from '@/lib/types';
+import { Equipment, EquipmentStatus, WorkOrder, ChatMessage } from '@/lib/types';
 import { getEquipmentChatResponse } from '@/lib/gemini';
 
 interface ExtendedChatMessage extends ChatMessage {
@@ -113,7 +113,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                     {/* Hero Spec Block */}
                     <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-10 opacity-5">
-                            {equipment.type === EquipmentType.TRUCK ? <Truck className="w-64 h-64" /> : <Container className="w-64 h-64" />}
+                            {equipment.type === 'truck' ? <Truck className="w-64 h-64" /> : <Container className="w-64 h-64" />}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
                             <div className="space-y-6">

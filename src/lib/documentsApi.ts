@@ -38,7 +38,7 @@ export const documentsApi = {
 
   updateExtracted: async (
     id: string,
-    body: { ExtractedJson: any; VendorNameRaw?: string | null; ConfidenceScore?: number | null; Status?: string }
+    body: { extractedJson: any; vendorNameRaw?: string | null; confidenceScore?: number | null; status?: string }
   ) => {
     const res = await api.put(`/documents/${id}/extracted`, body);
     return res.data;

@@ -99,11 +99,6 @@ export const navigationItems: NavigationConfig = [
         icon: Settings,
       },
       {
-        title: "Shop Map",
-        url: "/app/shops/map",
-        icon: MapPin,
-      },
-      {
         title: "Vendor Analytics",
         url: "/app/vendor-analytics",
         icon: BarChart3,

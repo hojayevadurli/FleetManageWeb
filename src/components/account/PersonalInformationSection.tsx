@@ -1,6 +1,8 @@
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Industry } from "@/lib/industriesApi";
 
 interface PersonalInformationSectionProps {
   name: string;
@@ -11,6 +13,7 @@ interface PersonalInformationSectionProps {
   setPhone: (value: string) => void;
   companyName: string;
   setCompanyName: (value: string) => void;
+  industryName: string;
 }
 
 const PersonalInformationSection = ({
@@ -22,6 +25,7 @@ const PersonalInformationSection = ({
   setPhone,
   companyName,
   setCompanyName,
+  industryName
 }: PersonalInformationSectionProps) => {
   return (
     <div className="space-y-4">
@@ -59,6 +63,15 @@ const PersonalInformationSection = ({
             id="company"
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="industry">Industry</Label>
+          <Input
+            id="industry"
+            value={industryName}
+            disabled
+            className="bg-gray-100"
           />
         </div>
       </div>

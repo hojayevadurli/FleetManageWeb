@@ -15,10 +15,11 @@ interface AddServiceHistoryDialogProps {
 
 const AddServiceHistoryDialog = ({ open, onOpenChange, onAddRecord }: AddServiceHistoryDialogProps) => {
   const [isAddShopOpen, setIsAddShopOpen] = useState(false);
-  
+
   const {
     formData,
     isLoading,
+    loadingMessage,
     handleChange,
     handleVehicleChange,
     handleSubmit
@@ -39,7 +40,7 @@ const AddServiceHistoryDialog = ({ open, onOpenChange, onAddRecord }: AddService
           <DialogHeader>
             <DialogTitle>Add Service Record</DialogTitle>
           </DialogHeader>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <ServiceHistoryFormFields
               formData={formData}
@@ -55,7 +56,7 @@ const AddServiceHistoryDialog = ({ open, onOpenChange, onAddRecord }: AddService
 
             <div className="flex gap-2 pt-4">
               <Button type="submit" className="flex-1" disabled={isLoading}>
-                {isLoading ? "Adding..." : "Add Service Record"}
+                {isLoading ? (loadingMessage || "Adding...") : "Add Service Record"}
               </Button>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel

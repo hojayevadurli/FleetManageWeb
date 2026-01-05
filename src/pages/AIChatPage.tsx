@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { MessageList } from "@/components/chat/MessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
-import { supabase } from "@/integrations/supabase/client";
+// import { supabase } from "@/integrations/supabase/client"; // Removed - using backend API
 import { useToast } from "@/hooks/use-toast";
 
 export interface Message {

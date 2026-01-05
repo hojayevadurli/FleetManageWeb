@@ -18,6 +18,7 @@ import {
     Gauge,
     AlertTriangle
 } from 'lucide-react';
+import VehicleSelector from '../workorder/VehicleSelector';
 import {
     WorkOrder,
     WorkOrderStatus,
@@ -27,8 +28,16 @@ import {
     VendorStatus,
     WorkOrderItem,
     WorkOrderMedia,
-    ReceiptParsedData
+    ReceiptParsedData,
+    WorkOrderDto
 } from '@/lib/types';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { useNavigate } from 'react-router-dom';
 import { parseReceipt, fetchDetailedVendorInfo, searchVendorSuggestions } from '@/lib/gemini';
 
@@ -41,6 +50,7 @@ interface ServiceHistoryManagerProps {
     onUpdateVendors: (vendors: Vendor[]) => void;
     prefilledEquipmentId?: string;
     initialSelectedRecordId?: string | null;
+    availableWorkOrders?: WorkOrderDto[];
 }
 
 interface SmartSuggestion {
@@ -73,7 +83,8 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
     onUpdate,
     onUpdateVendors,
     prefilledEquipmentId,
-    initialSelectedRecordId
+    initialSelectedRecordId,
+    availableWorkOrders = []
 }) => {
     const navigate = useNavigate();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -95,12 +106,11 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
     const [isAddingItem, setIsAddingItem] = useState(false);
     const [newItemValue, setNewItemValue] = useState('');
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
-    const [assetTypeFilter, setAssetTypeFilter] = useState<'truck' | 'trailer'>('truck');
 
-    const [formData, setFormData] = useState<Partial<WorkOrder>>({
+    const [formData, setFormData] = useState<Partial<WorkOrder> & { workOrderId?: string }>({
         woNumber: `SR-${Math.floor(Math.random() * 100000)}`,
-        status: WorkOrderStatus.COMPLETED,
-        priority: WorkOrderPriority.MEDIUM,
+        status: WorkOrderStatus.Completed,
+        priority: WorkOrderPriority.Normal,
         date: new Date().toISOString().split('T')[0],
         totalCost: 0,
         description: '',
@@ -111,8 +121,10 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
         media: [],
         notes: '',
         payer: 'Company',
-        odometer: '',
-        engineHours: ''
+        odometer: 0,
+        hours: 0,
+        vehicle_type: 'truck',
+        workOrderId: undefined
     });
 
     const normalizeDate = (dateStr: string): string => {
@@ -154,7 +166,7 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
                 ...prev,
                 equipmentId: prefilledEquipmentId,
                 woNumber: `SR-${Math.floor(Math.random() * 100000)}`,
-                status: WorkOrderStatus.COMPLETED
+                status: WorkOrderStatus.Completed,
             }));
             setIsModalOpen(true);
         }
@@ -198,10 +210,12 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
             if (input.length >= 3) {
                 try {
                     const results = await searchVendorSuggestions(input);
-                    googleMatches = results
-                        .filter(r => !trustedMatches.some(tm => tm.name.toLowerCase() === (r.title).toLowerCase()))
-                        .map(r => ({ name: r.title, address: r.address, uri: r.uri, source: 'google' }));
-                } catch (err) { console.error(err); }
+                    if (Array.isArray(results)) {
+                        googleMatches = results
+                            .filter(r => !trustedMatches.some(tm => tm.name.toLowerCase() === (r.title).toLowerCase()))
+                            .map(r => ({ name: r.title, address: r.address, uri: r.uri, source: 'google' }));
+                    }
+                } catch (err) { console.error("Vendor search error:", err); }
             }
             setCombinedSuggestions([...trustedMatches, ...googleMatches]);
             setShowSuggestions(combinedSuggestions.length > 0);
@@ -333,13 +347,25 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
                     newAiFields.add('notes');
                 }
                 if (result.items && result.items.length > 0) {
-                    updates.items = result.items.map((it, idx) => ({
-                        id: `ai-item-${Date.now()}-${idx}`,
-                        description: it.description,
-                        cost: it.cost,
-                        type: it.type as any,
-                        serviceType: 'General'
-                    }));
+                    updates.items = result.items
+                        .filter(it => {
+                            const desc = (it.description || "").toLowerCase();
+                            // Filter out redundant summary lines from AI
+                            const isSummary = desc.includes("subtotal") ||
+                                desc.includes("total") ||
+                                (desc.includes("taxable") && !desc.includes("part")) ||
+                                desc.includes("amount due") ||
+                                desc.includes("balance due") ||
+                                desc.includes("liability");
+                            return !isSummary;
+                        })
+                        .map((it, idx) => ({
+                            id: `ai-item-${Date.now()}-${idx}`,
+                            description: it.description,
+                            cost: it.cost,
+                            type: it.type as any,
+                            serviceType: 'General'
+                        }));
                     newAiFields.add('items');
                 }
 
@@ -349,7 +375,7 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
                     );
                     if (matchedEquip) {
                         updates.equipmentId = matchedEquip.id;
-                        setAssetTypeFilter(matchedEquip.type.toLowerCase() as any);
+                        (updates as any).vehicle_type = matchedEquip.type.toLowerCase();
                         newAiFields.add('equipmentId');
                     }
                 }
@@ -444,6 +470,13 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
 
     const handleAddSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!formData.equipmentId) {
+            alert("Please select an asset.");
+            return;
+        }
+
+        console.log("Submitting Service Record with Data:", formData);
         onAdd(formData as any, attachedFiles, rawAiData);
         setIsModalOpen(false);
         resetForm();
@@ -452,8 +485,8 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
     const resetForm = () => {
         setFormData({
             woNumber: `SR-${Math.floor(Math.random() * 100000)}`,
-            status: WorkOrderStatus.COMPLETED,
-            priority: WorkOrderPriority.MEDIUM,
+            status: WorkOrderStatus.Completed,
+            priority: WorkOrderPriority.Normal,
             date: new Date().toISOString().split('T')[0],
             totalCost: 0,
             items: [],
@@ -463,8 +496,8 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
             equipmentId: '',
             notes: '',
             payer: 'Company',
-            odometer: '',
-            engineHours: ''
+            odometer: 0,
+            hours: 0
         });
         setAttachedFiles([]);
         setRawAiData(null);
@@ -478,8 +511,8 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
 
     const getStatusBadgeClass = (status: WorkOrderStatus) => {
         switch (status) {
-            case WorkOrderStatus.COMPLETED: return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-            case WorkOrderStatus.IN_PROGRESS: return 'bg-amber-100 text-amber-700 border-amber-200';
+            case WorkOrderStatus.Completed: return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+            case WorkOrderStatus.InProcess: return 'bg-amber-100 text-amber-700 border-amber-200';
             default: return 'bg-slate-100 text-slate-700 border-slate-200';
         }
     };
@@ -596,43 +629,55 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Asset Type *</label>
-                                            <div className="flex bg-slate-100 p-1 rounded-xl">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setAssetTypeFilter('truck')}
-                                                    className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${assetTypeFilter === 'truck' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
-                                                >Trucks</button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setAssetTypeFilter('trailer')}
-                                                    className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${assetTypeFilter === 'trailer' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
-                                                >Trailers</button>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                                                Select Asset * {aiPopulatedFields.has('equipmentId') && <AiBadge />}
-                                            </label>
-                                            <select required className="w-full px-5 py-5 bg-slate-50 border border-slate-200 rounded-[2rem] text-sm font-black text-slate-900 outline-none" value={formData.equipmentId} onChange={e => setFormData({ ...formData, equipmentId: e.target.value })}>
-                                                <option value="">{equipmentList.length === 0 ? "Loading Assets..." : "Select Asset..."}</option>
-                                                {equipmentList
-                                                    .filter(e => e.type.toLowerCase() === assetTypeFilter)
-                                                    .map(e => <option key={e.id} value={e.id}>{e.unitNumber} — {e.make} {e.model}</option>)
-                                                }
-                                            </select>
-                                            {equipmentList.filter(e => e.type.toLowerCase() === assetTypeFilter).length === 0 && equipmentList.length > 0 && (
-                                                <p className="text-[9px] text-amber-600 font-bold mt-1 ml-4 italic">No {assetTypeFilter}s found in fleet.</p>
-                                            )}
-                                        </div>
-                                    </div>
+                                    <VehicleSelector
+                                        selectedVehicleId={formData.equipmentId || ""}
+                                        selectedVehicleType={(formData as any).vehicle_type || ""}
+                                        equipment={equipmentList}
+                                        onVehicleSelect={(vehicleId: string, vehicleType: string) => {
+                                            console.log("Vehicle Selected:", vehicleId, vehicleType);
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                equipmentId: vehicleId,
+                                                vehicle_type: vehicleType
+                                            } as any));
+                                            setAiPopulatedFields(prev => {
+                                                const next = new Set(prev);
+                                                next.delete('equipmentId');
+                                                return next;
+                                            });
+                                        }}
+                                    />
                                     <div className="space-y-1.5 flex flex-col justify-end">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                                             Service Date * {aiPopulatedFields.has('date') && <AiBadge />}
                                         </label>
                                         <input type="date" required className="w-full px-5 py-5 bg-slate-50 border border-slate-200 rounded-[2rem] text-sm font-bold text-slate-900 outline-none" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
+                                    </div>
+
+                                    <div className="space-y-1.5 flex flex-col justify-end">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                                            Link Work Order (Optional)
+                                        </label>
+                                        <Select
+                                            value={formData.workOrderId || "none"}
+                                            onValueChange={(val) => setFormData(prev => ({ ...prev, workOrderId: val === "none" ? undefined : val }))}
+                                            disabled={!formData.equipmentId}
+                                        >
+                                            <SelectTrigger className="w-full px-5 py-8 bg-slate-50 border border-slate-200 rounded-[2rem] text-sm font-bold text-slate-900 outline-none ring-0 focus:ring-0">
+                                                <SelectValue placeholder={formData.equipmentId ? "Select Work Order..." : "Select Asset First"} />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-white border border-slate-100 rounded-xl shadow-xl z-[99999]">
+                                                <SelectItem value="none" className="font-medium text-slate-500">All / None</SelectItem>
+                                                {availableWorkOrders
+                                                    .filter(wo => wo.equipmentId === formData.equipmentId)
+                                                    .map(wo => (
+                                                        <SelectItem key={wo.id} value={wo.id} className="font-bold text-slate-700">
+                                                            {wo.workOrderNumber || "WO"} - {wo.title}
+                                                        </SelectItem>
+                                                    ))
+                                                }
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                 </div>
 
@@ -676,10 +721,10 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
                                         <div className="relative group">
                                             <Gauge className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
                                             <input
-                                                type="text"
+                                                type="number"
                                                 className="w-full pl-16 pr-16 py-5 bg-slate-50 border border-slate-200 rounded-[2rem] text-sm font-bold text-slate-900 outline-none"
-                                                value={formData.odometer}
-                                                onChange={e => setFormData({ ...formData, odometer: e.target.value })}
+                                                value={formData.odometer || ''}
+                                                onChange={e => setFormData({ ...formData, odometer: parseInt(e.target.value) || 0 })}
                                             />
                                         </div>
                                     </div>
@@ -688,10 +733,10 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
                                         <div className="relative group">
                                             <Clock className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
                                             <input
-                                                type="text"
+                                                type="number"
                                                 className="w-full pl-16 pr-16 py-5 bg-slate-50 border border-slate-200 rounded-[2rem] text-sm font-bold text-slate-900 outline-none"
-                                                value={formData.engineHours}
-                                                onChange={e => setFormData({ ...formData, engineHours: e.target.value })}
+                                                value={formData.hours ? formData.hours.toString() : ''}
+                                                onChange={e => setFormData({ ...formData, hours: parseInt(e.target.value) || 0 })}
                                             />
                                         </div>
                                     </div>
@@ -839,9 +884,9 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
                             )}
                         </div>
                     </div>
-                </div>
+                </div >
             )}
-        </div>
+        </div >
     );
 };
 

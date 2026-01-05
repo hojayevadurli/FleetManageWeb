@@ -6,18 +6,19 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Edit2, Check, X, Trash2 } from "lucide-react";
 
+export interface WorkOrderItemData {
+  description: string;
+  price: number;
+  quantity: number;
+}
+
 interface WorkOrderItemsProps {
-  items: string[];
-  onItemsChange: (items: string[]) => void;
+  items: WorkOrderItemData[];
+  onItemsChange: (items: WorkOrderItemData[]) => void;
 }
 
 const WorkOrderItems = ({ items, onItemsChange }: WorkOrderItemsProps) => {
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const [newItem, setNewItem] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
-
-  // Quick add buttons for common work items
+  // Quick add just appends a row with default values
   const quickAddItems = [
     "Full Inspection",
     "Oil Change",
@@ -27,195 +28,146 @@ const WorkOrderItems = ({ items, onItemsChange }: WorkOrderItemsProps) => {
     "Fluid Top-off"
   ];
 
-  const handleAddItem = (item: string) => {
-    if (item.trim() && !items.includes(item.trim())) {
-      onItemsChange([...items, item.trim()]);
+  const handleQuickAdd = (description: string) => {
+    onItemsChange([...items, { description, price: 0, quantity: 1 }]);
+  };
+
+  const handleUpdateItem = (index: number, field: keyof WorkOrderItemData, value: string | number) => {
+    const newItems = [...items];
+    const currentItem = newItems[index];
+
+    if (field === 'description') {
+      currentItem.description = value as string;
+    } else if (field === 'price') {
+      currentItem.price = parseFloat(value as string) || 0;
+    } else if (field === 'quantity') {
+      currentItem.quantity = parseFloat(value as string) || 0;
     }
-  };
 
-  const handleQuickAdd = (item: string) => {
-    handleAddItem(item);
-  };
-
-  const handleAddNewItem = () => {
-    if (newItem.trim()) {
-      handleAddItem(newItem);
-      setNewItem("");
-      setIsAdding(false);
-    }
-  };
-
-  const handleEditItem = (index: number) => {
-    setEditingIndex(index);
-    setEditValue(items[index]);
-  };
-
-  const handleSaveEdit = () => {
-    if (editValue.trim() && editingIndex !== null) {
-      const updatedItems = [...items];
-      updatedItems[editingIndex] = editValue.trim();
-      onItemsChange(updatedItems);
-      setEditingIndex(null);
-      setEditValue("");
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingIndex(null);
-    setEditValue("");
+    onItemsChange(newItems);
   };
 
   const handleDeleteItem = (index: number) => {
-    const updatedItems = items.filter((_, i) => i !== index);
-    onItemsChange(updatedItems);
+    onItemsChange(items.filter((_, i) => i !== index));
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
         <Label className="text-base font-semibold">Work Order Items</Label>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setIsAdding(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
-        </Button>
       </div>
 
-      {/* Quick Add Buttons */}
-      <div className="space-y-2">
-        <Label className="text-sm text-gray-600">Quick Add:</Label>
-        <div className="flex flex-wrap gap-2">
-          {quickAddItems.map((item) => (
-            <Button
-              key={item}
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-xs"
-              onClick={() => handleQuickAdd(item)}
-              disabled={items.includes(item)}
-            >
-              {item}
-            </Button>
-          ))}
-        </div>
+      {/* Quick Add Pills */}
+      <div className="flex flex-wrap gap-2">
+        {quickAddItems.map((item) => (
+          <Button
+            key={item}
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs rounded-full"
+            onClick={() => handleQuickAdd(item)}
+          >
+            + {item}
+          </Button>
+        ))}
       </div>
 
-      {/* Add New Item Input */}
-      {isAdding && (
-        <Card className="border-dashed">
-          <CardContent className="pt-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Enter work item..."
-                value={newItem}
-                onChange={(e) => setNewItem(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddNewItem()}
-                autoFocus
-              />
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleAddNewItem}
-                disabled={!newItem.trim()}
-              >
-                <Check className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setIsAdding(false);
-                  setNewItem("");
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <div className="border rounded-xl overflow-hidden bg-white shadow-sm">
+        <table className="w-full text-sm item-table">
+          <thead className="bg-slate-50 border-b border-slate-100">
+            <tr>
+              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest w-[40%]">Service Description</th>
+              <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-[15%]">Qty</th>
+              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-[20%]">Unit Price</th>
+              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-[20%]">Amount</th>
+              <th className="px-6 py-4 w-[5%]"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {items.map((item, index) => (
+              <tr key={index} className="group hover:bg-slate-50/50 transition-colors">
+                <td className="px-6 py-4">
+                  <Input
+                    value={item.description}
+                    onChange={(e) => handleUpdateItem(index, 'description', e.target.value)}
+                    className="border-transparent bg-transparent hover:bg-white focus:bg-white px-0 font-bold text-slate-900 placeholder:text-slate-300 transition-all"
+                    placeholder="Description"
+                  />
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={item.quantity}
+                    onChange={(e) => handleUpdateItem(index, 'quantity', e.target.value)}
+                    className="border-transparent bg-transparent hover:bg-white focus:bg-white px-0 text-center font-bold text-slate-700 h-8 w-20 mx-auto"
+                  />
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <div className="relative">
+                    <span className="absolute left-auto right-full mr-2 top-1.5 text-slate-400 text-xs">$</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.price || ''}
+                      onChange={(e) => handleUpdateItem(index, 'price', e.target.value)}
+                      className="border-transparent bg-transparent hover:bg-white focus:bg-white text-right font-mono font-bold text-slate-600 h-8 w-24 ml-auto"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-right font-mono font-black text-slate-900">
+                  ${((item.price || 0) * (item.quantity || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td className="px-4 py-4 text-right">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                    onClick={() => handleDeleteItem(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </td>
+              </tr>
+            ))}
 
-      {/* Work Items List */}
-      <div className="space-y-2">
-        {items.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="pt-6 pb-6">
-              <div className="text-center text-gray-500">
-                <p className="text-sm">No work items added yet</p>
-                <p className="text-xs mt-1">Use quick add buttons or add custom items</p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          items.map((item, index) => (
-            <Card key={index} className="hover:shadow-sm transition-shadow">
-              <CardContent className="pt-3 pb-3">
-                <div className="flex items-center justify-between">
-                  {editingIndex === index ? (
-                    <div className="flex-1 flex gap-2">
-                      <Input
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit()}
-                        className="flex-1"
-                        autoFocus
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleSaveEdit}
-                        disabled={!editValue.trim()}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCancelEdit}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <span className="text-sm font-medium">{item}</span>
-                      <div className="flex gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditItem(index)}
-                        >
-                          <Edit2 className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteItem(index)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
+            {/* Empty State / Add Row */}
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 text-xs italic">
+                  No items added. Use the quick add buttons above or click "Add Item" below.
+                </td>
+              </tr>
+            )}
+          </tbody>
+          <tfoot className="bg-slate-50/50 border-t border-slate-100">
+            <tr>
+              <td colSpan={5} className="px-2 py-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full justify-start text-slate-500 hover:text-blue-600 hover:bg-blue-50 py-6"
+                  onClick={() => onItemsChange([...items, { description: "New Item", quantity: 1, price: 0 }])}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Item
+                </Button>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
 
       {items.length > 0 && (
-        <div className="text-sm text-gray-600">
-          {items.length} work item{items.length !== 1 ? 's' : ''} added
+        <div className="flex justify-end gap-6 px-6 text-sm">
+          <div className="text-slate-500 uppercase font-bold text-[10px] tracking-widest py-1">Total Estimated Cost</div>
+          <div className="font-mono font-black text-lg text-slate-900">
+            ${items.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </div>
         </div>
       )}
     </div>

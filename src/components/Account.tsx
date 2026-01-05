@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -9,32 +9,73 @@ import UserManagementSection from "./account/UserManagementSection";
 import PreferencesSection from "./account/PreferencesSection";
 import AccountActionsSection from "./account/AccountActionsSection";
 import BillingSection from "./account/BillingSection";
+import { industriesApi, Industry } from "@/lib/industriesApi";
+
+import { tenantsApi } from "@/lib/tenantsApi";
 
 const Account = () => {
-  const [name, setName] = useState("John Doe");
-  const [email, setEmail] = useState("johndoe@email.com");
-  const [phone, setPhone] = useState("+1 (555) 123-4567");
-  const [companyName, setCompanyName] = useState("Fleet Management Co.");
+  const [name, setName] = useState(""); // Personal name logic might need separate handling if not in Tenant DTO
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [industryId, setIndustryId] = useState("");
+  const [industryName, setIndustryName] = useState("");
+  const [industries, setIndustries] = useState<Industry[]>([]);
+  const [industriesLoading, setIndustriesLoading] = useState(true);
   const [timeZone, setTimeZone] = useState("America/New_York");
   const [unitSystem, setUnitSystem] = useState("imperial");
-  
+
   // Motive integration settings
   const [motiveEnabled, setMotiveEnabled] = useState(false);
   const [motiveApiKey, setMotiveApiKey] = useState("");
   const [motiveBaseUrl, setMotiveBaseUrl] = useState("https://api.gomotive.com");
   const [motiveConnected, setMotiveConnected] = useState(false);
 
-  const handleSaveChanges = (e: React.FormEvent) => {
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [industriesData, tenantData] = await Promise.all([
+          industriesApi.list(),
+          tenantsApi.getCurrent()
+        ]);
+
+        setIndustries(industriesData);
+
+        if (tenantData) {
+          setCompanyName(tenantData.name);
+          setEmail(tenantData.email || "");
+          setPhone(tenantData.phone || "");
+          setIndustryId(tenantData.industryId?.toString() || "");
+          setIndustryName(tenantData.industryName || "");
+          // Note: "name" state is currently personal name, but TenantDto only has Company Name. 
+          // Keeping "John Doe" placeholder or leaving blank if not provided by another user-specific endpoint.
+          // If the user intends for Tenant Name to be the main display name, we'd map `setName(tenantData.name)`.
+          // For now, assuming Personal Name is separate (User entity) which isn't in this specific controller.
+        }
+      } catch (e) {
+        console.error("Failed to load account data", e);
+        toast.error("Failed to load account details");
+      } finally {
+        setIndustriesLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Saving changes:", { 
-      name, 
-      email, 
-      phone, 
-      companyName, 
-      timeZone, 
-      unitSystem 
-    });
-    toast.success("Account details updated successfully!");
+    try {
+      await tenantsApi.updateCurrent({
+        name: companyName,
+        industryId: parseInt(industryId) || 0,
+        email: email,
+        phone: phone
+      });
+      toast.success("Account details updated successfully!");
+    } catch (error) {
+      console.error("Failed to update tenant", error);
+      toast.error("Failed to save changes.");
+    }
   };
 
   return (
@@ -58,6 +99,7 @@ const Account = () => {
                 setPhone={setPhone}
                 companyName={companyName}
                 setCompanyName={setCompanyName}
+                industryName={industryName}
               />
 
               <BillingSection />

@@ -3,7 +3,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import api from "@/lib/Api";
+import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
+import { Equipment } from "@/lib/types";
 
 type VehicleType = "truck" | "trailer";
 
@@ -13,30 +14,10 @@ interface VehicleSelectorProps {
   onVehicleSelect: (vehicleId: string, vehicleType: VehicleType) => void;
 }
 
-type TruckDto = {
-  id: string;
-  number: string;
-  vin: string;
-  year?: number | null;
-  make?: string | null;
-  model?: string | null;
-  status?: string | null;
-};
-
-type TrailerDto = {
-  id: string;
-  number: string;
-  vin: string;
-  year?: number | null;
-  make?: string | null;
-  model?: string | null;
-  status?: string | null;
-};
-
 type Option = {
   id: string;
   label: string;
-  number: string;
+  unitNumber: string;
   status?: string | null;
 };
 
@@ -51,8 +32,7 @@ export default function VehicleSelector({
   onVehicleSelect,
 }: VehicleSelectorProps) {
   const [loading, setLoading] = useState(false);
-  const [trucks, setTrucks] = useState<TruckDto[]>([]);
-  const [trailers, setTrailers] = useState<TrailerDto[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
 
   const entity = (selectedVehicleType?.toLowerCase() === "trailer" ? "trailer" : "truck") as VehicleType;
 
@@ -60,14 +40,8 @@ export default function VehicleSelector({
     const load = async () => {
       try {
         setLoading(true);
-
-        const [tRes, trRes] = await Promise.all([
-          api.get<TruckDto[]>("/trucks"),
-          api.get<TrailerDto[]>("/trailers"),
-        ]);
-
-        setTrucks(tRes.data ?? []);
-        setTrailers(trRes.data ?? []);
+        const data = await equipmentApi.list();
+        setEquipment(data.map(mapDtoToEquipment));
       } catch (e) {
         console.error(e);
         toast.error("Failed to load equipment. Check API URL + auth token.");
@@ -80,40 +54,24 @@ export default function VehicleSelector({
   }, []);
 
   const options: Option[] = useMemo(() => {
-    if (entity === "truck") {
-      return (trucks ?? [])
-        .filter((t) => isActive(t.status))
-        .map((t) => ({
-          id: t.id,
-          number: t.number,
-          status: t.status ?? null,
-          label: [
-            `Truck • ${t.number}`,
-            t.year ? `${t.year}` : null,
-            t.make ? t.make : null,
-            t.model ? t.model : null,
-            `VIN ${t.vin}`,
-          ].filter(Boolean).join(" • "),
-        }))
-        .sort((a, b) => a.number.localeCompare(b.number));
-    }
+    const targetType = entity.toLowerCase(); // "truck" or "trailer"
 
-    return (trailers ?? [])
-      .filter((t) => isActive(t.status))
-      .map((t) => ({
-        id: t.id,
-        number: t.number,
-        status: t.status ?? null,
+    return equipment
+      .filter(e => isActive(e.status) && e.type?.toLowerCase() === targetType)
+      .map(e => ({
+        id: e.id,
+        unitNumber: e.unitNumber,
+        status: e.status,
         label: [
-          `Trailer • ${t.number}`,
-          t.year ? `${t.year}` : null,
-          t.make ? t.make : null,
-          t.model ? t.model : null,
-          `VIN ${t.vin}`,
+          `${entity === 'truck' ? 'Truck' : 'Trailer'} • ${e.unitNumber}`,
+          e.year ? `${e.year}` : null,
+          e.make ? e.make : null,
+          e.model ? e.model : null,
+          `VIN ${e.vin}`,
         ].filter(Boolean).join(" • "),
       }))
-      .sort((a, b) => a.number.localeCompare(b.number));
-  }, [entity, trucks, trailers]);
+      .sort((a, b) => a.unitNumber.localeCompare(b.unitNumber));
+  }, [entity, equipment]);
 
   return (
     <div className="space-y-4">

@@ -13,7 +13,7 @@ import {
   Clock,
   Activity
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+// import { supabase } from "@/integrations/supabase/client"; // Removed - using backend API
 import { useToast } from "@/hooks/use-toast";
 import SyncLogsTable from "./SyncLogsTable";
 

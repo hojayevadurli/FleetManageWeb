@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, X } from "lucide-react";
-import { WorkOrderDto } from "@/lib/workOrdersApi";
+import { WorkOrderDto } from "@/lib/types";
 
 type StatusFilter = "all" | WorkOrderDto["status"];
 
@@ -80,10 +80,10 @@ const WorkOrderFilters = ({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All statuses</SelectItem>
-          <SelectItem value="draft">Draft</SelectItem>
-          <SelectItem value="open">Open</SelectItem>
-          <SelectItem value="closed">Closed</SelectItem>
-          <SelectItem value="paid">Paid</SelectItem>
+          <SelectItem value="Draft">Draft</SelectItem>
+          <SelectItem value="Open">Open</SelectItem>
+          <SelectItem value="Closed">Closed</SelectItem>
+          <SelectItem value="Paid">Paid</SelectItem>
         </SelectContent>
       </Select>
     </div>

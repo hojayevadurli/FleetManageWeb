@@ -3,6 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Industry } from "@/lib/industriesApi";
 
 interface LoginFormProps {
   // existing
@@ -26,9 +28,18 @@ interface LoginFormProps {
   companyName?: string;
   setCompanyName?: (name: string) => void;
 
+  phoneNumber?: string;
+  setPhoneNumber?: (phone: string) => void;
+
   // Optional (nice UX): confirm password on sign-up
   confirmPassword?: string;
   setConfirmPassword?: (pwd: string) => void;
+
+  // Industry
+  industryId?: string;
+  setIndustryId?: (id: string) => void;
+  industries?: Industry[];
+  industriesLoading?: boolean;
 }
 
 export const LoginForm = ({
@@ -49,26 +60,60 @@ export const LoginForm = ({
   onForgotPasswordClick,
   companyName,
   setCompanyName,
+  phoneNumber,
+  setPhoneNumber,
   confirmPassword,
   setConfirmPassword,
+  industryId,
+  setIndustryId,
+  industries = [],
+  industriesLoading = false
 }: LoginFormProps) => {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {/* Company Name (sign-up only) */}
       {isSignUp && !isForgotPassword && setCompanyName && (
-        <div className="space-y-2">
-          <Label htmlFor="companyName">Company Name</Label>
-          <Input
-            id="companyName"
-            type="text"
-            placeholder="Acme Logistics"
-            value={companyName ?? ""}
-            onChange={(e) => setCompanyName(e.target.value)}
-            required={isSignUp}
-            className="h-11"
-            autoComplete="organization"
-          />
-        </div>
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="companyName">Company Name</Label>
+            <Input
+              id="companyName"
+              type="text"
+              placeholder="Acme Logistics"
+              value={companyName ?? ""}
+              onChange={(e) => setCompanyName(e.target.value)}
+              required={isSignUp}
+              className="h-11"
+              autoComplete="organization"
+            />
+          </div>
+
+          {/* Industry Selection */}
+          {setIndustryId && (
+            <div className="space-y-2">
+              <Label htmlFor="industry">Industry</Label>
+              <Select value={industryId} onValueChange={setIndustryId} disabled={industriesLoading}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder={industriesLoading ? "Loading industry options..." : "Select industry type"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {industries.length > 0 ? (
+                    industries.map((ind) => (
+                      <SelectItem key={ind.id} value={ind.id}>
+                        {ind.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="trucking">Trucking & Logistics</SelectItem>
+                      <SelectItem value="construction">Construction</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </>
       )}
 
       {/* Full Name (sign-up only) */}
@@ -102,6 +147,23 @@ export const LoginForm = ({
           autoComplete={isForgotPassword ? "email" : "username"}
         />
       </div>
+
+      {/* Phone Number (sign-up only) */}
+      {isSignUp && !isForgotPassword && setPhoneNumber && (
+        <div className="space-y-2">
+          <Label htmlFor="phoneNumber">Phone Number</Label>
+          <Input
+            id="phoneNumber"
+            type="tel"
+            placeholder="(555) 123-4567"
+            value={phoneNumber ?? ""}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            required={isSignUp}
+            className="h-11"
+            autoComplete="tel"
+          />
+        </div>
+      )}
 
       {/* Password (hidden for forgot) */}
       {!isForgotPassword && (
@@ -178,15 +240,15 @@ export const LoginForm = ({
       >
         {isLoading
           ? (isForgotPassword
-              ? "Sending reset email..."
-              : isSignUp
-                ? "Creating account..."
-                : "Signing in...")
+            ? "Sending reset email..."
+            : isSignUp
+              ? "Creating account..."
+              : "Signing in...")
           : (isForgotPassword
-              ? "Send Reset Email"
-              : isSignUp
-                ? "Create Account"
-                : "Sign In")}
+            ? "Send Reset Email"
+            : isSignUp
+              ? "Create Account"
+              : "Sign In")}
       </Button>
     </form>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -8,7 +9,10 @@ import WorkOrderList from "@/components/workorder/WorkOrderList";
 import CreateWorkOrderDialog from "@/components/workorder/CreateWorkOrderDialog";
 import EditWorkOrderDialog from "@/components/workorder/EditWorkOrderDialog";
 
-import { workOrdersApi, WorkOrderDto, WorkOrderUpsertDto } from "@/lib/workOrdersApi";
+import { WorkOrderDto, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
+import { workOrdersApi, WorkOrderUpsertDto } from "@/lib/workOrdersApi";
+import { equipmentApi } from "@/lib/equipmentApi";
+import { shopsApi } from "@/lib/shopsApi";
 
 // Use the SAME key your axios interceptor uses
 function useApiToken() {
@@ -25,9 +29,14 @@ type WorkOrderUpsertWithOptions = WorkOrderUpsertDto & {
 
 const WorkOrders = () => {
   const token = useApiToken();
+  const navigate = useNavigate();
 
   const [workOrders, setWorkOrders] = useState<WorkOrderDto[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Maps for displaying names
+  const [equipmentMap, setEquipmentMap] = useState<Record<string, string>>({});
+  const [vendorMap, setVendorMap] = useState<Record<string, string>>({});
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | WorkOrderDto["status"]>("all");
@@ -39,15 +48,37 @@ const WorkOrders = () => {
 
   useEffect(() => {
     if (!token) return;
-    fetchWorkOrders();
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const fetchWorkOrders = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      const data = await workOrdersApi.list({ page: 1, pageSize: 50 });
-      setWorkOrders(data);
+
+      const [woData, equipData, shopData] = await Promise.all([
+        workOrdersApi.list({ page: 1, pageSize: 50 }),
+        equipmentApi.list(),
+        shopsApi.list()
+      ]);
+
+      setWorkOrders(woData);
+
+      // Build Maps
+      const eMap: Record<string, string> = {};
+      equipData.forEach((e: any) => {
+        // unitNumber is the primary identifier users known
+        eMap[e.id] = e.unitNumber || e.name || "Unknown Asset";
+      });
+      setEquipmentMap(eMap);
+
+      const vMap: Record<string, string> = {};
+      shopData.forEach((s: any) => {
+        // standardized on 'id' and 'name' usually
+        vMap[s.id] = s.name || s.shopName || "Unknown Vendor";
+      });
+      setVendorMap(vMap);
+
     } catch (e: any) {
       console.error(e);
       toast.error("Failed to fetch work orders");
@@ -61,79 +92,82 @@ const WorkOrders = () => {
 
     // Status filter
     if (statusFilter !== "all") {
-      filtered = filtered.filter((w) => w.status === statusFilter);
+      filtered = filtered.filter((w) =>
+        (w.status || "").toLowerCase() === statusFilter.toLowerCase()
+      );
     }
 
     // Search
     if (searchTerm.trim()) {
       const s = searchTerm.trim().toLowerCase();
       filtered = filtered.filter((w) => {
-        const woNumber = (w.woNumber ?? "").toLowerCase();
-        const assetId = (w.assetId ?? "").toLowerCase();
-        const summary = (w.summary ?? "").toLowerCase();
+        const woNumber = (w.workOrderNumber ?? "").toLowerCase();
+        const equipmentId = (w.equipmentId ?? "").toLowerCase();
+        const title = (w.title ?? "").toLowerCase();
         const firstLine = (w.lines?.[0]?.description ?? "").toLowerCase();
+
+        // Check maps too for better search
+        const unitNumber = (equipmentMap[w.equipmentId] || "").toLowerCase();
+        const vendorName = (w.vendorId ? (vendorMap[w.vendorId] || "") : "").toLowerCase();
 
         return (
           woNumber.includes(s) ||
-          assetId.includes(s) ||
-          summary.includes(s) ||
+          equipmentId.includes(s) ||
+          unitNumber.includes(s) ||
+          vendorName.includes(s) ||
+          title.includes(s) ||
           firstLine.includes(s) ||
           w.id.toLowerCase().includes(s)
         );
       });
     }
 
-    // Sort newest service date first
+    // Sort newest opened date first
     filtered.sort((a, b) => {
-      const da = new Date(a.serviceDate).getTime();
-      const db = new Date(b.serviceDate).getTime();
+      const da = new Date(a.openedAt).getTime();
+      const db = new Date(b.openedAt).getTime();
       return db - da;
     });
 
     return filtered;
-  }, [workOrders, searchTerm, statusFilter]);
+  }, [workOrders, searchTerm, statusFilter, equipmentMap, vendorMap]);
 
   const updateWorkOrderStatus = async (id: string, status: WorkOrderDto["status"]) => {
     try {
       const wo = workOrders.find((w) => w.id === id);
       if (!wo) return;
 
-      const body: WorkOrderUpsertWithOptions = {
-        assetType: wo.assetType,
-        assetId: wo.assetId,
+      const body: WorkOrderUpsertDto = {
+        equipmentId: wo.equipmentId,
         vendorId: wo.vendorId ?? null,
-        woNumber: wo.woNumber ?? null,
-        odometer: wo.odometer ?? null,
-        serviceDate: wo.serviceDate,
-        summary: wo.summary ?? null,
-
-        // server recalculates
-        totalAmount: 0,
-        taxAmount: wo.taxAmount ?? 0,
-
-        status,
+        workOrderNumber: wo.workOrderNumber ?? null,
+        odometerAtService: wo.odometerAtService ?? null,
+        openedAt: wo.openedAt,
+        closedAt: wo.closedAt ?? null,
+        title: wo.title,
+        complaint: wo.complaint,
+        diagnosis: wo.diagnosis ?? null,
+        resolution: wo.resolution ?? null,
+        notes: wo.notes ?? null,
+        status: (WorkOrderStatus as any)[status] ?? (typeof status === 'number' ? status : WorkOrderStatus.Open),
+        priority: (WorkOrderPriority as any)[wo.priority] ?? (typeof wo.priority === 'number' ? wo.priority : WorkOrderPriority.Normal),
+        costSource: (WorkOrderCostSource as any)[wo.costSource] ?? (typeof wo.costSource === 'number' ? wo.costSource : WorkOrderCostSource.Estimated),
+        estimatedTotal: wo.estimatedTotal,
+        manualActualTotal: wo.manualActualTotal,
         lines: (wo.lines ?? []).map((l) => ({
-          id: l.id,
           type: l.type,
           description: l.description,
           qty: l.qty,
           unitPrice: l.unitPrice,
-          amount: 0,
           partNumber: l.partNumber ?? null
         })),
-
-        /**
-         * ✅ IMPORTANT:
-         * If your backend supports "replaceDocuments", keep it false so attachments don't change.
-         * Also keep documentIds empty to satisfy DTO shape (if it's required in TS).
-         */
         replaceDocuments: false,
         documentIds: []
       };
 
       await workOrdersApi.update(id, body);
       toast.success("Work order status updated");
-      await fetchWorkOrders();
+      await loadData(); // refresh all
     } catch (e) {
       console.error(e);
       toast.error("Failed to update work order status");
@@ -179,24 +213,18 @@ const WorkOrders = () => {
         </Button>
       </div>
 
-      {/* ✅ Create dialog now handles:
-          - create draft (when Upload Files clicked)
-          - upload attachments to /workorders/{id}/attachments
-          - finalize draft on Create Work Order
-          So parent only needs to refresh list after success.
-      */}
       <CreateWorkOrderDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         initialCompanyName={"Fleet Company"}
-        onAfterCreated={fetchWorkOrders}
+        onAfterCreated={loadData}
       />
 
       <EditWorkOrderDialog
         workOrder={selectedWorkOrder}
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
-        onWorkOrderUpdated={fetchWorkOrders}
+        onWorkOrderUpdated={loadData}
       />
 
       <WorkOrderFilters
@@ -208,12 +236,14 @@ const WorkOrders = () => {
 
       <WorkOrderList
         workOrders={filteredOrders}
+        equipmentMap={equipmentMap}
+        vendorMap={vendorMap}
         onEditWorkOrder={handleEditWorkOrder}
         onUpdateStatus={updateWorkOrderStatus}
         onCreateClick={() => setIsCreateDialogOpen(true)}
+        onViewDetails={(id) => navigate(`/app/maintenance/service-history/${id}`)}
       />
     </div>
   );
 };
-
 export default WorkOrders;

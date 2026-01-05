@@ -20,7 +20,7 @@ import {
     Activity,
     Award
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+// import { supabase } from "@/integrations/supabase/client"; // Removed - using backend API
 import { Shop } from '@/components/shops/types/ShopTypes';
 import { useToast } from '@/hooks/use-toast';
 

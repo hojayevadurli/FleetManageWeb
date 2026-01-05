@@ -13,7 +13,7 @@ import {
   Filter,
   Locate
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+// import { supabase } from "@/integrations/supabase/client"; // Removed - using backend API
 import { Shop } from "./types/ShopTypes";
 import { Loader } from "@googlemaps/js-api-loader";
 
