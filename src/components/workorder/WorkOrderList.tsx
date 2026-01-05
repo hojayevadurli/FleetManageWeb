@@ -11,14 +11,16 @@ import {
   Edit,
   MoreVertical
 } from "lucide-react";
-import { WorkOrderDto } from "@/lib/workOrdersApi";
+import { WorkOrderDto } from "@/lib/types";
 
 interface WorkOrderListProps {
   workOrders: WorkOrderDto[];
+  equipmentMap?: Record<string, string>; // ID -> Unit Number
+  vendorMap?: Record<string, string>;    // ID -> Vendor Name
   onEditWorkOrder: (workOrder: WorkOrderDto) => void;
   onUpdateStatus: (id: string, status: WorkOrderDto["status"]) => void;
   onCreateClick: () => void;
-  onViewDetails?: (id: string) => void; // optional (for routing later)
+  onViewDetails?: (id: string) => void;
 }
 
 const formatMoney = (n: number) =>
@@ -26,8 +28,9 @@ const formatMoney = (n: number) =>
 
 const formatShortId = (id: string) => id.slice(0, 8).toUpperCase();
 
-const statusBadgeClass = (status: WorkOrderDto["status"]) => {
-  switch (status) {
+const statusBadgeClass = (status: string) => {
+  const s = status.toLowerCase();
+  switch (s) {
     case "draft":
       return "bg-gray-100 text-gray-800";
     case "open":
@@ -41,23 +44,14 @@ const statusBadgeClass = (status: WorkOrderDto["status"]) => {
   }
 };
 
-const statusLabel = (status: WorkOrderDto["status"]) => {
-  switch (status) {
-    case "draft":
-      return "Draft";
-    case "open":
-      return "Open";
-    case "closed":
-      return "Closed";
-    case "paid":
-      return "Paid";
-    default:
-      return status;
-  }
+const statusLabel = (status: string) => {
+  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 };
 
 const WorkOrderList = ({
   workOrders,
+  equipmentMap = {},
+  vendorMap = {},
   onEditWorkOrder,
   onUpdateStatus,
   onCreateClick,
@@ -84,25 +78,39 @@ const WorkOrderList = ({
   return (
     <div className="space-y-4">
       {workOrders.map((wo) => {
-        const title = wo.lines?.[0]?.description || wo.summary || "Work Order";
-        const woNumber = wo.woNumber ?? formatShortId(wo.id);
-        const assetLabel = `${wo.assetType.toUpperCase()} • ${wo.assetId}`;
-        const serviceDate = wo.serviceDate ? new Date(wo.serviceDate).toLocaleDateString() : "-";
+        const title = wo.title || "Work Order";
+        const woNumber = wo.workOrderNumber ?? formatShortId(wo.id);
+
+        // Lookup Unit Number
+        const unitNumber = equipmentMap[wo.equipmentId] || wo.equipmentId.slice(0, 8).toUpperCase();
+
+        // Lookup Vendor Name
+        const vendorName = wo.vendorId ? (vendorMap[wo.vendorId] || "Unknown Vendor") : "In-House / No Vendor";
+
+        const serviceDate = wo.openedAt ? new Date(wo.openedAt).toLocaleDateString() : "-";
 
         return (
           <Card key={wo.id} className="hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
                 <div className="min-w-0">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Wrench className="h-5 w-5 text-blue-600" />
-                    {woNumber}
-                  </CardTitle>
-                  <CardDescription className="truncate">{title}</CardDescription>
-
-                  <div className="text-sm text-gray-500 mt-1 truncate">
-                    {assetLabel}
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="bg-blue-50 p-2 rounded-lg">
+                      <Truck className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900 leading-none">{woNumber}</h3>
+                      <span className="text-xs text-slate-400 font-mono">{unitNumber}</span>
+                    </div>
                   </div>
+
+                  <CardDescription className="truncate mt-2 font-medium text-slate-600">
+                    {vendorName}
+                  </CardDescription>
+
+                  <p className="text-xs text-gray-400 mt-1 truncate max-w-md">
+                    {title}
+                  </p>
                 </div>
 
                 <div className="flex gap-2 items-center">
@@ -141,19 +149,19 @@ const WorkOrderList = ({
 
             <CardContent>
               <div className="space-y-4">
-                {wo.summary && (
+                {wo.notes && (
                   <div className="text-gray-600 whitespace-pre-line text-sm">
-                    {wo.summary}
+                    {wo.notes}
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
                   <div className="flex items-center gap-2">
-                    <Truck className="h-4 w-4 text-gray-400" />
+                    <Wrench className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Asset</p>
-                      <p className="font-semibold">
-                        {wo.assetType.charAt(0).toUpperCase() + wo.assetType.slice(1)}
+                      <p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Priority</p>
+                      <p className="font-semibold text-sm capitalize">
+                        {wo.priority}
                       </p>
                     </div>
                   </div>
@@ -161,21 +169,21 @@ const WorkOrderList = ({
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Service Date</p>
-                      <p className="font-semibold">{serviceDate}</p>
+                      <p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Service Date</p>
+                      <p className="font-semibold text-sm">{serviceDate}</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Total</p>
-                      <p className="font-semibold">{formatMoney(wo.totalAmount)}</p>
+                      <p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Total Cost</p>
+                      <p className="font-semibold text-sm text-slate-900">{formatMoney(wo.manualActualTotal || wo.estimatedTotal)}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2 flex-wrap pt-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -193,21 +201,11 @@ const WorkOrderList = ({
                     Edit
                   </Button>
 
-                  {wo.status !== "paid" && (
+                  {wo.status.toLowerCase() !== "closed" && (
                     <Button
                       size="sm"
-                      className="bg-purple-600 hover:bg-purple-700"
-                      onClick={() => onUpdateStatus(wo.id, "paid")}
-                    >
-                      Mark Paid
-                    </Button>
-                  )}
-
-                  {wo.status !== "closed" && (
-                    <Button
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700"
-                      onClick={() => onUpdateStatus(wo.id, "closed")}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => onUpdateStatus(wo.id, "Closed")}
                     >
                       Close WO
                     </Button>

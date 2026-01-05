@@ -1,31 +1,48 @@
-
 export enum EquipmentStatus {
   ACTIVE = 'active',
   IN_SHOP = 'in shop',
-  OUT_OF_SERVICE = 'out of service'
+  OUT_OF_SERVICE = 'out of service',
+  SOLD = 'sold',
+  ARCHIVED = 'archived'
 }
 
-export enum EquipmentType {
-  TRUCK = 'truck',
-  TRAILER = 'trailer'
+export enum EquipmentLifecycleStatus {
+  Active = 1,
+  Retired = 2,
+  Sold = 3
 }
+
+export enum EquipmentOperationalStatus {
+  Available = 1,
+  InShop = 2,
+  OutOfService = 3,
+  OnRoad = 4
+}
+
+// 63+ types supported now
+export type EquipmentType = string;
 
 export enum WorkOrderStatus {
-  OPEN = 'Open',
-  SENT_TO_SHOP = 'Sent to Shop',
-  QUOTE_RECEIVED = 'Quote Received',
-  APPROVED = 'Approved',
-  IN_PROGRESS = 'In Progress',
-  COMPLETED = 'Completed',
-  ON_HOLD = 'On Hold',
-  CANCELLED = 'Cancelled'
+  Draft = 0,
+  Open = 1,
+  InProcess = 2,
+  Completed = 3,
+  Closed = 4,
+  Cancelled = 5,
+  Paid = 6
 }
 
 export enum WorkOrderPriority {
-  CRITICAL = 'Critical',
-  HIGH = 'High',
-  MEDIUM = 'Medium',
-  LOW = 'Low'
+  Low = 0,
+  Normal = 1,
+  High = 2,
+  Critical = 3
+}
+
+export enum WorkOrderCostSource {
+  Estimated = 0,
+  Manual = 1,
+  Invoiced = 2
 }
 
 export enum VendorStatus {
@@ -50,6 +67,7 @@ export interface WorkOrderItem {
   unitPrice?: number;
   cost?: number;
   type?: 'parts' | 'labor' | 'fee' | 'tax' | 'discount';
+  partNumber?: string;
 }
 
 export interface VendorReview {
@@ -102,53 +120,203 @@ export interface Vendor {
 export interface Equipment {
   id: string;
   unitNumber: string;
-  type: EquipmentType;
+  type: EquipmentType; // "Truck", "Trailer", "Forklift", etc.
+  make?: string;
+  model?: string;
+  year?: number;
+  vin?: string;
+  serialNumber?: string;
+  licensePlate?: string;
+  status: EquipmentStatus;
+  lastServiceDate?: string;
+  acquiredDate?: string;
+  inServiceDate?: string;
+  outOfServiceDate?: string;
+
+  // Common optional specs
+  mileage?: number;
+  engineType?: string;
+  fuelType?: string;
+  length?: number;
+  weightCapacity?: number;
+  purchasedAt?: string;
+  notes?: string;
+
+  // Flexible bag for extra properties if needed
+  specs?: Record<string, string | number | boolean>;
+
+  // Department/Industry links
+  fleetCategoryId?: number;
+  fleetCategoryName?: string;
+  equipmentTypeId?: string;
+  equipmentTypeName?: string;
+}
+
+// Backend DTO structure
+export interface EquipmentDto {
+  id: string;
+  equipmentTypeId: string;
+  equipmentTypeName: string;
+  equipmentTypeCode: string;
+  fleetCategoryId: number;
+  fleetCategoryName: string;
+  unitNumber: string;
+  displayName: string;
+  vin: string;
+  serialNumber: string;
   make: string;
   model: string;
   year: number;
-  vin: string;
-  licensePlate: string; // Map to PlateNumber in C# Truck
-  status: EquipmentStatus;
-  lastServiceDate: string;
+  plateNumber: string;
+  lifecycleStatus: EquipmentLifecycleStatus;
+  operationalStatus: EquipmentOperationalStatus;
+  odometerCurrent: number;
+  hoursCurrent: number;
+  acquiredDate: string;
+  inServiceDate: string;
+  outOfServiceDate: string;
+  notes: string;
+  recalls: any[]; // Define clearer recall type later if needed
+}
 
-  // Truck specific (C#)
-  mileage?: number;
-  engineType?: string;
-
-  // Trailer specific (C#)
-  trailerType?: string; // Map to Type in C# Trailer
-  length?: number;
-  weightCapacity?: number;
-
-  purchasedAt?: string;
+export interface EquipmentTypeDto {
+  id: number;
+  industryId: number;
+  fleetCategoryId?: number;
+  name: string;
+  code: string;
+  meterMode: string; // "odometer", "hours", "both"
+  hasVin: boolean;
+  hasSerial: boolean;
+  isActive: boolean;
 }
 
 export interface WorkOrder {
   id: string;
   woNumber: string;
   equipmentId: string;
+  vendorId?: string | null;
   status: WorkOrderStatus;
   priority: WorkOrderPriority;
-  date: string;
+  date: string; // Map from OpenedAt
+  closedAt?: string;
   technician: string;
-  totalCost: number;
+  totalCost: number; // Estimated or Manual
   partsCost: number;
   laborCost: number;
-  description: string;
-  vendor: string;
+  title: string;
+  complaint: string;
+  diagnosis?: string;
+  resolution?: string;
+  notes?: string;
+  costSource: WorkOrderCostSource;
+  estimatedTotal: number;
+  manualActualTotal: number;
+  description: string; // Shared field if needed
+  vendor?: string;
   vendorAddress?: string;
   items: WorkOrderItem[];
-  notes?: string;
-  eta?: string;
   media?: WorkOrderMedia[];
-  payer?: 'Company' | 'Drivers/Contractors' | 'Others';
-  isRoadside?: boolean;
-  location?: string;
-  driverPhone?: string;
-  shareToken?: string;
-  quoteSubmittedAt?: string;
-  odometer?: string;
-  engineHours?: string;
+  odometer?: number;
+  hours?: number;
+  payer?: string;
+}
+
+export interface ServiceHistoryLine {
+  id: string;
+  serviceHistoryId: string;
+  type: string; // part/labor/fee/misc
+  description: string;
+  qty: number;
+  unitPrice: number;
+  amount: number;
+  partNumber?: string;
+}
+
+export interface ServiceHistory {
+  id: string;
+  equipmentId: string;
+  workOrderId?: string;
+  vendorId?: string;
+  vendorNameRaw?: string;
+  invoiceNumber?: string;
+  invoiceDate?: string;
+  odometer?: number;
+  totalAmount: number;
+  taxAmount: number;
+  summary?: string;
+  category: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  lines: ServiceHistoryLine[];
+}
+
+export interface ServiceHistoryUpsertDto {
+  equipmentId: string;
+  workOrderId?: string;
+  vendorId?: string | null;
+  vendorNameRaw?: string | null;
+  invoiceNumber?: string | null;
+  invoiceDate?: string | null;
+  odometer?: number | null;
+  totalAmount: number;
+  taxAmount: number;
+  summary?: string | null;
+  category: string;
+  status: string;
+  lines: {
+    type: string;
+    description: string;
+    qty: number;
+    unitPrice: number;
+    amount: number;
+    partNumber?: string | null;
+  }[];
+}
+
+export interface WorkOrderLineDto {
+  id: string;
+  type: string;
+  description: string;
+  qty: number;
+  unitPrice: number;
+  amount: number;
+  partNumber?: string;
+}
+
+export interface WorkOrderDocumentDto {
+  id: string;
+  fileUrl: string;
+  fileType: string;
+  docKind: string;
+  status: string;
+  confidenceScore?: number;
+  createdAt: string;
+}
+
+export interface WorkOrderDto {
+  id: string;
+  isDeleted: boolean;
+  deletedAt?: string;
+  equipmentId: string;
+  vendorId?: string;
+  workOrderNumber?: string;
+  odometerAtService?: number;
+  openedAt: string;
+  closedAt?: string;
+  title: string;
+  complaint: string;
+  diagnosis?: string;
+  resolution?: string;
+  notes?: string;
+  estimatedTotal: number;
+  manualActualTotal: number;
+  status: string;
+  priority: string;
+  costSource: string;
+  lines: WorkOrderLineDto[];
+  documents: WorkOrderDocumentDto[];
 }
 
 export interface ChatMessage {

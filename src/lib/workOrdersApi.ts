@@ -4,72 +4,41 @@ import api from "@/lib/Api";
  * DTOs that match your .NET API
  */
 
-export type WorkOrderStatus = "draft" | "open" | "closed" | "paid";
+import { WorkOrderDto, WorkOrderLineDto, WorkOrderDocumentDto, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
+
 export type AssetType = "truck" | "trailer";
 export type WorkOrderLineType = "part" | "labor" | "fee" | "misc";
 
-export interface WorkOrderLineDto {
-  id?: string;
-  type: WorkOrderLineType;
-  description: string;
-  qty: number;
-  unitPrice: number;
-  amount: number; // backend will recalc; safe to send 0 from UI
-  partNumber?: string | null;
-}
-
-export interface WorkOrderDocumentDto {
-  id: string;
-  fileUrl: string;
-  fileType: string;
-  docKind: string;
-  status: string;
-  confidenceScore?: number | null;
-  createdAt: string;
-}
-
-export interface WorkOrderDto {
-  id: string;
-  assetType: AssetType;
-  assetId: string;
-  vendorId?: string | null;
-  woNumber?: string | null;
-  odometer?: number | null;
-  serviceDate: string; // ISO string
-  summary?: string | null;
-  totalAmount: number;
-  taxAmount: number;
-  status: WorkOrderStatus;
-  lines: WorkOrderLineDto[];
-  documents: WorkOrderDocumentDto[];
-
-  // Optional: if you later include these from backend, UI can consume them
-  deletedStatus?: number;
-  deletedAt?: string | null;
-}
-
 /**
- * IMPORTANT:
- * - documentIds is optional
- * - replaceDocuments controls whether documentIds should overwrite existing attachments
+ * Match CreateWorkOrderDto / UpdateWorkOrderDto
  */
 export interface WorkOrderUpsertDto {
-  assetType: AssetType;
-  assetId: string;
+  equipmentId: string;
   vendorId?: string | null;
-  woNumber?: string | null;
-  odometer?: number | null;
-  serviceDate: string; // ISO string
-  summary?: string | null;
-
-  totalAmount: number;
-  taxAmount: number;
-
+  workOrderNumber?: string | null;
+  odometerAtService?: number | null;
+  hoursAtService?: number | null;
+  openedAt: string; // ISO string
+  closedAt?: string | null;
+  title: string;
+  complaint: string;
+  diagnosis?: string | null;
+  resolution?: string | null;
+  notes?: string | null;
   status: WorkOrderStatus;
-  lines: WorkOrderLineDto[];
-
+  priority: WorkOrderPriority;
+  costSource: WorkOrderCostSource;
+  estimatedTotal: number;
+  manualActualTotal: number;
+  lines: {
+    type: string;
+    description: string;
+    qty: number;
+    unitPrice: number;
+    partNumber?: string | null;
+  }[];
   replaceDocuments?: boolean;
-  documentIds?: string[]; // undefined => don't touch attachments
+  documentIds?: string[];
 }
 
 /**
@@ -77,21 +46,19 @@ export interface WorkOrderUpsertDto {
  * POST /api/workorders/from-document/{documentId}
  */
 export interface CreateWorkOrderFromDocumentDto {
-  assetType: AssetType;
-  assetId: string;
+  equipmentId: string;
   vendorId?: string | null;
   odometer?: number | null;
-  serviceDate?: string | null; // optional override (ISO)
-  summary?: string | null; // optional override
-  confirmDocument?: boolean; // default true on backend (if you implemented)
+  serviceDate?: string | null;
+  summary?: string | null;
+  confirmDocument?: boolean;
 }
 
 /**
  * Query params for listing
  */
 export interface WorkOrderListParams {
-  assetType?: AssetType;
-  assetId?: string;
+  equipmentId?: string;
   page?: number;
   pageSize?: number;
 }
@@ -168,35 +135,25 @@ export const workOrdersApi = {
    * IMPORTANT: calls create() so ID is guaranteed even if backend returns Location header / no body.
    */
   createDraft: async (args: {
-    assetType: AssetType;
-    assetId: string;
-    summary?: string;
-    serviceDate?: string; // ISO
+    equipmentId: string;
+    title?: string;
+    openedAt?: string; // ISO
   }): Promise<WorkOrderDto> => {
     const dto: WorkOrderUpsertDto = {
-      assetType: args.assetType,
-      assetId: args.assetId,
+      equipmentId: args.equipmentId,
       vendorId: null,
-      woNumber: null,
-      odometer: null,
-      serviceDate: args.serviceDate ?? new Date().toISOString(),
-      summary: args.summary ?? "Draft",
-      totalAmount: 0,
-      taxAmount: 0,
-      status: "draft",
-      lines: [
-        {
-          type: "misc",
-          description: "Draft",
-          qty: 1,
-          unitPrice: 0,
-          amount: 0,
-          partNumber: null
-        }
-      ]
+      workOrderNumber: null,
+      odometerAtService: null,
+      openedAt: args.openedAt ?? new Date().toISOString(),
+      title: args.title ?? "Draft",
+      complaint: "Draft created for attachments",
+      status: WorkOrderStatus.Draft,
+      priority: WorkOrderPriority.Medium,
+      costSource: WorkOrderCostSource.Estimated,
+      estimatedTotal: 0,
+      manualActualTotal: 0,
+      lines: []
     };
-
-    // 🔥 reuse create() so we never lose the ID
     return await workOrdersApi.create(dto);
   },
 

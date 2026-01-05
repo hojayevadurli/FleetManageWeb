@@ -1,16 +1,16 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import AnalyticsDashboard from "@/components/dashboard/AnalyticsDashboard";
-import { equipmentApi } from "@/lib/equipmentApi";
+import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
 import { workOrdersApi } from "@/lib/workOrdersApi";
-import { serviceHistoryApi, ServiceHistoryDto } from "@/lib/serviceHistoryApi";
-import { Equipment, WorkOrder, EquipmentStatus, EquipmentType, WorkOrderStatus } from "@/lib/types";
+import { serviceHistoryApi } from "@/lib/serviceHistoryApi";
+import { Equipment, WorkOrder, EquipmentStatus, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource, ServiceHistory } from "@/lib/types";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [serviceRecords, setServiceRecords] = useState<ServiceHistoryDto[]>([]);
+  const [serviceRecords, setServiceRecords] = useState<ServiceHistory[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async (isSilent = false) => {
@@ -22,36 +22,32 @@ const Dashboard = () => {
         serviceHistoryApi.list()
       ]);
 
-      // Map EquipmentOption to Equipment
-      const mappedEquipment: Equipment[] = equipData.map(e => ({
-        id: e.id,
-        unitNumber: e.number,
-        type: e.type === 'truck' ? EquipmentType.TRUCK : EquipmentType.TRAILER,
-        make: e.make || 'Unknown',
-        model: e.model || 'Unknown',
-        year: e.year || new Date().getFullYear(),
-        vin: e.vin,
-        licensePlate: '',
-        status: (e.status as EquipmentStatus) || EquipmentStatus.ACTIVE,
-        lastServiceDate: new Date().toISOString()
-      }));
+      // Map EquipmentDto to Equipment
+      const mappedEquipment: Equipment[] = equipData.map(mapDtoToEquipment);
 
       // Map WorkOrderDto to WorkOrder
       const mappedWorkOrders: WorkOrder[] = woData.map(wo => ({
         id: wo.id,
-        woNumber: wo.woNumber || 'Draft',
-        equipmentId: wo.assetId,
-        status: (wo.status as unknown as WorkOrderStatus) || WorkOrderStatus.OPEN,
-        priority: 'Medium' as any,
-        date: wo.serviceDate,
+        woNumber: wo.workOrderNumber || 'Draft',
+        equipmentId: wo.equipmentId,
+        status: (WorkOrderStatus as any)[wo.status] ?? WorkOrderStatus.Open,
+        priority: (WorkOrderPriority as any)[wo.priority] ?? WorkOrderPriority.Normal,
+        date: wo.openedAt,
         technician: 'Unknown',
-        totalCost: wo.totalAmount,
+        totalCost: wo.manualActualTotal || wo.estimatedTotal,
         partsCost: 0,
         laborCost: 0,
-        description: wo.summary || '',
+        title: wo.title,
+        complaint: wo.complaint,
+        diagnosis: wo.diagnosis || '',
+        resolution: wo.resolution || '',
+        costSource: (WorkOrderCostSource as any)[wo.costSource] ?? WorkOrderCostSource.Estimated,
+        estimatedTotal: wo.estimatedTotal,
+        manualActualTotal: wo.manualActualTotal,
+        description: wo.notes || '',
         vendor: '',
         items: [],
-        isRoadside: (wo as any).isRoadside
+        media: []
       }));
 
       setEquipment(mappedEquipment);

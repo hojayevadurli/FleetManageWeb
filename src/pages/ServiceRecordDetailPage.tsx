@@ -147,14 +147,31 @@ const ServiceRecordDetailPage = () => {
         );
     }
 
-    const linesSum = record.lines?.reduce((acc, line) => acc + (line.amount || 0), 0) || 0;
-    const subtotal = linesSum > 0 ? linesSum : (record.totalAmount || 0) - (record.taxAmount || 0);
+    // Filter out summary lines that AI catchers might have included (duplicates)
+    const invalidTerms = ['subtotal', 'total', 'taxable', 'non-taxable', 'amount due', 'balance due', 'liability'];
+    const validLines = record.lines?.filter(l => {
+        const desc = (l.description || '').toLowerCase();
+        // Allow "Taxable" if it's "Taxable Parts" or clearly a category, but "Non-taxable" is usually a summary
+        // Actually, "Taxable" line in screenshot was $44.80 which was sum of parts + fee. So it IS a summary.
+        return !invalidTerms.some(term => desc === term || desc.startsWith(term + ' '));
+    }) || [];
 
-    // Logic: If line items exist, use their sum + tax as the total. 
-    // This prevents discrepancies where the header total doesn't match the table.
-    const displayedTotal = linesSum > 0
-        ? (linesSum + (record.taxAmount || 0))
-        : (record.totalAmount || record.total || (subtotal + (record.taxAmount || 0)));
+    const taxTypes = ['tax', 'taxes', 'fee', 'fees'];
+    const taxLines = validLines.filter(l => taxTypes.includes((l.type || '').toLowerCase()));
+    const serviceLines = validLines.filter(l => !taxTypes.includes((l.type || '').toLowerCase()));
+
+    const taxLinesSum = taxLines.reduce((acc, l) => acc + (l.amount || 0), 0);
+    const serviceLinesSum = serviceLines.reduce((acc, l) => acc + (l.amount || 0), 0);
+    const totalLinesSum = taxLinesSum + serviceLinesSum;
+
+    // Use lines if we have any, otherwise fall back to record totals
+    const hasLines = totalLinesSum > 0 || validLines.length > 0;
+
+    const displayedSubtotal = hasLines ? serviceLinesSum : ((record.totalAmount || 0) - (record.taxAmount || 0));
+    const displayedTax = hasLines ? taxLinesSum : (record.taxAmount || 0);
+    const displayedTotal = hasLines ? totalLinesSum : (record.totalAmount || 0);
+
+
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] pb-20">
@@ -264,7 +281,7 @@ const ServiceRecordDetailPage = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {record.lines?.map((line, idx) => (
+                                    {validLines.map((line, idx) => (
                                         <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
                                             <td className="px-10 py-8">
                                                 <div className="font-black text-slate-900 text-sm tracking-tight">{line.description}</div>
@@ -275,7 +292,7 @@ const ServiceRecordDetailPage = () => {
                                             <td className="px-10 py-8 text-right font-mono font-black text-slate-900 text-sm">${line.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                         </tr>
                                     ))}
-                                    {(!record.lines || record.lines.length === 0) && (
+                                    {(!validLines || validLines.length === 0) && (
                                         <tr>
                                             <td className="px-10 py-10" colSpan={4}>
                                                 <div className="text-sm font-bold text-slate-400 italic">No itemized lines extracted. Check raw summary below.</div>
@@ -284,13 +301,10 @@ const ServiceRecordDetailPage = () => {
                                     )}
                                 </tbody>
                                 <tfoot>
-                                    <tr className="bg-slate-50/50">
-                                        <td colSpan={3} className="px-10 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal</td>
-                                        <td className="px-10 py-6 text-right font-mono font-black text-slate-900 text-sm">${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                    </tr>
+
                                     <tr className="bg-slate-50/50">
                                         <td colSpan={3} className="px-10 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Taxes & Fees</td>
-                                        <td className="px-10 py-6 text-right font-mono font-black text-rose-600 text-sm">${(record.taxAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                        <td className="px-10 py-6 text-right font-mono font-black text-rose-600 text-sm">${displayedTax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                     </tr>
                                     <tr className="bg-slate-50">
                                         <td colSpan={3} className="px-10 py-8 text-right text-xs font-black text-slate-900 uppercase tracking-widest">Total Liability</td>

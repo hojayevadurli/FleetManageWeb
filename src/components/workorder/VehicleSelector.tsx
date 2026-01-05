@@ -1,154 +1,118 @@
 import { useState, useEffect, useMemo } from "react";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Truck, RectangleHorizontal } from "lucide-react";
+import { Truck } from "lucide-react";
 import { toast } from "sonner";
-import api from "@/lib/api";
-
-type VehicleType = "truck" | "trailer";
-
-type TruckDto = {
-  id: string;
-  number: string;
-  vin: string;
-  year?: number | null;
-  make?: string | null;
-  model?: string | null;
-  status?: string | null;
-};
-
-type TrailerDto = {
-  id: string;
-  number: string;
-  vin: string;
-  year?: number | null;
-  make?: string | null;
-  model?: string | null;
-  status?: string | null;
-};
-
-type Option = {
-  id: string;          // GUID
-  type: VehicleType;
-  number: string;
-  vin: string;
-  year?: number | null;
-  make?: string | null;
-  model?: string | null;
-  status?: string | null;
-};
+import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
+import { Equipment, EquipmentStatus } from "@/lib/types";
 
 interface VehicleSelectorProps {
-  selectedVehicleId: string;             // GUID from backend
-  selectedVehicleType: string;           // "truck" | "trailer"
-  onVehicleSelect: (vehicleId: string, vehicleType: string) => void;
+  selectedVehicleId: string;
+  selectedVehicleType: string;
+  onVehicleSelect: (vehicleId: string, vehicleType: string, unitNumber: string) => void;
+  equipment?: Equipment[]; // Optional prop to avoid redundant fetching
 }
 
-const isActive = (status?: string | null) => {
+const isSelectable = (status?: string | null) => {
   const s = (status ?? "").trim().toLowerCase();
-  return s === "" || s === "active";
+  // Allow Active, In Shop, and Out of Service. Exclude Sold/Archived.
+  return s === "" ||
+    s === EquipmentStatus.ACTIVE ||
+    s === EquipmentStatus.IN_SHOP ||
+    s === EquipmentStatus.OUT_OF_SERVICE ||
+    s === "active" ||
+    s === "in shop" ||
+    s === "out of service";
 };
 
-const VehicleSelector = ({ selectedVehicleId, selectedVehicleType, onVehicleSelect }: VehicleSelectorProps) => {
-  const [trucks, setTrucks] = useState<TruckDto[]>([]);
-  const [trailers, setTrailers] = useState<TrailerDto[]>([]);
-  const [loading, setLoading] = useState(true);
+const VehicleSelector = ({
+  selectedVehicleId,
+  selectedVehicleType,
+  onVehicleSelect,
+  equipment: passedEquipment
+}: VehicleSelectorProps) => {
+  const [internalEquipment, setInternalEquipment] = useState<Equipment[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Use passed equipment if available, otherwise fetch internal
+  const equipment = passedEquipment || internalEquipment;
 
   useEffect(() => {
-    fetchVehicles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!passedEquipment) {
+      fetchVehicles();
+    }
+  }, [passedEquipment]);
 
   const fetchVehicles = async () => {
     try {
       setLoading(true);
-
-      const [trucksRes, trailersRes] = await Promise.all([
-        api.get<TruckDto[]>("/trucks"),
-        api.get<TrailerDto[]>("/trailers"),
-      ]);
-
-      setTrucks(trucksRes.data ?? []);
-      setTrailers(trailersRes.data ?? []);
+      const data = await equipmentApi.list();
+      setInternalEquipment(data.map(mapDtoToEquipment));
     } catch (error) {
-      console.error("Error fetching vehicles:", error);
-      toast.error("Failed to load vehicles. Check API URL + auth token.");
+      console.error("Error fetching vehicles in VehicleSelector:", error);
+      toast.error("Failed to load assets for selection.");
     } finally {
       setLoading(false);
     }
   };
 
-  const truckOptions: Option[] = useMemo(
-    () =>
-      (trucks ?? [])
-        .filter((t) => isActive(t.status))
-        .map((t) => ({
-          id: t.id,
-          type: "truck",
-          number: t.number,
-          vin: t.vin,
-          year: t.year ?? null,
-          make: t.make ?? null,
-          model: t.model ?? null,
-          status: t.status ?? null,
-        }))
-        .sort((a, b) => a.number.localeCompare(b.number)),
-    [trucks]
-  );
+  const groupedOptions = useMemo(() => {
+    const groups: Record<string, Equipment[]> = {};
+    equipment
+      .filter((e) => isSelectable(e.status))
+      .forEach((e) => {
+        const type = e.type || e.equipmentTypeName || "Other Assets";
+        if (!groups[type]) groups[type] = [];
+        groups[type].push(e);
+      });
 
-  const trailerOptions: Option[] = useMemo(
-    () =>
-      (trailers ?? [])
-        .filter((t) => isActive(t.status))
-        .map((t) => ({
-          id: t.id,
-          type: "trailer",
-          number: t.number,
-          vin: t.vin,
-          year: t.year ?? null,
-          make: t.make ?? null,
-          model: t.model ?? null,
-          status: t.status ?? null,
-        }))
-        .sort((a, b) => a.number.localeCompare(b.number)),
-    [trailers]
-  );
+    // Sort groups and items
+    return Object.keys(groups)
+      .sort()
+      .map((groupName) => ({
+        name: groupName,
+        items: groups[groupName].sort((a, b) => a.unitNumber.localeCompare(b.unitNumber))
+      }));
+  }, [equipment]);
 
-  const handleVehicleSelect = (value: string) => {
-    const [vehicleType, vehicleId] = value.split(":");
-    onVehicleSelect(vehicleId, vehicleType);
+  const handleVehicleSelect = (id: string) => {
+    const v = equipment.find((x) => x.id === id);
+    if (v) {
+      onVehicleSelect(v.id, v.type, v.unitNumber);
+    }
   };
 
   const getSelectedVehicleDisplay = () => {
-    if (!selectedVehicleId || !selectedVehicleType) return null;
+    if (!selectedVehicleId) return null;
 
-    const list = selectedVehicleType === "trailer" ? trailerOptions : truckOptions;
-    const v = list.find((x) => x.id === selectedVehicleId);
-
-    if (!v) return null;
+    const v = equipment.find((x) => x.id === selectedVehicleId);
+    if (!v) {
+      // Fallback for when we have an ID but it hasn't loaded yet or is missing
+      return <span className="text-slate-400 font-bold italic">Selected Asset #{selectedVehicleId.slice(0, 4)}</span>;
+    }
 
     return (
       <div className="flex items-center gap-2">
-        {v.type === "truck" ? <Truck className="h-4 w-4" /> : <RectangleHorizontal className="h-4 w-4" />}
-        <span className="font-medium">{v.number}</span>
-        <span className="text-gray-500">
+        <Truck className="h-4 w-4 text-blue-500" />
+        <span className="font-black text-slate-900">{v.unitNumber}</span>
+        <span className="text-slate-500 text-[10px] hidden sm:inline font-bold">
           ({[v.year, v.make, v.model].filter(Boolean).join(" ")})
         </span>
-        <Badge variant="outline" className="text-xs">
+        <Badge variant="outline" className="text-[8px] font-black uppercase tracking-tight px-1.5 py-0 border-slate-200 text-slate-400">
           {v.type}
         </Badge>
       </div>
     );
   };
 
-  if (loading) {
+  if (loading && !passedEquipment) {
     return (
-      <div>
-        <Label>Vehicle *</Label>
+      <div className="space-y-1.5">
+        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Asset *</Label>
         <Select disabled>
-          <SelectTrigger>
-            <SelectValue placeholder="Loading vehicles..." />
+          <SelectTrigger className="w-full px-5 py-6 bg-slate-50 border border-slate-200 rounded-[2rem]">
+            <SelectValue placeholder="Accessing Vault..." />
           </SelectTrigger>
         </Select>
       </div>
@@ -156,60 +120,48 @@ const VehicleSelector = ({ selectedVehicleId, selectedVehicleType, onVehicleSele
   }
 
   return (
-    <div>
-      <Label htmlFor="vehicle">Vehicle *</Label>
+    <div className="space-y-1.5">
+      <Label htmlFor="vehicle" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+        Asset * <span className="text-slate-200">({equipment.length})</span>
+      </Label>
       <Select
-        value={selectedVehicleId && selectedVehicleType ? `${selectedVehicleType}:${selectedVehicleId}` : ""}
+        value={selectedVehicleId || ""}
         onValueChange={handleVehicleSelect}
       >
-        <SelectTrigger>
-          <SelectValue placeholder="Select a vehicle">
+        <SelectTrigger className="w-full px-5 py-6 bg-slate-50 border border-slate-200 rounded-[2rem] text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+          <SelectValue placeholder="Select an Asset">
             {getSelectedVehicleDisplay()}
           </SelectValue>
         </SelectTrigger>
 
-        <SelectContent>
-          {truckOptions.length > 0 && (
-            <>
-              <div className="px-2 py-1.5 text-sm font-semibold text-gray-500 flex items-center gap-2">
-                <Truck className="h-4 w-4" />
-                Trucks
-              </div>
-              {truckOptions.map((t) => (
-                <SelectItem key={`truck:${t.id}`} value={`truck:${t.id}`}>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{t.number}</span>
-                    <span className="text-gray-500">
-                      {[t.year, t.make, t.model].filter(Boolean).join(" ")}
-                    </span>
-                  </div>
-                </SelectItem>
-              ))}
-            </>
-          )}
-
-          {trailerOptions.length > 0 && (
-            <>
-              {truckOptions.length > 0 && <div className="border-t my-1" />}
-              <div className="px-2 py-1.5 text-sm font-semibold text-gray-500 flex items-center gap-2">
-                <RectangleHorizontal className="h-4 w-4" />
-                Trailers
-              </div>
-              {trailerOptions.map((t) => (
-                <SelectItem key={`trailer:${t.id}`} value={`trailer:${t.id}`}>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{t.number}</span>
-                    <span className="text-gray-500">
-                      {[t.year, t.make, t.model].filter(Boolean).join(" ")}
-                    </span>
-                  </div>
-                </SelectItem>
-              ))}
-            </>
-          )}
-
-          {truckOptions.length === 0 && trailerOptions.length === 0 && (
-            <div className="px-2 py-1.5 text-sm text-gray-500">No active vehicles found</div>
+        <SelectContent className="z-[99999] rounded-[2rem] border-slate-100 shadow-2xl p-2 max-h-[400px]">
+          {groupedOptions.length > 0 ? (
+            groupedOptions.map((group) => (
+              <SelectGroup key={group.name} className="space-y-1">
+                <SelectLabel className="px-4 py-2 mt-2 text-[8px] font-black text-slate-300 uppercase tracking-widest bg-slate-50/50 rounded-lg">
+                  {group.name}s
+                </SelectLabel>
+                {group.items.map((v) => (
+                  <SelectItem
+                    key={v.id}
+                    value={v.id}
+                    className="px-4 py-3 focus:bg-blue-50 focus:text-blue-600 cursor-pointer rounded-xl"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-black text-slate-900">{v.unitNumber}</span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                        {[v.year, v.make, v.model].filter(Boolean).join(" ")}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))
+          ) : (
+            <div className="px-4 py-8 text-center">
+              <p className="text-sm text-slate-400 font-bold uppercase tracking-widest text-[10px]">No active assets found</p>
+              <p className="text-[9px] text-slate-300 mt-1">Check fleet synchronization status</p>
+            </div>
           )}
         </SelectContent>
       </Select>

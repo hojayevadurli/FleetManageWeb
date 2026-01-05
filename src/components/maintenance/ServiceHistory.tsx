@@ -9,19 +9,11 @@ import VehicleComparison from "./VehicleComparison";
 import CostAnalysis from "./CostAnalysis";
 import ServiceHistoryManager from "./ServiceHistoryManager";
 import { documentsApi } from "../../lib/documentsApi";
-import { equipmentApi } from "@/lib/equipmentApi";
-import { Vendor, WorkOrder, WorkOrderStatus, WorkOrderPriority } from "@/lib/types";
-import { serviceHistoryApi, type ServiceHistoryDto } from "@/lib/serviceHistoryApi";
-
-type UiVehicle = {
-  id: string;
-  unitNumber: string;
-  make?: string;
-  model?: string;
-  year?: number;
-  vin?: string;
-  type: "truck" | "trailer";
-};
+import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
+import { serviceHistoryApi } from "@/lib/serviceHistoryApi";
+import { workOrdersApi } from "@/lib/workOrdersApi";
+import { shopsApi } from "@/lib/shopsApi";
+import { Vendor, WorkOrder, WorkOrderStatus, WorkOrderPriority, Equipment, ServiceHistoryUpsertDto, VendorStatus, WorkOrderDto, ServiceHistory as ServiceHistoryModel } from "@/lib/types";
 
 const ServiceHistory = () => {
   console.log("%c--- SERVICE HISTORY v2.1 (FIXED PATHS/DTO) ---", "color: #2563eb; font-weight: bold;");
@@ -30,9 +22,10 @@ const ServiceHistory = () => {
   const queryParams = new URLSearchParams(location.search);
   const initialRecordId = queryParams.get('recordId');
 
-  const [serviceRecords, setServiceRecords] = useState<ServiceHistoryDto[]>([]);
-  const [vehicles, setVehicles] = useState<UiVehicle[]>([]);
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [serviceRecords, setServiceRecords] = useState<ServiceHistoryModel[]>([]);
+  const [vehicles, setVehicles] = useState<Equipment[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]); // Derived from serviceRecords for display
+  const [availableWorkOrders, setAvailableWorkOrders] = useState<WorkOrderDto[]>([]); // Real Work Orders for linking
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState("all");
 
@@ -48,41 +41,41 @@ const ServiceHistory = () => {
       // Load both in parallel but handle failures independently
       const results = await Promise.allSettled([
         serviceHistoryApi.list(),
-        equipmentApi.list()
+        equipmentApi.list(),
+        shopsApi.list(),
+        workOrdersApi.list()
       ]);
 
       const recordsRes = results[0];
       const equipmentRes = results[1];
+      const vendorsRes = results[2];
+      const workOrdersRes = results[3];
 
       // 1. Process Records
       if (recordsRes.status === 'fulfilled') {
-        const records = recordsRes.value || [];
-        const mappedRecords: WorkOrder[] = records.map(r => {
+        const records: ServiceHistoryModel[] = recordsRes.value || [];
+        const maps: WorkOrder[] = records.map(r => {
           if (!r || !r.id) return null as any;
           return {
             id: r.id,
-            woNumber: r.invoiceNumber || `SR-${r.id.slice(0, 5)}`,
-            equipmentId: r.assetId || "",
-            status: (r.status as any) || WorkOrderStatus.COMPLETED,
-            priority: WorkOrderPriority.MEDIUM,
+            woNumber: `SR-${r.id.slice(0, 5)}`,
+            equipmentId: r.equipmentId || "",
+            status: WorkOrderStatus.Completed,
+            priority: WorkOrderPriority.Normal,
             date: r.invoiceDate || r.createdAt || new Date().toISOString(),
             technician: "",
-            totalCost: r.totalAmount || r.total || 0,
-            partsCost: r.totalAmount || r.total || 0,
+            totalCost: r.totalAmount || 0,
+            partsCost: r.totalAmount || 0,
             laborCost: 0,
-            description: r.summary || r.description || "Routine Service",
-            vendor: r.vendorNameRaw || r.vendorName || "Professional Service",
+            description: r.summary || "Routine Service",
+            vendor: r.vendorNameRaw || "Professional Service",
             items: [],
-            media: r.attachmentUrl ? [{
-              url: r.attachmentUrl,
-              type: r.attachmentUrl.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image',
-              name: r.attachmentFileName || 'attachment'
-            }] : [],
+            media: [], // We might handle this later if r has attachments
             odometer: r.odometer?.toString() || ""
           };
         }).filter(Boolean);
 
-        setWorkOrders(mappedRecords);
+        setWorkOrders(maps);
         setServiceRecords(records);
       } else {
         console.error("Records failed to load:", recordsRes.reason);
@@ -92,19 +85,46 @@ const ServiceHistory = () => {
       // 2. Process Equipment
       if (equipmentRes.status === 'fulfilled') {
         const equipment = equipmentRes.value || [];
-        const allEquipment: UiVehicle[] = equipment.map(e => ({
-          id: e.id,
-          unitNumber: e.number,
-          type: e.type,
-          make: e.make || undefined,
-          model: e.model || undefined,
-          year: e.year || undefined,
-          vin: e.vin
-        }));
-        setVehicles(allEquipment);
+        setVehicles(equipment.map(mapDtoToEquipment));
       } else {
         console.error("Equipment failed to load:", equipmentRes.reason);
         toast({ title: "Fleet Sync Warning", description: "Could not retrieve equipment list.", variant: "destructive" });
+      }
+
+      // 3. Process Vendors
+      if (vendorsRes.status === 'fulfilled') {
+        const vendorList: Vendor[] = vendorsRes.value.map((s: any) => ({
+          id: s.id || s.shopId,
+          slug: s.id,
+          name: s.shopName || s.name,
+          address: s.address || "",
+          phone: s.phone || "",
+          email: s.email || "",
+          businessHours: "",
+          services: s.specialties || [],
+          rating: s.averageRating || 0,
+          reviewCount: s.reviewCount || 0,
+          status: (s.networkTier as VendorStatus) || VendorStatus.STANDARD,
+          lastUsedDate: "",
+          lastReviewedDate: "",
+          totalWorkOrders: 0,
+          avgCost: s.laborRate || 0,
+          distance: "0 mi",
+          responseTime: "24h",
+          turnaroundTime: "24h",
+          priceRange: (s.pricingStrategy?.length || 2),
+          lat: s.latitude || 0,
+          lng: s.longitude || 0,
+          reviews: []
+        }));
+        console.log("Loaded vendors:", vendorList.length);
+        setVendors(vendorList);
+      }
+
+      // 4. Process Work Orders
+      if (workOrdersRes.status === 'fulfilled') {
+        setAvailableWorkOrders(workOrdersRes.value);
+        console.log("Loaded available work orders:", workOrdersRes.value.length);
       }
 
     } catch (error) {
@@ -153,61 +173,164 @@ const ServiceHistory = () => {
           // 3. Persist AI Metadata if available (UpdateDocumentExtractDto pattern)
           if (rawAiData) {
             await documentsApi.updateExtracted(documentId, {
-              ExtractedJson: rawAiData,
-              VendorNameRaw: record.vendor,
-              ConfidenceScore: 0.95,
-              Status: "processed"
+              extractedJson: rawAiData,
+              vendorNameRaw: record.vendor,
+              confidenceScore: 0.95,
+              status: "processed"
             });
           }
         }
       }
 
       // 4. Create the final service record (CamelCase as per Swagger)
-      const sumOfItems = (record.items || []).reduce((sum, it) => sum + (it.cost || 0), 0);
-      const taxAmount = Math.max(0, record.totalCost - sumOfItems);
+      // 3. Resolve Vendor (Find existing or Create new to bypass backend auto-create bugs)
+      let finalVendorId = vendors.find(v => v.name.toLowerCase() === (record.vendor || "").toLowerCase())?.id || null;
 
-      const dto: any = {
-        assetType: (asset?.type?.toLowerCase() as any) || "truck",
-        assetId: record.equipmentId,
+      // Calculate Tax Amount from items
+      const taxAmount = (record.items || [])
+        .filter(i => (i.type || "").toLowerCase().includes("tax"))
+        .reduce((sum, i) => sum + (i.cost || (i.unitPrice || 0) * (i.quantity || 1)), 0);
+
+      const dto: ServiceHistoryUpsertDto = {
+        equipmentId: record.equipmentId || "",
+        workOrderId: (record as any).workOrderId || null,
+        vendorId: finalVendorId,
         vendorNameRaw: record.vendor,
         invoiceNumber: record.woNumber,
         invoiceDate: record.date ? new Date(record.date).toISOString() : null, // Ensure UTC for Postgres
         totalAmount: record.totalCost,
         taxAmount: taxAmount,
-        odometer: record.odometer ? parseInt(record.odometer) : null,
+        odometer: record.odometer ? (typeof record.odometer === 'string' ? parseInt(record.odometer) : record.odometer) : null,
         summary: record.description,
-        status: "closed",
+        status: "Completed",
         category: "General",
-        attachmentUrl: fileUrl,
-        attachmentFileName: files && files.length > 0 ? files[0].name : null,
         lines: (record.items && record.items.length > 0)
-          ? record.items.map(it => ({
-            type: (it.type || "misc").toLowerCase(),
-            description: it.description || "Service",
-            qty: it.quantity || 1,
-            unitPrice: it.unitPrice || it.cost || 0,
-            amount: it.cost || (it.unitPrice ? it.unitPrice * (it.quantity || 1) : 0)
-          }))
+          ? record.items
+            .filter(it => {
+              const desc = (it.description || "").toLowerCase();
+              // Filter out summary lines captured by AI to avoid double counting
+              const isSummary = desc.includes("subtotal") ||
+                desc.includes("total") ||
+                (desc.includes("taxable") && !desc.includes("part")) || // Allow "Taxable Parts" if specific
+                desc.includes("amount due") ||
+                desc.includes("balance due") ||
+                desc.includes("liability");
+              return !isSummary;
+            })
+            .map(it => {
+              const rawType = (it.type || "misc").toLowerCase();
+              const typeMap: Record<string, string> = {
+                "parts": "Parts",
+                "part": "Part",
+                "labor": "Labor",
+                "labour": "Labor",
+                "fee": "Fee",
+                "fees": "Fee",
+                "tax": "Tax",
+                "taxes": "Tax",
+                "misc": "Misc",
+                "miscellaneous": "Misc"
+              };
+              return {
+                type: typeMap[rawType] || "Misc",
+                description: it.description || "Service",
+                qty: it.quantity || 1,
+                unitPrice: it.unitPrice || it.cost || 0,
+                amount: it.cost || (it.unitPrice ? it.unitPrice * (it.quantity || 1) : 0),
+                partNumber: it.partNumber
+              };
+            })
           : [
             {
-              type: "misc",
+              type: "Misc",
               description: record.description || "Service",
               qty: 1,
               unitPrice: record.totalCost,
-              amount: record.totalCost
+              amount: record.totalCost,
+              partNumber: null
             }
           ]
       };
 
-      console.log("Service Record Payload:", dto);
-      await serviceHistoryApi.create(dto);
+      console.log("Creating Service Record with DTO:", dto);
+      const newId = await serviceHistoryApi.create(dto);
 
-      toast({ title: "Success", description: "Service record audited and saved." });
+      toast({ title: "Success", description: "Service record created successfully.", variant: "default" });
       loadData();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating service record:", error);
-      const detail = error.details?.message || error.message;
-      toast({ title: "Archive Failed", description: detail || "Failed to save service record.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to create service record.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateRecord = async (id: string, updates: Partial<WorkOrder>, files?: File[]) => {
+    setLoading(true);
+    try {
+      console.log("Updating Service Record:", id, updates);
+
+      // Resolve Vendor ID similarly to create (reuse logic ideally, but inline for now)
+      let finalVendorId = vendors.find(v => v.name.toLowerCase() === (updates.vendor || "").toLowerCase())?.id || null;
+      if (!finalVendorId && updates.vendor) {
+        // Try to find if we just need to use what we have, or if we need to auto-create logic again. 
+        // For update, we might assume user picks existing or keeps current, but let's be safe.
+        // If generic update, maybe we skip auto-create to avoid complexity unless strictly needed.
+        // But let's assume if they changed the vendor name to something new, we might need it.
+        // For now, let's just stick to finding existing.
+      }
+
+      // Calculate Tax Amount
+      const taxAmount = (updates.items || [])
+        .filter(i => (i.type || "").toLowerCase().includes("tax"))
+        .reduce((sum, i) => sum + (i.cost || (i.unitPrice || 0) * (i.quantity || 1)), 0);
+
+      const dto: ServiceHistoryUpsertDto = {
+        equipmentId: updates.equipmentId || "",
+        workOrderId: updates.workOrderId || null, // Ensure we send null if undefined/empty
+        vendorId: finalVendorId, // Might be null if not found, backend will try to match or whatever logic it has
+        vendorNameRaw: updates.vendor,
+        invoiceNumber: updates.woNumber,
+        invoiceDate: updates.date ? new Date(updates.date).toISOString() : null,
+        totalAmount: updates.totalCost || 0,
+        taxAmount: taxAmount,
+        odometer: updates.odometer ? (typeof updates.odometer === 'string' ? parseInt(updates.odometer) : updates.odometer) : null,
+        summary: updates.description,
+        status: "Completed",
+        category: "General",
+        lines: (updates.items || [])
+          .filter(it => {
+            const desc = (it.description || "").toLowerCase();
+            const isSummary = desc.includes("subtotal") ||
+              desc.includes("total") ||
+              (desc.includes("taxable") && !desc.includes("part")) ||
+              desc.includes("amount due") ||
+              desc.includes("balance due") ||
+              desc.includes("liability");
+            return !isSummary;
+          })
+          .map(it => {
+            const rawType = (it.type || "misc").toLowerCase();
+            const typeMap: Record<string, string> = { "parts": "Parts", "part": "Part", "labor": "Labor", "labour": "Labor", "fee": "Fee", "fees": "Fee", "tax": "Tax", "taxes": "Tax", "misc": "Misc", "miscellaneous": "Misc" };
+            return {
+              type: typeMap[rawType] || "Misc",
+              description: it.description || "Service",
+              qty: it.quantity || 1,
+              unitPrice: it.unitPrice || it.cost || 0,
+              amount: it.cost || 0,
+              partNumber: null
+            };
+          })
+      };
+
+      await serviceHistoryApi.update(id, dto);
+      toast({ title: "Success", description: "Service record updated.", variant: "default" });
+      loadData();
+    } catch (err) {
+      console.error("Error updating service record:", err);
+      toast({ title: "Error", description: "Failed to update record.", variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -254,9 +377,9 @@ const ServiceHistory = () => {
             equipmentList={vehicles as any}
             vendors={vendors}
             onAdd={handleAddServiceRecord}
-            onUpdate={() => { }}
+            onUpdate={handleUpdateRecord}
             onUpdateVendors={setVendors}
-            initialSelectedRecordId={initialRecordId}
+            availableWorkOrders={availableWorkOrders}
           />
         </TabsContent>
 

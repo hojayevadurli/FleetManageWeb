@@ -22,7 +22,7 @@ function fileToBase64(file: File): Promise<string> {
 
 export default function InvoicesAiTab() {
   const [vehicleId, setVehicleId] = useState("");
-  const [vehicleType, setVehicleType] = useState<"truck" | "trailer">("truck");
+  const [vehicleType, setVehicleType] = useState<string>("truck");
 
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -104,7 +104,7 @@ export default function InvoicesAiTab() {
             selectedVehicleType={vehicleType}
             onVehicleSelect={(id: string, type: string) => {
               setVehicleId(id);
-              setVehicleType(type === "trailer" ? "trailer" : "truck");
+              setVehicleType(type);
             }}
           />
         </div>

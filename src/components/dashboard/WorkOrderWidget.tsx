@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
-import { workOrdersApi, WorkOrderDto } from "@/lib/workOrdersApi";
+import { workOrdersApi } from "@/lib/workOrdersApi";
+import { WorkOrderDto, WorkOrderStatus } from "@/lib/types";
 
-const statusBadgeClass = (status: WorkOrderDto["status"]) => {
-  switch (status) {
+const statusBadgeClass = (status: string) => {
+  const s = status.toLowerCase();
+  switch (s) {
     case "open":
       return "bg-blue-100 text-blue-800";
     case "draft":
@@ -16,6 +18,8 @@ const statusBadgeClass = (status: WorkOrderDto["status"]) => {
       return "bg-green-100 text-green-800";
     case "paid":
       return "bg-purple-100 text-purple-800";
+    case "completed":
+      return "bg-emerald-100 text-emerald-800";
     default:
       return "bg-gray-100 text-gray-800";
   }
@@ -29,7 +33,10 @@ const WorkOrderWidget = () => {
 
   // If you want “active” only (open + draft), filter here
   const active = useMemo(
-    () => workOrders.filter((w) => w.status === "open" || w.status === "draft"),
+    () => workOrders.filter((w) => {
+      const s = w.status.toLowerCase();
+      return s === "open" || s === "draft" || s === "inprocess";
+    }),
     [workOrders]
   );
 
@@ -84,19 +91,19 @@ const WorkOrderWidget = () => {
             </div>
           ) : (
             active.slice(0, 2).map((wo) => {
-              const title = wo.lines?.[0]?.description || wo.summary || "Work Order";
+              const title = wo.lines?.[0]?.description || wo.title || "Work Order";
               return (
                 <div key={wo.id} className="flex justify-between items-center text-sm">
                   <div className="min-w-0">
                     <div className="font-medium">
-                      {wo.woNumber ?? formatShortId(wo.id)}
+                      {wo.workOrderNumber ?? formatShortId(wo.id)}
                     </div>
                     <div className="text-gray-500 truncate">
-                      {wo.assetType} • {wo.assetId} • {title}
+                      {wo.equipmentId} • {title}
                     </div>
                   </div>
                   <Badge className={statusBadgeClass(wo.status)}>
-                    {wo.status.toUpperCase()}
+                    {wo.status}
                   </Badge>
                 </div>
               );

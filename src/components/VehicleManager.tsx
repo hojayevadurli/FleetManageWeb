@@ -1,122 +1,36 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/Api";
+import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
 
 import EquipmentDetail from "@/components/equipment/EquipmentDetail";
 import EquipmentList from "@/components/equipment/EquipmentList";
 import { workOrdersApi } from "@/lib/workOrdersApi";
 import { serviceHistoryApi } from "@/lib/serviceHistoryApi";
-import { Equipment, WorkOrder, EquipmentStatus, EquipmentType, WorkOrderStatus } from "@/lib/types";
-
-interface TruckDto {
-  id: string;
-  number: string;
-  vin: string;
-  year?: number | null;
-  make?: string | null;
-  model?: string | null;
-  purchasedAt?: string | null;
-  plateNumber?: string | null;
-  mileage?: number | null;
-  engineType?: string | null;
-  status?: string | null;
-}
-
-interface TrailerDto {
-  id: string;
-  number: string;
-  vin: string;
-  year?: number | null;
-  make?: string | null;
-  model?: string | null;
-  purchasedAt?: string | null;
-  type?: string | null; // Trailer category
-  length?: number | null;
-  weightCapacity?: number | null;
-  status?: string | null;
-}
-
-interface Vehicle {
-  id: string;
-  vehicle_id: string;
-  vin: string;
-  make: string;
-  model: string;
-  year: number;
-  status: string;
-  type: 'truck' | 'trailer';
-
-  created_at: string;
-  updated_at: string;
-
-  // Specifics
-  plate_number?: string;
-  mileage?: number;
-  engine_type?: string;
-  trailer_type?: string;
-  length?: number;
-  weight_capacity?: number;
-}
+import { Equipment, WorkOrder, EquipmentStatus, WorkOrderStatus, EquipmentLifecycleStatus, EquipmentOperationalStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
 
 const VehicleManager = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const initialStatus = queryParams.get('status') as EquipmentStatus | null;
 
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
-  const [vehicleWorkOrders, setVehicleWorkOrders] = useState<WorkOrder[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+  const [equipmentWorkOrders, setEquipmentWorkOrders] = useState<WorkOrder[]>([]);
   const { toast } = useToast();
 
-  const fetchVehicles = useCallback(async () => {
+  const fetchEquipment = useCallback(async () => {
     try {
       setLoading(true);
-
-      const [trucksRes, trailersRes] = await Promise.all([
-        api.get<TruckDto[]>("/trucks"),
-        api.get<TrailerDto[]>("/trailers")
-      ]);
-
-      const trucks: Vehicle[] = (trucksRes.data ?? []).map((t) => ({
-        id: t.id,
-        vehicle_id: t.number,
-        vin: t.vin,
-        make: t.make ?? "",
-        model: t.model ?? "",
-        year: t.year ?? new Date().getFullYear(),
-        status: t.status || "active",
-        type: 'truck',
-        plate_number: t.plateNumber ?? undefined,
-        mileage: t.mileage ?? undefined,
-        engine_type: t.engineType ?? undefined,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }));
-
-      const trailers: Vehicle[] = (trailersRes.data ?? []).map((t) => ({
-        id: t.id,
-        vehicle_id: t.number,
-        vin: t.vin,
-        make: t.make ?? "",
-        model: t.model ?? "",
-        year: t.year ?? new Date().getFullYear(),
-        status: t.status || "active",
-        type: 'trailer',
-        trailer_type: t.type ?? undefined,
-        length: t.length ?? undefined,
-        weight_capacity: t.weightCapacity ?? undefined,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }));
-
-      setVehicles([...trucks, ...trailers]);
+      // Fetch all equipment (backend unifies trucks, trailers, etc.)
+      const data = await equipmentApi.list();
+      setEquipmentList(data.map(mapDtoToEquipment));
     } catch (error: any) {
-      console.error("Failed to fetch fleet", error);
+      console.error("Failed to fetch equipment", error);
       toast({
         title: "Error",
-        description: error?.message || "Failed to fetch vehicles",
+        description: error?.message || "Failed to fetch fleet",
         variant: "destructive",
       });
     } finally {
@@ -125,34 +39,41 @@ const VehicleManager = () => {
   }, [toast]);
 
   useEffect(() => {
-    fetchVehicles();
-  }, [fetchVehicles]);
+    fetchEquipment();
+  }, [fetchEquipment]);
 
-  // Fetch work orders when a vehicle is selected
+  // Fetch work orders when equipment is selected
   useEffect(() => {
     const fetchWO = async () => {
-      if (!selectedVehicle) {
-        setVehicleWorkOrders([]);
+      if (!selectedEquipment) {
+        setEquipmentWorkOrders([]);
         return;
       }
       try {
         const [wos, shRecords] = await Promise.all([
-          workOrdersApi.list({ assetId: selectedVehicle.id }),
-          serviceHistoryApi.list({ assetId: selectedVehicle.id })
+          workOrdersApi.list({ equipmentId: selectedEquipment.id }),
+          serviceHistoryApi.list(selectedEquipment.id)
         ]);
 
         const mappedWos: WorkOrder[] = wos.map(wo => ({
           id: wo.id,
-          woNumber: wo.woNumber || 'Draft',
-          equipmentId: wo.assetId,
-          status: (wo.status as unknown as WorkOrderStatus) || WorkOrderStatus.OPEN,
-          priority: 'Medium' as any,
-          date: wo.serviceDate,
+          woNumber: wo.workOrderNumber || 'Draft',
+          equipmentId: wo.equipmentId,
+          status: (WorkOrderStatus as any)[wo.status] ?? WorkOrderStatus.Open,
+          priority: (WorkOrderPriority as any)[wo.priority] ?? WorkOrderPriority.Normal,
+          date: wo.openedAt,
           technician: 'Unknown',
-          totalCost: wo.totalAmount,
+          totalCost: wo.manualActualTotal || wo.estimatedTotal,
           partsCost: 0,
           laborCost: 0,
-          description: wo.summary || '',
+          title: wo.title,
+          complaint: wo.complaint,
+          diagnosis: wo.diagnosis || '',
+          resolution: wo.resolution || '',
+          costSource: (WorkOrderCostSource as any)[wo.costSource] ?? WorkOrderCostSource.Estimated,
+          estimatedTotal: wo.estimatedTotal,
+          manualActualTotal: wo.manualActualTotal,
+          description: wo.notes || '',
           vendor: '',
           items: [],
           media: wo.documents?.map(doc => ({
@@ -162,84 +83,71 @@ const VehicleManager = () => {
           })) || []
         }));
 
+        // Map ServiceHistory to WorkOrder-like structure for display
         const mappedSh: WorkOrder[] = shRecords.map(r => ({
           id: r.id,
           woNumber: r.invoiceNumber || `SR-${r.id.slice(0, 5)}`,
-          equipmentId: r.assetId || "",
-          status: (r.status as any) || WorkOrderStatus.COMPLETED,
-          priority: 'Medium' as any,
-          date: r.invoiceDate || r.createdAt || new Date().toISOString(),
+          equipmentId: r.equipmentId,
+          status: WorkOrderStatus.Completed,
+          priority: WorkOrderPriority.Normal,
+          date: r.invoiceDate || r.createdAt,
           technician: "",
-          totalCost: r.totalAmount || r.total || 0,
-          partsCost: r.totalAmount || r.total || 0,
-          laborCost: 0,
-          description: r.summary || r.description || "Routine Service",
-          vendor: r.vendorNameRaw || r.vendorName || "Professional Service",
-          items: [],
-          media: r.attachmentUrl ? [{
-            url: r.attachmentUrl,
-            type: r.attachmentUrl.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image',
-            name: r.attachmentFileName || 'attachment'
-          }] : [],
-          odometer: r.odometer?.toString() || ""
+          totalCost: r.totalAmount,
+          partsCost: r.lines?.filter(l => l.type === 'part').reduce((sum, l) => sum + l.amount, 0) || 0,
+          laborCost: r.lines?.filter(l => l.type === 'labor').reduce((sum, l) => sum + l.amount, 0) || 0,
+          title: r.summary || 'Service History',
+          complaint: r.summary || 'Routine Service',
+          costSource: WorkOrderCostSource.Invoiced,
+          estimatedTotal: r.totalAmount,
+          manualActualTotal: r.totalAmount,
+          description: r.summary || "Routine Service",
+          vendor: r.vendorNameRaw || "Professional Service",
+          items: r.lines?.map(l => ({
+            id: l.id,
+            serviceType: l.type,
+            description: l.description,
+            quantity: l.qty,
+            unitPrice: l.unitPrice,
+            cost: l.amount,
+            type: l.type as any
+          })) || [],
+          media: [], // Documents are linked differently now?
+          odometer: r.odometer
         }));
 
         const combined = [...mappedWos, ...mappedSh].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setVehicleWorkOrders(combined);
+        setEquipmentWorkOrders(combined);
       } catch (err) {
-        console.error("Failed to fetch history for vehicle", err);
+        console.error("Failed to fetch history for equipment", err);
       }
     };
     fetchWO();
-  }, [selectedVehicle]);
-
-  const mapVehicleToEquipment = (v: Vehicle): Equipment => ({
-    id: v.id,
-    unitNumber: v.vehicle_id,
-    type: v.type === 'trailer' ? EquipmentType.TRAILER : EquipmentType.TRUCK,
-    make: v.make,
-    model: v.model,
-    year: v.year,
-    vin: v.vin,
-    licensePlate: v.plate_number || '',
-    status: (v.status as EquipmentStatus) || EquipmentStatus.ACTIVE,
-    lastServiceDate: v.updated_at,
-    mileage: v.mileage,
-    engineType: v.engine_type,
-    trailerType: v.trailer_type,
-    length: v.length,
-    weightCapacity: v.weight_capacity
-  });
-
-  const equipmentList = vehicles.map(mapVehicleToEquipment);
+  }, [selectedEquipment]);
 
   const handleAddEquipment = async (e: Omit<Equipment, 'id'>) => {
     try {
-      const isTruck = e.type === EquipmentType.TRUCK;
-      const endpoint = isTruck ? "/trucks" : "/trailers";
-
       const payload: any = {
-        number: e.unitNumber,
+        equipmentTypeId: e.equipmentTypeId,
+        fleetCategoryId: e.fleetCategoryId,
+        unitNumber: e.unitNumber,
+        displayName: e.unitNumber,
         vin: e.vin,
-        year: e.year,
+        serialNumber: e.serialNumber,
+        plateNumber: e.licensePlate,
         make: e.make,
         model: e.model,
-        status: e.status,
+        year: e.year,
+        operationalStatus: EquipmentOperationalStatus.Available,
+        lifecycleStatus: EquipmentLifecycleStatus.Active,
+        acquiredDate: new Date().toISOString().split('T')[0],
+        inServiceDate: new Date().toISOString().split('T')[0],
+        notes: e.notes,
+        initialOdometer: (e as any).initialOdometer || 0,
+        initialHours: (e as any).initialHours || 0
       };
-
-      if (isTruck) {
-        payload.plateNumber = e.licensePlate || "";
-        payload.mileage = e.mileage || 0;
-        payload.engineType = e.engineType || "";
-      } else {
-        payload.type = e.trailerType || "";
-        payload.length = e.length || 0;
-        payload.weightCapacity = e.weightCapacity || 0;
-      }
-
-      await api.post(endpoint, payload);
+      await equipmentApi.create(payload);
       toast({ title: "Equipment Added", description: `${e.unitNumber} has been successfully onboarded.` });
-      fetchVehicles();
+      fetchEquipment();
     } catch (err: any) {
       const errorMsg = err.response?.data?.message || err.response?.data?.title || err.message;
       console.error("Onboarding error details:", err.response?.data);
@@ -247,43 +155,10 @@ const VehicleManager = () => {
     }
   };
 
-  const handleAddWorkOrder = async (wo: Omit<WorkOrder, 'id'>, files?: File[]) => {
+  const handleAddWorkOrder = async (woPayload: any, files?: File[]) => {
     try {
-      const v = vehicles.find(veh => veh.id === wo.equipmentId);
-      if (!v) throw new Error("Asset not found");
-
-      const assetType = v.type === 'trailer' ? 'trailer' : 'truck';
-
-      const payload = {
-        assetType: assetType as any,
-        assetId: v.id,
-        serviceDate: wo.date ? new Date(wo.date).toISOString() : new Date().toISOString(),
-        summary: wo.description,
-        totalAmount: wo.totalCost || 0,
-        taxAmount: 0,
-        status: "open" as any,
-        woNumber: wo.woNumber,
-        vendorId: null, // explicit null for backend mapping
-        odometer: null, // explicit null for backend mapping
-        lines: [
-          {
-            type: "labor" as any,
-            description: "Maintenance Service",
-            qty: 1,
-            unitPrice: wo.laborCost || 0,
-            amount: wo.laborCost || 0
-          },
-          {
-            type: "part" as any,
-            description: "Parts",
-            qty: 1,
-            unitPrice: wo.partsCost || 0,
-            amount: wo.partsCost || 0
-          }
-        ]
-      };
-
-      const createdWo = await workOrdersApi.create(payload as any);
+      // woPayload is already mapped to WorkOrderUpsertDto structure in EquipmentList
+      const createdWo = await workOrdersApi.create(woPayload);
 
       if (files && files.length > 0) {
         toast({ title: "Uploading Attachments...", description: `Saving ${files.length} files.` });
@@ -292,10 +167,8 @@ const VehicleManager = () => {
 
       toast({
         title: "Work Order Created",
-        description: `Record ${createdWo.woNumber || wo.woNumber} saved successfully.`
+        description: `Record ${createdWo.workOrderNumber || 'Successfully saved'}.`
       });
-
-      // Optionally refresh something or fetch updated WO list if the detail view is open
     } catch (err: any) {
       console.error("WO Creation failed:", err);
       const errorMsg = err.response?.data?.message || err.message;
@@ -308,53 +181,70 @@ const VehicleManager = () => {
   };
 
   const handleUpdateStatus = async (status: EquipmentStatus) => {
-    if (!selectedVehicle) return;
+    if (!selectedEquipment) return;
     try {
-      const isTruck = selectedVehicle.type === 'truck';
-      const endpoint = isTruck ? `/trucks/${selectedVehicle.id}` : `/trailers/${selectedVehicle.id}`;
-
       // Optimistic update
-      const updatedVehicle = { ...selectedVehicle, status };
-      setSelectedVehicle(updatedVehicle);
-      setVehicles(prev => prev.map(v => v.id === selectedVehicle.id ? updatedVehicle : v));
+      const updatedEquipment = { ...selectedEquipment, status };
+      setSelectedEquipment(updatedEquipment);
+      setEquipmentList(prev => prev.map(v => v.id === selectedEquipment.id ? updatedEquipment : v));
 
+      // Map full payload required by backend Update endpoint
       const payload: any = {
-        number: selectedVehicle.vehicle_id,
-        vin: selectedVehicle.vin,
-        year: selectedVehicle.year,
-        make: selectedVehicle.make,
-        model: selectedVehicle.model,
-        status: status,
+        equipmentTypeId: selectedEquipment.equipmentTypeId,
+        fleetCategoryId: selectedEquipment.fleetCategoryId,
+        unitNumber: selectedEquipment.unitNumber,
+        displayName: selectedEquipment.unitNumber, // fallback
+        vin: selectedEquipment.vin,
+        serialNumber: selectedEquipment.serialNumber,
+        plateNumber: selectedEquipment.licensePlate,
+        make: selectedEquipment.make,
+        model: selectedEquipment.model,
+        year: selectedEquipment.year,
+        operationalStatus: (() => {
+          switch (status) {
+            case EquipmentStatus.ACTIVE: return EquipmentOperationalStatus.Available;
+            case EquipmentStatus.IN_SHOP: return EquipmentOperationalStatus.InShop;
+            case EquipmentStatus.OUT_OF_SERVICE: return EquipmentOperationalStatus.OutOfService;
+            default: return EquipmentOperationalStatus.Available;
+          }
+        })(),
+        lifecycleStatus: status === EquipmentStatus.SOLD ? EquipmentLifecycleStatus.Sold :
+          status === EquipmentStatus.ARCHIVED ? EquipmentLifecycleStatus.Retired :
+            EquipmentLifecycleStatus.Active,
+        outOfServiceDate: status === EquipmentStatus.OUT_OF_SERVICE ? new Date().toISOString().split('T')[0] : selectedEquipment.outOfServiceDate,
+        notes: selectedEquipment.notes
+        // Add other fields if needed by backend DTO
       };
 
-      if (isTruck) {
-        payload.plateNumber = selectedVehicle.plate_number;
-        payload.mileage = selectedVehicle.mileage;
-        payload.engineType = selectedVehicle.engine_type;
-      } else {
-        payload.type = selectedVehicle.trailer_type;
-        payload.length = selectedVehicle.length;
-        payload.weightCapacity = selectedVehicle.weight_capacity;
-      }
-
-      await api.put(endpoint, payload);
+      await equipmentApi.update(selectedEquipment.id, payload);
       toast({ title: "Status Updated", description: `Unit is now ${status}` });
     } catch (err: any) {
       console.error("Status update error details:", err.response?.data);
       const errorMsg = err.response?.data?.message || err.message;
       toast({ title: "Update Failed", description: errorMsg, variant: "destructive" });
-      fetchVehicles(); // Revert on error
+      fetchEquipment(); // Revert
     }
   };
 
-  if (selectedVehicle) {
+  const handleBulkDelete = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    try {
+      await equipmentApi.bulkDelete(ids);
+      toast({ title: "Assets Deleted", description: `${ids.length} items removed from fleet.` });
+      fetchEquipment();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to delete items", variant: "destructive" });
+    }
+  };
+
+  if (selectedEquipment) {
     return (
       <EquipmentDetail
-        equipment={mapVehicleToEquipment(selectedVehicle)}
-        workOrders={vehicleWorkOrders}
-        onBack={() => setSelectedVehicle(null)}
+        equipment={selectedEquipment}
+        workOrders={equipmentWorkOrders}
+        onBack={() => setSelectedEquipment(null)}
         onUpdateStatus={handleUpdateStatus}
-        initialAiOpen={false} // Default closed
+        initialAiOpen={false}
       />
     );
   }
@@ -372,37 +262,14 @@ const VehicleManager = () => {
     );
   }
 
-  const handleBulkDelete = async (ids: string[]) => {
-    if (ids.length === 0) return;
-    try {
-      // We need to know which IDs are trucks and which are trailers to hit correct endpoints
-      // Or if the backend has a single bulk-delete endpoint that takes generic IDs.
-      // Usually, separate endpoints are cleaner.
-
-      const trucksToDelete = vehicles.filter(v => ids.includes(v.id) && v.type === 'truck').map(v => v.id);
-      const trailersToDelete = vehicles.filter(v => ids.includes(v.id) && v.type === 'trailer').map(v => v.id);
-
-      const deletions = [];
-      if (trucksToDelete.length > 0) deletions.push(api.post("/trucks/bulk-delete", { truckIds: trucksToDelete }));
-      if (trailersToDelete.length > 0) deletions.push(api.post("/trailers/bulk-delete", { trailerIds: trailersToDelete }));
-
-      await Promise.all(deletions);
-      toast({ title: "Assets Deleted", description: `${ids.length} items removed from fleet.` });
-      fetchVehicles();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message || "Failed to delete items", variant: "destructive" });
-    }
-  };
-
   return (
     <div className="space-y-8">
       <EquipmentList
         equipment={equipmentList}
         initialStatusFilter={initialStatus || 'ALL'}
-        onSelect={(e, openAi) => {
-          // Find original vehicle to set selected
-          const v = vehicles.find(veh => veh.id === e.id);
-          if (v) setSelectedVehicle(v);
+        onSelect={(e) => {
+          const v = equipmentList.find(veh => veh.id === e.id);
+          if (v) setSelectedEquipment(v);
         }}
         onAddEquipment={handleAddEquipment}
         onNewWorkOrder={(unitId) => console.log("New WO for", unitId)}

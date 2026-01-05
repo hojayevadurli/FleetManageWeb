@@ -11,13 +11,13 @@ import {
   MapPin,
   ArrowRight
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Shop } from "@/components/shops/types/ShopTypes";
 import ShopCard from "@/components/shops/ShopCard";
 import ShopMap from "@/components/shops/ShopMap";
 import AddShopDialog from "@/components/shops/AddShopDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { shopsApi } from "@/lib/shopsApi";
 
 const ShopsPage = () => {
   const [view, setView] = useState<'list' | 'map'>('list');
@@ -45,21 +45,8 @@ const ShopsPage = () => {
   const loadShops = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('shops')
-        .select('*')
-        .order('shop_name');
-
-      if (error) throw error;
-
-      const typedShops = (data || []).map(shop => ({
-        ...shop,
-        rate_category: shop.rate_category as 'green' | 'orange' | 'red',
-        hours_of_operation: shop.hours_of_operation as Record<string, string>,
-        specialties: shop.specialties as string[] || []
-      }));
-
-      setShops(typedShops);
+      const data = await shopsApi.list();
+      setShops(data);
     } catch (error) {
       console.error('Error loading shops:', error);
       toast({

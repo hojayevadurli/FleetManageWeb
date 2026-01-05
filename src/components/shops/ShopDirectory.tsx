@@ -5,23 +5,24 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Globe, 
-  Clock, 
-  Star, 
-  Filter, 
+import {
+  MapPin,
+  Phone,
+  Mail,
+  Globe,
+  Clock,
+  Star,
+  Filter,
   Search,
   Plus,
   Navigation,
-  Eye
+  Eye,
+  RotateCcw
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Shop } from "./types/ShopTypes";
 import ShopDetailsDialog from "./ShopDetailsDialog";
 import AddShopDialog from "./AddShopDialog";
+import { shopsApi } from "@/lib/shopsApi";
 
 const ShopDirectory = () => {
   const [shops, setShops] = useState<Shop[]>([]);
@@ -44,22 +45,8 @@ const ShopDirectory = () => {
 
   const loadShops = async () => {
     try {
-      const { data, error } = await supabase
-        .from('shops')
-        .select('*')
-        .order('shop_name');
-
-      if (error) throw error;
-      
-      // Type cast the data to ensure rate_category is properly typed
-      const typedShops = (data || []).map(shop => ({
-        ...shop,
-        rate_category: shop.rate_category as 'green' | 'orange' | 'red',
-        hours_of_operation: shop.hours_of_operation as Record<string, string>,
-        specialties: shop.specialties as string[]
-      }));
-      
-      setShops(typedShops);
+      const data = await shopsApi.list();
+      setShops(data);
     } catch (error) {
       console.error('Error loading shops:', error);
     } finally {
@@ -72,7 +59,7 @@ const ShopDirectory = () => {
 
     // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(shop => 
+      filtered = filtered.filter(shop =>
         shop.shop_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         shop.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
         shop.shop_id.toLowerCase().includes(searchTerm.toLowerCase())
@@ -82,14 +69,14 @@ const ShopDirectory = () => {
     // Rating filter
     if (ratingFilter !== "all") {
       const minRating = parseInt(ratingFilter);
-      filtered = filtered.filter(shop => 
+      filtered = filtered.filter(shop =>
         (shop.average_rating || 0) >= minRating
       );
     }
 
     // Category filter
     if (categoryFilter !== "all") {
-      filtered = filtered.filter(shop => 
+      filtered = filtered.filter(shop =>
         shop.rate_category === categoryFilter
       );
     }
@@ -110,9 +97,8 @@ const ShopDirectory = () => {
     return Array.from({ length: 5 }, (_, i) => (
       <Star
         key={i}
-        className={`h-4 w-4 ${
-          i < rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-        }`}
+        className={`h-4 w-4 ${i < rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+          }`}
       />
     ));
   };
@@ -133,10 +119,16 @@ const ShopDirectory = () => {
           <h2 className="text-2xl font-bold text-gray-900">Shop Directory</h2>
           <p className="text-gray-600">Manage and browse all service shops</p>
         </div>
-        <Button onClick={() => setIsAddShopOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Shop
-        </Button>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={loadShops} disabled={loading}>
+            <RotateCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button onClick={() => setIsAddShopOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Shop
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -246,9 +238,9 @@ const ShopDirectory = () => {
               )}
 
               <div className="flex gap-2 pt-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="flex-1"
                   onClick={() => {
                     setSelectedShop(shop);
@@ -259,8 +251,8 @@ const ShopDirectory = () => {
                   Details
                 </Button>
                 {shop.latitude && shop.longitude && (
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => {
                       const url = `https://www.google.com/maps/dir/?api=1&destination=${shop.latitude},${shop.longitude}`;

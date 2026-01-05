@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createTrailer } from "@/api/trailers";
+import { equipmentApi } from "@/lib/equipmentApi";
 
 interface AddTrailerDialogProps {
   onTrailerAdded: () => void;
@@ -56,17 +56,17 @@ const AddTrailerDialog = ({ onTrailerAdded }: AddTrailerDialogProps) => {
       const yearNumber =
         formData.year.trim() === "" ? undefined : Number(formData.year);
 
-      await createTrailer({
-        number: formData.number.trim(),
+      await equipmentApi.create({
+        unitNumber: formData.number.trim(),
         vin: formData.vin.trim(),
         year: isNaN(yearNumber as number) ? undefined : yearNumber,
         make: formData.make.trim() || undefined,
+        type: "trailer", // Explicitly set type for backend discriminator
+        status: formData.status as any,
         model: undefined,
         purchasedAt: undefined,
-        type: undefined,
         length: undefined,
         weightCapacity: undefined,
-        status: formData.status,
       });
 
       toast({

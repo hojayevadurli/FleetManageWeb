@@ -18,10 +18,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { type Trailer, updateTrailer } from "@/api/trailers";
+import { equipmentApi } from "@/lib/equipmentApi";
+import { Equipment } from "@/lib/types";
 
 interface EditTrailerDialogProps {
-  trailer: Trailer | null;
+  trailer: Equipment | null;
   open: boolean;
   onClose: () => void;
   onUpdated: () => void;
@@ -54,7 +55,7 @@ const EditTrailerDialog = ({
   useEffect(() => {
     if (!trailer) return;
     setFormData({
-      number: trailer.number ?? "",
+      number: trailer.unitNumber ?? "",
       vin: trailer.vin ?? "",
       make: trailer.make ?? "",
       year: trailer.year ? String(trailer.year) : "",
@@ -75,8 +76,8 @@ const EditTrailerDialog = ({
       const yearNumber =
         formData.year.trim() === "" ? undefined : Number(formData.year);
 
-      await updateTrailer(trailer.id, {
-        number: formData.number.trim(),
+      await equipmentApi.update(trailer.id, {
+        unitNumber: formData.number.trim(),
         vin: formData.vin.trim(),
         year: isNaN(yearNumber as number) ? undefined : yearNumber,
         make: formData.make.trim() || undefined,
@@ -85,7 +86,7 @@ const EditTrailerDialog = ({
         type: trailer.type,
         length: trailer.length,
         weightCapacity: trailer.weightCapacity,
-        status: formData.status,
+        status: formData.status as any,
       });
 
       toast({

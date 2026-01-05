@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/Api";
+import { equipmentApi } from "@/lib/equipmentApi";
 
 type EquipmentType = "truck" | "trailer";
 
@@ -83,22 +83,20 @@ const AddVehicleDialog = ({
       setSubmitting(true);
 
       const payload: any = {
-        number: data.number.trim(),
+        unitNumber: data.number.trim(),
         vin: data.vin.trim(),
         year: data.year || undefined,
         make: data.make.trim() || undefined,
         model: data.model.trim() || undefined,
-        status: data.status,
-        // Unified endpoint req: always send type
+        status: data.status as any,
         type: data.equipmentType,
-        plateNumber: data.equipmentType === "truck" ? (data.plateNumber?.trim() || undefined) : undefined,
-        // Map trailerType to something if needed, or just rely on 'type' = trailer
-        // If the backend expects specific fields for trailer type details, we can add them, 
-        // but the prompt said "use Trucks model". We'll send what we have.
+        licensePlate: data.equipmentType === "truck" ? (data.plateNumber?.trim() || undefined) : undefined,
+        // Map trailerType to specs or specific field if backend supports it
+        // based on previous analysis trailerType is used
+        trailerType: data.equipmentType === "trailer" ? (data.trailerType?.trim() || undefined) : undefined,
       };
 
-      // Unified endpoint: Always use /trucks
-      await api.post("/trucks", payload);
+      await equipmentApi.create(payload);
 
       toast({
         title: "Vehicle added",

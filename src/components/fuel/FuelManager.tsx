@@ -21,7 +21,7 @@ import {
 import { FuelRecord, FuelParsedData, Equipment } from '@/lib/types';
 import { parseFuelReceipt } from '@/lib/gemini';
 import { fuelApi } from '@/lib/fuelApi';
-import { equipmentApi } from '@/lib/equipmentApi';
+import { equipmentApi, mapDtoToEquipment } from '@/lib/equipmentApi';
 import { useToast } from "@/hooks/use-toast";
 
 const FuelManager = () => {
@@ -61,7 +61,7 @@ const FuelManager = () => {
                 equipmentApi.list()
             ]);
             setRecords(fuelData || []);
-            setEquipment(equipData || []);
+            setEquipment(equipData?.map(mapDtoToEquipment) || []);
         } catch (err) {
             console.error("Failed to load fuel data", err);
             toast({ title: "Sync Error", description: "Failed to load fuel records.", variant: "destructive" });

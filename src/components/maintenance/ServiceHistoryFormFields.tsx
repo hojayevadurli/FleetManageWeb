@@ -40,7 +40,7 @@ const ServiceHistoryFormFields = ({
             onValueChange={onVehicleChange}
           />
         </div>
-        
+
         <div>
           <Label htmlFor="service_date">Service Date</Label>
           <Input
@@ -72,6 +72,21 @@ const ServiceHistoryFormFields = ({
           onValueChange={(shopId) => onFieldChange("shop_id", shopId)}
           onAddShop={onAddShop}
         />
+        {/* Auto-Create Toggle */}
+        {!formData.shop_id && formData.invoice_file && (
+          <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded-lg text-sm text-blue-700">
+            <input
+              type="checkbox"
+              id="autoCreateShop"
+              checked={(formData as any).autoCreateShop}
+              onChange={(e) => onFieldChange("autoCreateShop", e.target.checked)}
+              className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+            />
+            <label htmlFor="autoCreateShop" className="font-medium cursor-pointer">
+              Add to Shop List if new (AI Detected)
+            </label>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -86,7 +101,7 @@ const ServiceHistoryFormFields = ({
             placeholder="3.5"
           />
         </div>
-        
+
         <div>
           <Label htmlFor="total_cost">Total Cost ($)</Label>
           <Input
@@ -98,7 +113,7 @@ const ServiceHistoryFormFields = ({
             placeholder="450.00"
           />
         </div>
-        
+
         <div>
           <Label htmlFor="mileage">Mileage (Optional)</Label>
           <Input

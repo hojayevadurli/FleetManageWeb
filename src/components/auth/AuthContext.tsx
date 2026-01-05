@@ -18,7 +18,9 @@ type AuthContextType = {
     companyName: string,
     fullName: string,
     email: string,
-    password: string
+    phoneNumber: string,
+    password: string,
+    industryId?: string
   ) => Promise<{ error?: string }>;
   signOut: () => void;
 };
@@ -108,14 +110,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     companyName: string,
     fullName: string,
     email: string,
-    password: string
+    phoneNumber: string,
+    password: string,
+    industryId?: string
   ) => {
     try {
       await api.post("/Auth/register", {
         companyName,
         fullName,
         email,
+        phoneNumber,
         password,
+        industryId
       });
 
       return {};
