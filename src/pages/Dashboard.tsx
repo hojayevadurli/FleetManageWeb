@@ -28,7 +28,18 @@ const Dashboard = () => {
         id: wo.id,
         woNumber: wo.workOrderNumber || 'Draft',
         equipmentId: wo.equipmentId,
-        status: (WorkOrderStatus as any)[wo.status] ?? WorkOrderStatus.Open,
+        status: (() => {
+          const s = wo.status;
+          if (typeof s === 'number') return s;
+          const lookup = (WorkOrderStatus as any)[s];
+          if (lookup !== undefined) return lookup;
+          // Case-insensitive fallback
+          const lower = String(s).toLowerCase();
+          // Enum keys are strings, values are numbers. 
+          // We need to find the Key that matches the input string case-insensitively, then get the Value.
+          const key = Object.keys(WorkOrderStatus).find(k => isNaN(Number(k)) && k.toLowerCase() === lower);
+          return key ? (WorkOrderStatus as any)[key] : WorkOrderStatus.Open;
+        })(),
         priority: (WorkOrderPriority as any)[wo.priority] ?? WorkOrderPriority.Normal,
         date: wo.openedAt,
         technician: 'Unknown',
@@ -50,9 +61,12 @@ const Dashboard = () => {
 
       setEquipment(mappedEquipment);
       setWorkOrders(mappedWorkOrders);
-      // Use mappedWorkOrders for service records, filtering for completed/history if needed, or all.
-      // Usually "Service History" means completed work orders.
-      setServiceRecords(mappedWorkOrders.filter(wo => wo.status === WorkOrderStatus.Completed || (wo as any).status === "Completed") as any);
+      // Use mappedWorkOrders for service records, allowing all active work (Open, InProcess, Completed)
+      // This ensures Maintenance Spend calculates correctly for all known costs.
+      setServiceRecords(mappedWorkOrders.filter(wo =>
+        wo.status !== WorkOrderStatus.Draft &&
+        wo.status !== WorkOrderStatus.Cancelled
+      ));
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
     } finally {

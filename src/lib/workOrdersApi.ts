@@ -84,51 +84,89 @@ function sanitizeUpsertDto(dto: WorkOrderUpsertDto): WorkOrderUpsertDto {
  * - response header Location: /api/workorders/{id} (requires CORS expose sometimes)
  */
 async function resolveCreatedWorkOrder(res: any): Promise<WorkOrderDto> {
-  // Case 1: backend returns full object (camelCase OR PascalCase)
-  const idFromObj = res?.data?.id || res?.data?.Id;
-  if (idFromObj) {
-    // normalize to camelCase for app usage
-    if (res.data && !res.data.id) res.data.id = idFromObj;
-    return res.data as WorkOrderDto;
-  }
+  let rawData = res?.data;
 
   // Case 2: backend returns id as plain string
-  if (typeof res?.data === "string" && res.data.trim()) {
-    const id = res.data.trim();
+  if (typeof rawData === "string" && rawData.trim()) {
+    const id = rawData.trim();
     const getRes = await api.get(`/workorders/${id}`);
-    return getRes.data as WorkOrderDto;
+    rawData = getRes.data;
   }
-
-  // Case 3: backend returns Location header (may be hidden unless exposed by CORS)
-  const location = (res?.headers?.location || res?.headers?.Location) as string | undefined;
-  if (location) {
+  // Case 3: backend returns Location header
+  else if (!rawData && (res?.headers?.location || res?.headers?.Location)) {
+    const location = (res.headers.location || res.headers.Location) as string;
     const id = location.split("/").filter(Boolean).pop();
     if (id) {
       const getRes = await api.get(`/workorders/${id}`);
-      return getRes.data as WorkOrderDto;
+      rawData = getRes.data;
     }
   }
 
+  if (rawData) {
+    return normalizeWorkOrder(rawData);
+  }
+
   throw new Error(
-    "Create work order failed: backend did not return id/Id in body, string id, or exposed Location header."
+    "Create work order failed: backend did not return body, string id, or exposed Location header."
   );
+}
+
+function normalizeWorkOrder(data: any): WorkOrderDto {
+  if (!data) return data;
+  return {
+    ...data,
+    id: data.id || data.Id,
+    workOrderNumber: data.workOrderNumber || data.WorkOrderNumber,
+    equipmentId: data.equipmentId || data.EquipmentId,
+    vendorId: data.vendorId || data.VendorId,
+    vendorName: data.vendorName || data.VendorName,
+    odometerAtService: data.odometerAtService ?? data.OdometerAtService,
+    hoursAtService: data.hoursAtService ?? data.HoursAtService,
+    openedAt: data.openedAt || data.OpenedAt,
+    closedAt: data.closedAt || data.ClosedAt,
+    title: data.title || data.Title,
+    complaint: data.complaint || data.Complaint,
+    diagnosis: data.diagnosis || data.Diagnosis,
+    resolution: data.resolution || data.Resolution,
+    notes: data.notes || data.Notes,
+    status: data.status || data.Status,
+    priority: data.priority || data.Priority,
+    costSource: data.costSource || data.CostSource,
+    estimatedTotal: data.estimatedTotal ?? data.EstimatedTotal ?? 0,
+    manualActualTotal: data.manualActualTotal ?? data.ManualActualTotal ?? 0,
+    lines: (data.lines || data.Lines || []).map((l: any) => ({
+      ...l,
+      id: l.id || l.Id,
+      type: l.type || l.Type,
+      description: l.description || l.Description,
+      qty: l.qty ?? l.Qty ?? 0,
+      unitPrice: l.unitPrice ?? l.UnitPrice ?? 0,
+      amount: l.amount ?? l.Amount ?? 0
+    })),
+    documents: (data.documents || data.Documents || []).map((d: any) => ({
+      ...d,
+      id: d.id || d.Id,
+      fileName: d.fileName || d.FileName,
+      fileUrl: d.fileUrl || d.FileUrl,
+      fileType: d.fileType || d.FileType
+    }))
+  } as WorkOrderDto;
 }
 
 export const workOrdersApi = {
   list: async (params?: WorkOrderListParams): Promise<WorkOrderDto[]> => {
     const res = await api.get("/workorders", { params });
-    return res.data;
+    return (res.data || []).map(normalizeWorkOrder);
   },
 
   get: async (id: string): Promise<WorkOrderDto> => {
     const res = await api.get(`/workorders/${id}`);
-    return res.data;
+    return normalizeWorkOrder(res.data);
   },
 
   // ✅ Alias (optional, helps avoid UI confusion)
   getById: async (id: string): Promise<WorkOrderDto> => {
-    const res = await api.get(`/workorders/${id}`);
-    return res.data;
+    return workOrdersApi.get(id);
   },
 
   /**
@@ -181,7 +219,7 @@ export const workOrdersApi = {
     const res = await api.put(`/workorders/${id}`, payload);
 
     // If backend returns updated entity
-    if (res?.data) return res.data as WorkOrderDto;
+    if (res?.data) return normalizeWorkOrder(res.data);
 
     // If backend returns no body, fetch it
     return await workOrdersApi.get(id);
@@ -192,7 +230,7 @@ export const workOrdersApi = {
     dto: CreateWorkOrderFromDocumentDto
   ): Promise<WorkOrderDto> => {
     const res = await api.post(`/workorders/from-document/${documentId}`, dto);
-    return res.data;
+    return normalizeWorkOrder(res.data);
   },
 
   /**
@@ -221,7 +259,7 @@ export const workOrdersApi = {
     files.forEach((f) => form.append("files", f));
 
     const res = await api.post(`/workorders/${workOrderId}/attachments`, form);
-    return res.data;
+    return res.data; // Attachments typically simple DTOs, usually camelCase from NestJS/ASP.NET default formatter, but we could normalize if needed.
   },
 
   /**

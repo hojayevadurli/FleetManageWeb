@@ -67,7 +67,7 @@ const VendorAnalytics = () => {
                 status: 'Standard'
             };
         }
-        acc[name].totalSpend += (r.manualActualTotal || r.estimatedTotal || 0);
+        acc[name].totalSpend += (r.estimatedTotal || 0);
         acc[name].orderCount += 1;
         return acc;
     }, {});

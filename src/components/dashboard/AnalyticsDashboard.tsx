@@ -22,7 +22,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
     const breakdowns = workOrders.filter(wo => (wo as any).isRoadside && wo.status !== WorkOrderStatus.Completed);
 
     // Maintenance Spend from Service Records
-    const totalSpend = serviceRecords.reduce((acc, sr) => acc + (sr.totalCost || sr.manualActualTotal || sr.estimatedTotal || 0), 0);
+    const totalSpend = serviceRecords.reduce((acc, sr) => acc + (sr.estimatedTotal || 0), 0);
 
     const statusData = [
         { name: 'Active', value: activeUnits, color: '#10b981' }, // emerald-500
@@ -171,8 +171,17 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                         <div className="space-y-4 flex-1">
                             {serviceRecords.slice(0, 6).map((sr) => {
                                 const vendorDisplay = (sr as any).vendor || (sr as any).vendorName || 'Unknown Vendor';
-                                const statusColor = (sr.status as any)?.toLowerCase() === 'closed' || (sr.status as any)?.toLowerCase() === 'completed' ? 'bg-emerald-50 text-emerald-600' :
-                                    (sr.status as any)?.toLowerCase() === 'open' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600';
+
+                                // Fix: Resolve status to string if it's a number (Enum)
+                                const statusRaw = sr.status;
+                                let statusLabel = String(statusRaw);
+                                if (typeof statusRaw === 'number') {
+                                    statusLabel = WorkOrderStatus[statusRaw] || 'Unknown';
+                                }
+
+                                const statusLower = statusLabel.toLowerCase();
+                                const statusColor = statusLower === 'closed' || statusLower === 'completed' || statusLower === 'paid' ? 'bg-emerald-50 text-emerald-600' :
+                                    statusLower === 'open' || statusLower === 'inprocess' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600';
 
                                 return (
                                     <div key={sr.id} onClick={() => onTabChange('maintenance/service-history', undefined, sr.id)} className="flex items-center gap-4 p-4 rounded-2xl bg-[#f8fafc] border border-transparent hover:border-blue-200 hover:bg-white hover:shadow-md transition-all duration-300 cursor-pointer group">
@@ -184,9 +193,9 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                                             <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate mt-0.5">{vendorDisplay}</div>
                                         </div>
                                         <div className="text-right shrink-0">
-                                            <div className="text-sm font-black text-slate-900 tracking-tight">${(sr.totalCost || sr.manualActualTotal || sr.estimatedTotal || 0).toLocaleString()}</div>
+                                            <div className="text-sm font-black text-slate-900 tracking-tight">${(sr.estimatedTotal || 0).toLocaleString()}</div>
                                             <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md mt-1 inline-block ${statusColor}`}>
-                                                {sr.status}
+                                                {statusLabel}
                                             </div>
                                         </div>
                                     </div>
