@@ -1,7 +1,6 @@
 import React from 'react';
 import { Truck, AlertTriangle, DollarSign, ShieldCheck, ClipboardList, Zap, ChevronRight, ArrowRight } from 'lucide-react';
 import { Equipment, EquipmentStatus, WorkOrder, WorkOrderStatus } from '@/lib/types';
-import { ServiceHistoryDto } from '@/lib/serviceHistoryApi';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import AIPredictiveForecast from './AIPredictiveForecast';
@@ -9,7 +8,7 @@ import AIPredictiveForecast from './AIPredictiveForecast';
 interface DashboardProps {
     equipment: Equipment[];
     workOrders: WorkOrder[];
-    serviceRecords: ServiceHistoryDto[];
+    serviceRecords: WorkOrder[];
     onTabChange: (tab: string, status?: string, recordId?: string) => void;
 }
 
@@ -20,10 +19,10 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
 
     // Work orders logic (active rescues/breakdowns)
     // Note: WorkOrder interface in types.ts HAS isRoadside, but the API DTO might not.
-    const breakdowns = workOrders.filter(wo => (wo as any).isRoadside && wo.status !== WorkOrderStatus.COMPLETED);
+    const breakdowns = workOrders.filter(wo => (wo as any).isRoadside && wo.status !== WorkOrderStatus.Completed);
 
     // Maintenance Spend from Service Records
-    const totalSpend = serviceRecords.reduce((acc, sr) => acc + (sr.totalAmount || sr.total || 0), 0);
+    const totalSpend = serviceRecords.reduce((acc, sr) => acc + (sr.totalCost || sr.manualActualTotal || sr.estimatedTotal || 0), 0);
 
     const statusData = [
         { name: 'Active', value: activeUnits, color: '#10b981' }, // emerald-500
@@ -140,7 +139,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                                     <div key={wo.id} onClick={() => onTabChange('work-orders')} className="bg-white p-4 rounded-xl border border-rose-200 flex items-center justify-between cursor-pointer hover:bg-rose-50/50 transition-colors">
                                         <div>
                                             <div className="text-sm font-black text-slate-900">{equipment.find(e => e.id === wo.equipmentId)?.unitNumber || 'Unit'}</div>
-                                            <div className="text-[10px] text-rose-500 font-bold uppercase tracking-tight">{wo.location || 'Unknown Location'}</div>
+                                            <div className="text-[10px] text-rose-500 font-bold uppercase tracking-tight">N/A</div>
                                         </div>
                                         <div className="bg-rose-500 p-2 rounded-lg">
                                             <ArrowRight className="w-4 h-4 text-white" />
@@ -171,9 +170,9 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                         </div>
                         <div className="space-y-4 flex-1">
                             {serviceRecords.slice(0, 6).map((sr) => {
-                                const vendorDisplay = sr.vendorNameRaw || sr.vendorName || 'Unknown Vendor';
-                                const statusColor = sr.status?.toLowerCase() === 'closed' ? 'bg-emerald-50 text-emerald-600' :
-                                    sr.status?.toLowerCase() === 'open' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600';
+                                const vendorDisplay = (sr as any).vendor || (sr as any).vendorName || 'Unknown Vendor';
+                                const statusColor = (sr.status as any)?.toLowerCase() === 'closed' || (sr.status as any)?.toLowerCase() === 'completed' ? 'bg-emerald-50 text-emerald-600' :
+                                    (sr.status as any)?.toLowerCase() === 'open' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600';
 
                                 return (
                                     <div key={sr.id} onClick={() => onTabChange('maintenance/service-history', undefined, sr.id)} className="flex items-center gap-4 p-4 rounded-2xl bg-[#f8fafc] border border-transparent hover:border-blue-200 hover:bg-white hover:shadow-md transition-all duration-300 cursor-pointer group">
@@ -181,11 +180,11 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                                             <ClipboardList className="w-5 h-5 text-slate-400 group-hover:text-white" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="text-sm font-black text-slate-900 truncate tracking-tight">{sr.invoiceNumber || 'Draft'}</div>
-                                            <div className="text-[10px] text-slate-400 font-black uppercase tracking-tight truncate mt-0.5">{vendorDisplay}</div>
+                                            <div className="text-xs text-slate-500 truncate mt-0.5">{(sr as any).location || 'Shop'}</div>
+                                            <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate mt-0.5">{vendorDisplay}</div>
                                         </div>
                                         <div className="text-right shrink-0">
-                                            <div className="text-sm font-black text-slate-900 tracking-tight">${(sr.totalAmount || sr.total || 0).toLocaleString()}</div>
+                                            <div className="text-sm font-black text-slate-900 tracking-tight">${(sr.totalCost || sr.manualActualTotal || sr.estimatedTotal || 0).toLocaleString()}</div>
                                             <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md mt-1 inline-block ${statusColor}`}>
                                                 {sr.status}
                                             </div>

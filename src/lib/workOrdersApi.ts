@@ -15,6 +15,7 @@ export type WorkOrderLineType = "part" | "labor" | "fee" | "misc";
 export interface WorkOrderUpsertDto {
   equipmentId: string;
   vendorId?: string | null;
+  vendorName?: string | null;
   workOrderNumber?: string | null;
   odometerAtService?: number | null;
   hoursAtService?: number | null;
@@ -59,6 +60,7 @@ export interface CreateWorkOrderFromDocumentDto {
  */
 export interface WorkOrderListParams {
   equipmentId?: string;
+  vendorId?: string;
   page?: number;
   pageSize?: number;
 }
@@ -148,7 +150,7 @@ export const workOrdersApi = {
       title: args.title ?? "Draft",
       complaint: "Draft created for attachments",
       status: WorkOrderStatus.Draft,
-      priority: WorkOrderPriority.Medium,
+      priority: WorkOrderPriority.Normal,
       costSource: WorkOrderCostSource.Estimated,
       estimatedTotal: 0,
       manualActualTotal: 0,

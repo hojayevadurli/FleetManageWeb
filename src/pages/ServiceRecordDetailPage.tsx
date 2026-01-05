@@ -19,10 +19,9 @@ import {
     Printer,
     ShieldCheck
 } from 'lucide-react';
-import { serviceHistoryApi, ServiceHistoryDto } from '@/lib/serviceHistoryApi';
-import { workOrdersApi, WorkOrderDto } from '@/lib/workOrdersApi';
+import { workOrdersApi } from '@/lib/workOrdersApi';
+import { WorkOrderDto, Equipment, WorkOrder } from '@/lib/types';
 import { equipmentApi } from '@/lib/equipmentApi';
-import { Equipment } from '@/lib/types';
 import { useToast } from "@/hooks/use-toast";
 
 const ServiceRecordDetailPage = () => {
@@ -30,7 +29,7 @@ const ServiceRecordDetailPage = () => {
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    const [record, setRecord] = useState<ServiceHistoryDto | null>(null);
+    const [record, setRecord] = useState<WorkOrder | null>(null);
     const [equipment, setEquipment] = useState<Equipment | null>(null);
     const [loading, setLoading] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -45,83 +44,61 @@ const ServiceRecordDetailPage = () => {
         setLoading(true);
         console.log("[Detail] Fetching record for ID:", id);
         try {
-            let data: any;
+            const wo = await workOrdersApi.get(id!);
+            console.log("[Detail] Found in Work Orders:", wo);
 
-            // Step 1: Try Service History API
-            try {
-                console.log("[Detail] Attempting serviceHistoryApi.get...");
-                data = await serviceHistoryApi.get(id!);
-                console.log("[Detail] Found in Service History:", data);
-            } catch (err) {
-                console.warn("[Detail] serviceHistoryApi.get failed. Error:", err);
-
-                // Step 2: Try Work Orders API Fallback
+            // Fetch equipment details if needed
+            if (wo.equipmentId) {
                 try {
-                    console.log("[Detail] Attempting workOrdersApi.get fallback...");
-                    const wo = await workOrdersApi.get(id!);
-                    console.log("[Detail] Found in Work Orders:", wo);
-
-                    data = {
-                        id: wo.id,
-                        invoiceNumber: wo.woNumber,
-                        assetId: wo.assetId,
-                        vendorName: wo.vendorId || 'Maintenance Service',
-                        vendorNameRaw: wo.vendorId,
-                        totalAmount: wo.totalAmount,
-                        taxAmount: wo.taxAmount,
-                        invoiceDate: wo.serviceDate,
-                        status: wo.status,
-                        summary: wo.summary,
-                        lines: wo.lines?.map(l => ({
-                            description: l.description,
-                            qty: l.qty,
-                            unitPrice: l.unitPrice,
-                            amount: l.amount,
-                            type: l.type
-                        })),
-                        attachmentUrl: wo.documents?.[0]?.fileUrl,
-                        attachmentFileName: 'Linked Document',
-                        odometer: wo.odometer
-                    };
-                } catch (woErr) {
-                    console.warn("[Detail] workOrdersApi.get failed. Error:", woErr);
-
-                    // Step 3: Last Resort - Search in List
-                    console.log("[Detail] Attempting search in Service History list...");
-                    const allSh = await serviceHistoryApi.list();
-                    const found = allSh.find(r => r.id === id);
-                    if (found) {
-                        console.log("[Detail] Found record in SH list search!", found);
-                        data = found;
-                    } else {
-                        console.error("[Detail] Record not found in any source.");
-                        throw new Error("Record not found across all audit sources.");
-                    }
-                }
+                    const eq = await equipmentApi.get(wo.equipmentId);
+                    setEquipment(eq);
+                } catch (e) { console.warn("Could not load equipment details"); }
             }
 
-            if (!data) throw new Error("Null data retrieved for record.");
+            // Map WorkOrderDto to WorkOrder
+            const mapped: WorkOrder = {
+                id: wo.id,
+                woNumber: wo.workOrderNumber || `WO-${wo.id.slice(0, 5)}`,
+                equipmentId: wo.equipmentId || "",
+                vendor: (wo as any).vendorName || wo.vendorId || "Unknown Vendor",
+                status: (wo.status as any), // Cast string to enum if needed
+                priority: (wo.priority as any),
+                date: wo.closedAt || wo.openedAt || new Date().toISOString(),
+                technician: "",
+                title: wo.title,
+                complaint: wo.complaint,
+                notes: wo.notes,
+                estimatedTotal: wo.estimatedTotal,
+                manualActualTotal: wo.manualActualTotal,
+                costSource: (wo.costSource as any),
+                totalCost: wo.manualActualTotal || wo.estimatedTotal || 0,
+                partsCost: 0,
+                laborCost: 0,
+                description: wo.notes || wo.complaint || "Service",
+                items: wo.lines?.map(l => ({
+                    id: l.id,
+                    serviceType: l.type,
+                    description: l.description,
+                    quantity: l.qty,
+                    unitPrice: l.unitPrice,
+                    cost: l.amount,
+                    type: l.type as any
+                })) || [],
+                media: [],
+                odometer: wo.odometerAtService || 0,
+                hours: 0
+            };
 
-            setRecord(data);
+            setRecord(mapped);
 
-            if (data.assetId) {
-                try {
-                    console.log("[Detail] Fetching equipment info for assetId:", data.assetId);
-                    const equip = await equipmentApi.get(data.assetId);
-                    if (equip) {
-                        setEquipment(equip as any);
-                    }
-                } catch (equipErr) {
-                    console.warn("[Detail] Failed to fetch equipment details", equipErr);
-                }
-            }
-        } catch (err: any) {
-            console.error("[Detail] Global fetch error:", err);
+        } catch (err) {
+            console.error("Error loading record:", err);
             toast({
-                title: "Fetch Failed",
-                description: err.message || "This specific audit record is currently unreachable.",
+                title: "Error",
+                description: "Could not load service record details.",
                 variant: "destructive"
             });
+            navigate('/maintenance/service-history');
         } finally {
             setLoading(false);
         }
@@ -167,9 +144,9 @@ const ServiceRecordDetailPage = () => {
     // Use lines if we have any, otherwise fall back to record totals
     const hasLines = totalLinesSum > 0 || validLines.length > 0;
 
-    const displayedSubtotal = hasLines ? serviceLinesSum : ((record.totalAmount || 0) - (record.taxAmount || 0));
-    const displayedTax = hasLines ? taxLinesSum : (record.taxAmount || 0);
-    const displayedTotal = hasLines ? totalLinesSum : (record.totalAmount || 0);
+    const displayedSubtotal = hasLines ? serviceLinesSum : (record.totalCost || 0);
+    const displayedTax = hasLines ? taxLinesSum : 0;
+    const displayedTotal = hasLines ? totalLinesSum : (record.totalCost || 0);
 
 
 
@@ -191,10 +168,12 @@ const ServiceRecordDetailPage = () => {
                                 <h1 className="text-xl font-black text-slate-900 tracking-tight">
                                     {record.invoiceNumber || `SR-${record.id.slice(0, 8).toUpperCase()}`}
                                 </h1>
-                                <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest border ${record.status?.toLowerCase() === 'closed' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-blue-100 text-blue-700 border-blue-200'
+                                <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border ${(record.status as string)?.toLowerCase() === 'completed'
+                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                    : 'bg-blue-50 text-blue-600 border-blue-100'
                                     }`}>
                                     {record.status}
-                                </span>
+                                </div>
                             </div>
                             <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">
                                 Verified Audit Record • AI Validated
@@ -230,22 +209,21 @@ const ServiceRecordDetailPage = () => {
                                     </div>
                                     <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 italic">
                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Service Date</div>
-                                        <div className="text-lg font-black text-slate-900">{record.invoiceDate ? new Date(record.invoiceDate).toLocaleDateString() : 'N/A'}</div>
+                                        <div className="text-lg font-black text-slate-900">{record.date ? new Date(record.date).toLocaleDateString() : 'N/A'}</div>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="space-y-8">
                                 <div className="space-y-3">
-                                    <div className="flex items-center gap-2 text-slate-400 font-black text-[10px] uppercase tracking-[0.2em]">
-                                        <Store className="w-4 h-4" /> Service Vendor
+                                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">{record.woNumber || 'Draft'}</h1>
+                                    <div className="flex items-center gap-2 mt-2 text-slate-500">
+                                        <Store className="w-4 h-4" />
+                                        <span className="font-bold text-xs uppercase tracking-widest">{record.vendor || 'Unknown Vendor'}</span>
+                                        <span className="text-slate-300">•</span>
+                                        <Calendar className="w-4 h-4" />
+                                        <span className="font-bold text-xs uppercase tracking-widest">{new Date(record.date || "").toLocaleDateString()}</span>
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900 tracking-tight leading-tight">
-                                        {record.vendorName || record.vendorNameRaw}
-                                    </h2>
-                                    <p className="text-sm text-slate-500 font-medium line-clamp-2">
-                                        Professional fleet maintenance and repairs.
-                                    </p>
                                 </div>
                                 <div className="pt-4">
                                     <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
@@ -287,9 +265,9 @@ const ServiceRecordDetailPage = () => {
                                                 <div className="font-black text-slate-900 text-sm tracking-tight">{line.description}</div>
                                                 <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{line.type}</div>
                                             </td>
-                                            <td className="px-10 py-8 font-black text-slate-700 text-sm">{line.qty}</td>
+                                            <td className="px-10 py-8 font-black text-slate-700 text-sm">{line.quantity}</td>
                                             <td className="px-10 py-8 text-right font-mono font-bold text-slate-600 text-sm">${line.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                            <td className="px-10 py-8 text-right font-mono font-black text-slate-900 text-sm">${line.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className="px-10 py-8 text-right font-mono font-black text-slate-900 text-sm">${line.cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                         </tr>
                                     ))}
                                     {(!validLines || validLines.length === 0) && (
@@ -301,7 +279,6 @@ const ServiceRecordDetailPage = () => {
                                     )}
                                 </tbody>
                                 <tfoot>
-
                                     <tr className="bg-slate-50/50">
                                         <td colSpan={3} className="px-10 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Taxes & Fees</td>
                                         <td className="px-10 py-6 text-right font-mono font-black text-rose-600 text-sm">${displayedTax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -322,7 +299,7 @@ const ServiceRecordDetailPage = () => {
                         </h3>
                         <div className="p-8 bg-blue-50/50 rounded-[2rem] border border-blue-100/50">
                             <p className="text-blue-900 font-medium leading-relaxed italic">
-                                "{record.summary || record.description || "The service was performed by an authorized partner. All line items have been verified against the fleet policy."}"
+                                "{record.notes || record.description || "The service was performed by an authorized partner. All line items have been verified against the fleet policy."}"
                             </p>
                         </div>
                     </div>
@@ -358,6 +335,7 @@ const ServiceRecordDetailPage = () => {
                                             target="_blank"
                                             rel="noreferrer"
                                             className="p-2 hover:bg-slate-100 rounded-lg text-blue-600 transition-all"
+                                            title="Download"
                                         >
                                             <Download className="w-4 h-4" />
                                         </a>

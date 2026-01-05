@@ -3,23 +3,21 @@ import { useNavigate } from "react-router-dom";
 import AnalyticsDashboard from "@/components/dashboard/AnalyticsDashboard";
 import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
 import { workOrdersApi } from "@/lib/workOrdersApi";
-import { serviceHistoryApi } from "@/lib/serviceHistoryApi";
-import { Equipment, WorkOrder, EquipmentStatus, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource, ServiceHistory } from "@/lib/types";
+import { Equipment, WorkOrder, EquipmentStatus, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [serviceRecords, setServiceRecords] = useState<ServiceHistory[]>([]);
+  const [serviceRecords, setServiceRecords] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
-      const [equipData, woData, shData] = await Promise.all([
+      const [equipData, woData] = await Promise.all([
         equipmentApi.list(),
-        workOrdersApi.list(),
-        serviceHistoryApi.list()
+        workOrdersApi.list()
       ]);
 
       // Map EquipmentDto to Equipment
@@ -52,7 +50,9 @@ const Dashboard = () => {
 
       setEquipment(mappedEquipment);
       setWorkOrders(mappedWorkOrders);
-      setServiceRecords(shData || []);
+      // Use mappedWorkOrders for service records, filtering for completed/history if needed, or all.
+      // Usually "Service History" means completed work orders.
+      setServiceRecords(mappedWorkOrders.filter(wo => wo.status === WorkOrderStatus.Completed || (wo as any).status === "Completed") as any);
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
     } finally {
