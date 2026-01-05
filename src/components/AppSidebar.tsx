@@ -5,7 +5,6 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import { SidebarNavigation } from "./sidebar/SidebarNavigation";
-import { SidebarAccountSection } from "./sidebar/SidebarAccountSection";
 import { SidebarFooterSection } from "./sidebar/SidebarFooterSection";
 
 export function AppSidebar() {
@@ -22,9 +21,6 @@ export function AppSidebar() {
 
       <SidebarContent className="flex flex-col">
         <SidebarNavigation />
-        <div className="mt-auto">
-          <SidebarAccountSection />
-        </div>
       </SidebarContent>
 
       <SidebarFooterSection />

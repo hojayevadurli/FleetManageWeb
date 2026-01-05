@@ -14,13 +14,20 @@ import {
     MapPin,
     Map as MapIcon,
     ChevronRight,
-    Trash2
+    Trash2,
+    Hammer, // For Heavy Equipment
+    CheckCircle2,
+    Lock,
+    RefreshCw,
+    Zap
 } from 'lucide-react';
 import { equipmentApi, EquipmentCreatePayload } from '@/lib/equipmentApi';
 import { fleetCategoriesApi, FleetCategory } from '@/lib/fleetCategoriesApi';
 import { equipmentTypesApi } from '@/lib/equipmentTypesApi';
 import { tenantsApi } from '@/lib/tenantsApi';
-import { Equipment, EquipmentStatus, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource, EquipmentTypeDto } from '@/lib/types';
+import { Equipment, EquipmentStatus, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource, EquipmentTypeDto, FleetType } from '@/lib/types';
+import { FLEET_TYPES, getSpecificTypes, getManufacturers, TRUCK_TYPES, TRAILER_TYPES, HEAVY_EQUIPMENT_TYPES, US_STATES } from '@/lib/fleetData';
+import { decodeVin, validateVin } from '@/lib/nhtsaApi'; // Import VIN helpers
 
 import { verifyVendorAddress, searchVendorSuggestions } from '@/lib/gemini';
 import { Checkbox } from "@/components/ui/checkbox";
@@ -42,7 +49,7 @@ import {
 interface EquipmentListProps {
     equipment: Equipment[];
     onSelect: (e: Equipment, openAi?: boolean) => void;
-    onAddEquipment: (e: Omit<Equipment, 'id'>) => void;
+    onAddEquipment: (e: Omit<Equipment, 'id'>) => Promise<{ status: number; message: string } | null>;
     onNewWorkOrder: (unitId: string) => void;
     onAddWorkOrder: (wo: Omit<WorkOrder, 'id'>, files?: File[]) => void;
     onBulkDelete?: (ids: string[]) => Promise<void>;
@@ -59,40 +66,21 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
     initialStatusFilter = 'ALL'
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [typeFilter, setTypeFilter] = useState<'ALL' | string>('ALL');
+    const [typeFilter, setTypeFilter] = useState<'ALL' | FleetType>('ALL');
     const [statusFilter, setStatusFilter] = useState<'ALL' | EquipmentStatus>(initialStatusFilter);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
 
-    const [fleetCategories, setFleetCategories] = useState<FleetCategory[]>([]);
-    const [equipmentTypes, setEquipmentTypes] = useState<EquipmentTypeDto[]>([]);
-    const [loadingConfig, setLoadingConfig] = useState(false);
+    const [isDecoding, setIsDecoding] = useState(false);
+    const [decodeError, setDecodeError] = useState<string | null>(null);
+    const [autoFilledFields, setAutoFilledFields] = useState<string[]>([]);
 
-
-
+    // Initial load logic simplified - no more heavy config fetching needed for new simple form
     useEffect(() => {
         if (isAddModalOpen) {
-            setLoadingConfig(true);
-            const loadData = async () => {
-                try {
-                    // 1. Get current tenant to find industry
-                    const tenant = await tenantsApi.getCurrent();
-                    const industryId = tenant?.industryId;
-
-                    if (industryId !== undefined && industryId !== null) {
-                        // 2. Fetch fleet categories filtered by industry
-                        const cats = await fleetCategoriesApi.list(industryId);
-                        setFleetCategories(cats);
-                    } else {
-                        setFleetCategories([]);
-                    }
-                } catch (err) {
-                    console.error("Failed to load config data", err);
-                } finally {
-                    setLoadingConfig(false);
-                }
-            };
-            loadData();
+            // Reset states if needed
+            setDecodeError(null);
+            setIsDecoding(false);
         }
     }, [isAddModalOpen]);
 
@@ -107,7 +95,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
     const [woFormData, setWoFormData] = useState<Partial<WorkOrder> & { unitNumber?: string }>({
         woNumber: '',
         status: WorkOrderStatus.Open,
-        priority: WorkOrderPriority.Medium,
+        priority: WorkOrderPriority.Normal,
         date: new Date().toISOString().split('T')[0],
         totalCost: 0,
         partsCost: 0,
@@ -176,7 +164,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
         setWoFormData({
             woNumber: `WO-${Math.floor(Math.random() * 10000)}`,
             status: WorkOrderStatus.Open,
-            priority: WorkOrderPriority.Medium,
+            priority: WorkOrderPriority.Normal,
             date: new Date().toISOString().split('T')[0],
             totalCost: 0,
             partsCost: 0,
@@ -245,9 +233,11 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
         setSelectedFiles([]);
     };
 
-    const [newEquip, setNewEquip] = useState<Partial<EquipmentCreatePayload>>({
+    const [newEquip, setNewEquip] = useState<Partial<EquipmentCreatePayload> & { fleetType?: FleetType; specificType?: string; licenseState?: string }>({
         unitNumber: '',
-        type: 'Truck',
+        type: 'Truck', // Default fallback
+        fleetType: 'TRUCK',
+        specificType: '',
         make: '',
         model: '',
         year: new Date().getFullYear(),
@@ -255,6 +245,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
         vin: '',
         serialNumber: '',
         licensePlate: '',
+        licenseState: '',
         lastServiceDate: new Date().toISOString().split('T')[0],
         mileage: 0,
         engineType: '',
@@ -265,31 +256,45 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
         initialHours: 0
     });
 
-    // Fetch Equipment Types when Fleet Category changes (and we know industry)
-    useEffect(() => {
-        const fetchTypes = async () => {
-            if (newEquip.fleetCategoryId) {
-                try {
-                    console.log("Fetching types for Category:", newEquip.fleetCategoryId);
-                    const tenant = await tenantsApi.getCurrent();
-                    console.log("Current Tenant Industry:", tenant?.industryId);
+    // VIN Decoder Handler
+    const handleVinChange = async (val: string) => {
+        const vin = val.toUpperCase();
+        setNewEquip(prev => ({ ...prev, vin }));
+        setDecodeError(null);
+        // Clear auto-filled status if user manually edits VIN (assuming strict correlation)
+        // But if they are just typing, we wait for valid VIN
+        if (val.length < 17) setAutoFilledFields([]);
 
-                    if (tenant?.industryId) {
-                        const types = await equipmentTypesApi.list(tenant.industryId, newEquip.fleetCategoryId);
-                        console.log("Fetched Equipment Types:", types);
-                        setEquipmentTypes(types);
-                    } else {
-                        console.warn("No industry ID found on tenant");
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch equipment types", e);
+        if (validateVin(vin)) {
+            setIsDecoding(true);
+            try {
+                const decoded = await decodeVin(vin);
+                if (decoded) {
+                    setNewEquip(prev => ({
+                        ...prev,
+                        vin,
+                        make: decoded.make || prev.make,
+                        model: decoded.model || prev.model,
+                        year: decoded.year || prev.year
+                    }));
+
+                    // Mark fields as auto-filled
+                    const newAutoFilled = [];
+                    if (decoded.make) newAutoFilled.push('make');
+                    if (decoded.model) newAutoFilled.push('model');
+                    if (decoded.year) newAutoFilled.push('year');
+                    setAutoFilledFields(newAutoFilled);
+                } else {
+                    setDecodeError("Could not decode VIN details. Please enter manually.");
+                    setAutoFilledFields([]);
                 }
-            } else {
-                setEquipmentTypes([]);
+            } catch (err) {
+                setDecodeError("VIN service unavailable.");
+            } finally {
+                setIsDecoding(false);
             }
-        };
-        fetchTypes();
-    }, [newEquip.fleetCategoryId]);
+        }
+    };
 
     const getStatusColor = (status: string) => {
         const s = status?.toLowerCase();
@@ -304,11 +309,24 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
         return equipment.filter(e => {
             const matchesSearch = (
                 e.unitNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                e.vin.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                e.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                e.model.toLowerCase().includes(searchTerm.toLowerCase())
+                (e.vin && e.vin.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (e.make && e.make.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (e.model && e.model.toLowerCase().includes(searchTerm.toLowerCase()))
             );
-            const matchesType = typeFilter === 'ALL' || e.type.toLowerCase().includes(typeFilter.toLowerCase());
+
+            let matchesType = true;
+            if (typeFilter !== 'ALL') {
+                if (e.fleetType) {
+                    matchesType = e.fleetType === typeFilter;
+                } else {
+                    // Fallback for legacy data
+                    const t = e.type.toLowerCase();
+                    if (typeFilter === 'TRUCK') matchesType = t.includes('truck') || t.includes('tractor') || t.includes('van');
+                    else if (typeFilter === 'TRAILER') matchesType = t.includes('trailer') || t.includes('chassis') || t.includes('dolly');
+                    else if (typeFilter === 'HEAVY_EQUIPMENT') matchesType = t.includes('dozer') || t.includes('crane') || t.includes('excavator') || t.includes('lift');
+                }
+            }
+
             const matchesStatus = statusFilter === 'ALL' || e.status === statusFilter;
             return matchesSearch && matchesType && matchesStatus;
         });
@@ -333,30 +351,53 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
         }
     };
 
-    const handleAddSubmit = (e: React.FormEvent) => {
+    // Submit
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleAddSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        onAddEquipment(newEquip as any);
-        setIsAddModalOpen(false);
-        setNewEquip({
-            unitNumber: '',
-            type: 'Truck',
-            make: '',
-            model: '',
-            year: new Date().getFullYear(),
-            status: EquipmentStatus.ACTIVE,
-            vin: '',
-            serialNumber: '',
-            licensePlate: '',
-            lastServiceDate: new Date().toISOString().split('T')[0],
-            mileage: 0,
-            engineType: '',
-            length: 53,
-            weightCapacity: 45000,
-            fleetCategoryId: undefined,
-            initialOdometer: 0,
-            initialHours: 0
-        });
-        setShowAdvanced(false);
+        setSubmitError(null);
+        setIsSubmitting(true);
+
+        try {
+            const error = await onAddEquipment(newEquip as any);
+
+            if (error) {
+                // If there's an error, show it and keep modal open
+                setSubmitError(error.message);
+                setIsSubmitting(false);
+            } else {
+                // Success
+                setIsAddModalOpen(false);
+                setNewEquip({
+                    unitNumber: '',
+                    type: 'Truck',
+                    make: '',
+                    model: '',
+                    year: new Date().getFullYear(),
+                    status: EquipmentStatus.ACTIVE,
+                    vin: '',
+                    serialNumber: '',
+                    licensePlate: '',
+                    licenseState: '',
+                    lastServiceDate: new Date().toISOString().split('T')[0],
+                    mileage: 0,
+                    engineType: '',
+                    length: 53,
+                    weightCapacity: 45000,
+                    fleetCategoryId: undefined,
+                    initialOdometer: 0,
+                    initialHours: 0
+                });
+                setShowAdvanced(false);
+                setIsSubmitting(false);
+            }
+        } catch (e) {
+            // Fallback for unexpected errors
+            setSubmitError("An unexpected error occurred.");
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -421,13 +462,19 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
 
                     <div className="flex flex-wrap items-center gap-3">
                         <div className="flex items-center bg-slate-50 border border-slate-200 rounded-2xl p-1">
-                            {(['ALL', 'truck', 'trailer'] as const).map(type => (
+                            <button
+                                onClick={() => setTypeFilter('ALL')}
+                                className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${typeFilter === 'ALL' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                            >
+                                All
+                            </button>
+                            {(Object.keys(FLEET_TYPES) as FleetType[]).map(type => (
                                 <button
                                     key={type}
                                     onClick={() => setTypeFilter(type)}
                                     className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${typeFilter === type ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
                                 >
-                                    {type === 'ALL' ? 'All' : type + 's'}
+                                    {FLEET_TYPES[type]}
                                 </button>
                             ))}
                         </div>
@@ -475,10 +522,18 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
 
                                 <div className="p-6 pb-2 flex justify-between items-start">
                                     <div className="flex items-center gap-3">
-                                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 group-hover:bg-blue-50 transition-colors">
-                                            {e.type === 'truck' ? <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> : <Container className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />}
+                                        <div className={`p-2.5 rounded-xl border border-slate-100 group-hover:bg-blue-50 transition-colors ${e.fleetType === 'HEAVY_EQUIPMENT' ? 'bg-amber-50' : 'bg-slate-50'}`}>
+                                            {e.fleetType === 'TRUCK' ? <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
+                                                e.fleetType === 'TRAILER' ? <Container className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
+                                                    e.fleetType === 'HEAVY_EQUIPMENT' ? <Hammer className="w-5 h-5 text-amber-500 group-hover:text-amber-600" /> :
+                                                        <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />}
                                         </div>
-                                        <h3 className="font-black text-xl text-slate-900 tracking-tight">{e.unitNumber}</h3>
+                                        <div>
+                                            <h3 className="font-black text-xl text-slate-900 tracking-tight">{e.unitNumber}</h3>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1">
+                                                {e.fleetType ? FLEET_TYPES[e.fleetType] : 'Unknown'}
+                                            </p>
+                                        </div>
                                     </div>
                                     <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase border tracking-widest flex items-center gap-1.5 ${getStatusColor(e.status)}`}>
                                         {e.status === EquipmentStatus.OUT_OF_SERVICE && <AlertCircle className="w-3 h-3" />}
@@ -549,157 +604,229 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                         </div>
                         <div className="overflow-y-auto flex-1">
                             <form className="p-10 space-y-6" onSubmit={handleAddSubmit}>
-                                <div className="grid grid-cols-2 gap-6 mb-6">
-                                    <div className="space-y-2">
-                                        <Label>Fleet Category <span className="text-red-500">*</span></Label>
-                                        <Select
-                                            value={newEquip.fleetCategoryId?.toString()}
-                                            onValueChange={(val) => setNewEquip({ ...newEquip, fleetCategoryId: parseInt(val) })}
-                                            disabled={loadingConfig}
-                                        >
-                                            <SelectTrigger className="w-full bg-slate-50 border-slate-200 py-4 h-auto text-sm font-bold">
-                                                <SelectValue placeholder={loadingConfig ? "Loading..." : "Select Category"} />
-                                            </SelectTrigger>
-                                            <SelectContent className="z-[200] max-h-[300px]">
-                                                {fleetCategories.length > 0 ? fleetCategories.map(c => (
-                                                    <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                                                )) : (
-                                                    <SelectItem value="none" disabled>No categories found for your industry</SelectItem>
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                {/* REORDERED FORM FIELDS */}
+                                <style>{`
+                                    .auto-filled-field {
+                                        background: linear-gradient(to right, #F0F4FF 0%, transparent 100%);
+                                        border-left: 3px solid #6366F1;
+                                    }
+                                    .auto-filled-badge {
+                                        font-size: 9px;
+                                        color: #6366F1;
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 3px;
+                                        margin-bottom: 2px;
+                                    }
+                                `}</style>
 
-                                    <div className="space-y-2">
-                                        <Label>Equipment Type <span className="text-red-500">*</span></Label>
-                                        <Select
-                                            value={newEquip.equipmentTypeId?.toString()}
-                                            onValueChange={(val) => {
-                                                const selectedType = equipmentTypes.find(t => t.id.toString() === val);
-                                                setNewEquip({
-                                                    ...newEquip,
-                                                    equipmentTypeId: val,
-                                                    equipmentTypeName: selectedType?.name,
-                                                    // Auto-set asset type 'Truck' or 'Trailer' based on name/code if possible, otherwise default
-                                                    // For now assume "Truck" unless name contains Trailer
-                                                    type: selectedType?.name.toLowerCase().includes('trailer') ? 'Trailer' : 'Truck'
-                                                });
-                                            }}
-                                            disabled={!newEquip.fleetCategoryId}
-                                        >
-                                            <SelectTrigger className="w-full bg-slate-50 border-slate-200 py-4 h-auto text-sm font-bold">
-                                                <SelectValue placeholder={!newEquip.fleetCategoryId ? "Select Category First" : "Select Type"} />
-                                            </SelectTrigger>
-                                            <SelectContent className="z-[200] max-h-[300px]">
-                                                {equipmentTypes.length > 0 ? equipmentTypes.map(t => (
-                                                    <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
-                                                )) : (
-                                                    <SelectItem value="none" disabled>No types found for this category</SelectItem>
-                                                )}
-                                            </SelectContent>
-                                        </Select>
+                                {submitError && (
+                                    <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-start gap-3 animate-in slide-in-from-top-2 duration-200">
+                                        <div className="bg-rose-100 p-2 rounded-full shrink-0">
+                                            <AlertCircle className="w-5 h-5 text-rose-600" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-black text-rose-700">Action Required</h4>
+                                            <p className="text-sm font-medium text-rose-600/90 mt-0.5">{submitError}</p>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
-                                <div className="grid grid-cols-2 gap-6">
+                                <div className="space-y-6">
+                                    {/* 1. Unit Number */}
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit Number</label>
                                         <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="T-100" value={newEquip.unitNumber} onChange={e => setNewEquip({ ...newEquip, unitNumber: e.target.value })} />
                                     </div>
 
-                                    {/* Dynamic Fields based on Equipment Type */}
-                                    {(() => {
-                                        const selectedType = equipmentTypes.find(t => t.id.toString() === newEquip.equipmentTypeId?.toString());
-                                        const showVin = selectedType ? selectedType.hasVin : true; // Default to showing VIN if no type selected yet
-                                        const showSerial = selectedType ? selectedType.hasSerial : false;
+                                    {/* 2. VIN with Decoder */}
+                                    {/* 2. VIN with Decoder */}
+                                    <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 space-y-3 relative overflow-hidden">
+                                        {/* Decoder Background Effect */}
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
 
-                                        return (
-                                            <>
-                                                {showVin && (
-                                                    <div className="space-y-1.5">
-                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">VIN (17 Digits)</label>
-                                                        <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Required" value={newEquip.vin} onChange={e => setNewEquip({ ...newEquip, vin: e.target.value })} />
-                                                    </div>
-                                                )}
-                                                {showSerial && (
-                                                    <div className="space-y-1.5">
-                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Serial Number</label>
-                                                        <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Required" value={newEquip.serialNumber || ''} onChange={e => setNewEquip({ ...newEquip, serialNumber: e.target.value })} />
-                                                    </div>
-                                                )}
-                                            </>
-                                        );
-                                    })()}
+                                        <div className="space-y-2 relative">
+                                            <div className="flex justify-between items-end px-1">
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                                    VIN (17 Characters)
+                                                </label>
+                                            </div>
+                                            <div className="relative group">
+                                                <input
+                                                    required
+                                                    type="text"
+                                                    className={`w-full px-5 py-4 bg-white border rounded-2xl text-sm font-mono font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none uppercase pr-12 transition-all shadow-sm group-hover:border-blue-300 ${decodeError ? 'border-rose-300 focus:ring-rose-200 bg-rose-50/30' : 'border-slate-200'} ${autoFilledFields.length > 0 ? 'border-emerald-500/50 bg-emerald-50/10' : ''}`}
+                                                    placeholder="ENTER 17-DIGIT VIN"
+                                                    value={newEquip.vin}
+                                                    maxLength={17}
+                                                    onChange={e => handleVinChange(e.target.value)}
+                                                />
+                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                                    {isDecoding && <Loader2 className="w-5 h-5 animate-spin text-blue-600" />}
+                                                    {!isDecoding && autoFilledFields.length > 0 && <div className="bg-emerald-100 text-emerald-700 p-1 rounded-full"><CheckCircle2 className="w-4 h-4" /></div>}
+                                                    {!isDecoding && decodeError && <div className="bg-rose-100 text-rose-600 p-1 rounded-full"><AlertCircle className="w-4 h-4" /></div>}
+                                                </div>
+                                            </div>
 
-                                </div>
+                                            {/* Decode Status Banner */}
+                                            {autoFilledFields.length > 0 && (
+                                                <div className="flex items-center gap-2 px-2 py-1">
+                                                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                                                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">Vehicle Details Decoded</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
 
+                                    {/* 3. Fleet Classification */}
+                                    <div className="space-y-4 pt-2">
+                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fleet Classification</h3>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            {(Object.keys(FLEET_TYPES) as FleetType[]).map(type => (
+                                                <div
+                                                    key={type}
+                                                    onClick={() => setNewEquip({ ...newEquip, fleetType: type, specificType: '', make: '' })}
+                                                    className={`cursor-pointer rounded-2xl border-2 p-4 text-center transition-all ${newEquip.fleetType === type ? 'border-blue-600 bg-blue-50/50' : 'border-slate-100 hover:border-slate-200'}`}
+                                                >
+                                                    <div className="text-xs font-black text-slate-800">{FLEET_TYPES[type]}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
 
-
-                                <div className="space-y-2">
-                                    <Label>Make</Label>
-                                    <Input
-                                        value={newEquip.make || ''}
-                                        onChange={e => setNewEquip({ ...newEquip, make: e.target.value })}
-                                        placeholder="e.g. Kenworth"
-                                    />
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Status</label>
-                                    <select
-                                        className={`w-full px-5 py-4 border rounded-2xl text-sm font-black outline-none appearance-none cursor-pointer transition-all ${getStatusColor(newEquip.status as EquipmentStatus || EquipmentStatus.ACTIVE)}`}
-                                        value={newEquip.status}
-                                        onChange={e => setNewEquip({ ...newEquip, status: e.target.value as EquipmentStatus })}
-                                    >
-                                        {Object.values(EquipmentStatus).map(s => (
-                                            <option key={s} value={s} className="bg-white text-slate-900">
-                                                {s.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model</label>
-                                    <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Cascadia" value={newEquip.model} onChange={e => setNewEquip({ ...newEquip, model: e.target.value })} />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model Year</label>
-                                    <input required type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="2025" value={newEquip.year} onChange={e => setNewEquip({ ...newEquip, year: parseInt(e.target.value) || new Date().getFullYear() })} />
-                                </div>
-
-
-                                <div className="pt-4 border-t border-slate-100/50 mt-6">
-                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Type Specific Specifications</h3>
+                                    {/* 4. Specific Type & Make */}
                                     <div className="grid grid-cols-2 gap-6">
-                                        {newEquip.type === 'truck' ? (
-                                            <>
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">License Plate</label>
-                                                    <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="ABC-1234" value={newEquip.licensePlate} onChange={e => setNewEquip({ ...newEquip, licensePlate: e.target.value })} />
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Engine Type</label>
-                                                    <input type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Cummins X15" value={newEquip.engineType} onChange={e => setNewEquip({ ...newEquip, engineType: e.target.value })} />
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Mileage</label>
-                                                    <input type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0" value={newEquip.mileage} onChange={e => setNewEquip({ ...newEquip, mileage: parseInt(e.target.value) || 0 })} />
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <>
+                                        <div className="space-y-2">
+                                            <Label>Specific Type <span className="text-red-500">*</span></Label>
+                                            <Select
+                                                value={newEquip.specificType}
+                                                onValueChange={(val) => setNewEquip({ ...newEquip, specificType: val, type: val })}
+                                            >
+                                                <SelectTrigger className="w-full bg-slate-50 border-slate-200 py-4 h-auto text-sm font-bold">
+                                                    <SelectValue placeholder="Select Type" />
+                                                </SelectTrigger>
+                                                <SelectContent className="z-[200] max-h-[300px]">
+                                                    {newEquip.fleetType ? getSpecificTypes(newEquip.fleetType).map(t => (
+                                                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                                                    )) : (
+                                                        <SelectItem value="none" disabled>Select Fleet Type First</SelectItem>
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
 
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Length (ft)</label>
-                                                    <input type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="53" value={newEquip.length} onChange={e => setNewEquip({ ...newEquip, length: parseInt(e.target.value) || 0 })} />
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Capacity (lbs)</label>
-                                                    <input type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="45000" value={newEquip.weightCapacity} onChange={e => setNewEquip({ ...newEquip, weightCapacity: parseInt(e.target.value) || 0 })} />
-                                                </div>
-                                            </>
-                                        )}
+                                        <div className="space-y-2">
+                                            {autoFilledFields.includes('make') ? (
+                                                <div className="auto-filled-badge"><Zap className="w-3 h-3" /> Auto-filled from VIN</div>
+                                            ) : (
+                                                <Label>Make</Label>
+                                            )}
+                                            <div className="relative">
+                                                <Input
+                                                    list="make-suggestions"
+                                                    className={`w-full bg-slate-50 border-slate-200 py-4 h-auto text-sm font-bold transition-all ${autoFilledFields.includes('make') ? 'auto-filled-field' : ''}`}
+                                                    placeholder="Select or Type Make"
+                                                    value={newEquip.make}
+                                                    onChange={(e) => setNewEquip({ ...newEquip, make: e.target.value })}
+                                                />
+                                                {autoFilledFields.includes('make') && <Lock className="w-3 h-3 text-indigo-400 absolute right-3 top-1/2 -translate-y-1/2 opacity-50" />}
+                                                <datalist id="make-suggestions">
+                                                    {newEquip.fleetType && getManufacturers(newEquip.fleetType).map(m => (
+                                                        <option key={m} value={m} />
+                                                    ))}
+                                                </datalist>
+
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 5. Status, Model, Year */}
+                                    <div className="grid grid-cols-3 gap-6">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Status</label>
+                                            <select
+                                                className={`w-full px-5 py-4 border rounded-2xl text-sm font-black outline-none appearance-none cursor-pointer transition-all ${getStatusColor(newEquip.status as EquipmentStatus || EquipmentStatus.ACTIVE)}`}
+                                                value={newEquip.status}
+                                                onChange={e => setNewEquip({ ...newEquip, status: e.target.value as EquipmentStatus })}
+                                            >
+                                                {Object.values(EquipmentStatus).map(s => (
+                                                    <option key={s} value={s} className="bg-white text-slate-900">
+                                                        {s.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1.5 relative">
+                                            {autoFilledFields.includes('model') ? (
+                                                <div className="auto-filled-badge"><Zap className="w-3 h-3" /> Auto-filled</div>
+                                            ) : (
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model</label>
+                                            )}
+                                            <div className="relative">
+                                                <input
+                                                    required
+                                                    type="text"
+                                                    className={`w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all ${autoFilledFields.includes('model') ? 'auto-filled-field' : ''}`}
+                                                    placeholder="Model"
+                                                    value={newEquip.model}
+                                                    onChange={e => setNewEquip({ ...newEquip, model: e.target.value })}
+                                                />
+                                                {autoFilledFields.includes('model') && <Lock className="w-3 h-3 text-indigo-400 absolute right-3 top-1/2 -translate-y-1/2 opacity-50" />}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1.5 relative">
+                                            {autoFilledFields.includes('year') ? (
+                                                <div className="auto-filled-badge"><Zap className="w-3 h-3" /> Auto-filled</div>
+                                            ) : (
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model Year</label>
+                                            )}
+                                            <div className="relative">
+                                                <input
+                                                    required
+                                                    type="number"
+                                                    className={`w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all ${autoFilledFields.includes('year') ? 'auto-filled-field' : ''}`}
+                                                    placeholder="Year"
+                                                    value={newEquip.year}
+                                                    onChange={e => setNewEquip({ ...newEquip, year: parseInt(e.target.value) || new Date().getFullYear() })}
+                                                />
+                                                {autoFilledFields.includes('year') && <Lock className="w-3 h-3 text-indigo-400 absolute right-3 top-1/2 -translate-y-1/2 opacity-50" />}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 6. License Details (Moved to Bottom) */}
+                                    <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-100/50">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">License Number (Optional)</label>
+                                            <input
+                                                type="text"
+                                                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none uppercase placeholder:text-slate-300 transition-all"
+                                                placeholder="ABC-1234"
+                                                value={newEquip.licensePlate}
+                                                onChange={e => setNewEquip({ ...newEquip, licensePlate: e.target.value.toUpperCase() })}
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Issuing State (Optional)</label>
+                                            <Select
+                                                value={newEquip.licenseState}
+                                                onValueChange={(val) => setNewEquip({ ...newEquip, licenseState: val })}
+                                            >
+                                                <SelectTrigger className="w-full bg-slate-50 border-slate-200 rounded-2xl px-5 py-4 h-auto text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none">
+                                                    <SelectValue placeholder="Select State" />
+                                                </SelectTrigger>
+                                                <SelectContent className="z-[200] max-h-[300px]">
+                                                    {US_STATES.map(state => (
+                                                        <SelectItem key={state.code} value={state.code}>
+                                                            <span className="font-mono w-6 inline-block text-slate-400">{state.code}</span>
+                                                            {state.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                     </div>
                                 </div>
 

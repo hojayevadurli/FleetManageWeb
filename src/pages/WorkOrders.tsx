@@ -203,7 +203,7 @@ const WorkOrders = () => {
     <div className="p-6 space-y-6 animate-in fade-in duration-500 h-full">
       <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Work Orders</h1>
+          <h1 className="text-xl font-black text-slate-900 tracking-tight">Service</h1>
           <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Operational Fleet Directives</p>
         </div>
 

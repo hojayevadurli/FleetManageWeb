@@ -15,7 +15,8 @@ import {
     ExternalLink,
     MapPin,
     Sparkles,
-    FileText
+    FileText,
+    RefreshCw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Equipment, EquipmentStatus, WorkOrder, ChatMessage } from '@/lib/types';
@@ -40,6 +41,9 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
+
+    // Tab State
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'ai' | 'spend'>('dashboard');
 
     const equipmentHistory = workOrders.filter(wo => wo.equipmentId === equipment.id);
 
@@ -98,145 +102,208 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
 
     return (
         <div className="h-full flex flex-col relative overflow-hidden bg-slate-50 min-h-screen p-6">
-            <div className="flex items-center gap-4 mb-6">
-                <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-lg transition-colors group">
-                    <ArrowLeft className="w-5 h-5 text-slate-600 group-hover:text-blue-600 transition-colors" />
-                </button>
-                <div>
-                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">Unit {equipment.unitNumber} Diagnostics</h1>
-                    <p className="text-sm text-slate-500 font-medium">Holistic asset health & historical performance audit</p>
+            {/* Header & Navigation */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                <div className="flex items-center gap-4">
+                    <button onClick={onBack} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all shadow-sm group">
+                        <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                    </button>
+                    <div>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Unit {equipment.unitNumber} Intel</h1>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Verified asset diagnostics & service timeline</p>
+                    </div>
+                </div>
+
+                <div className="flex p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                    {(['dashboard', 'history', 'ai', 'spend'] as const).map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab
+                                ? 'bg-slate-900 text-white shadow-md'
+                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                                }`}
+                        >
+                            <span className="flex items-center gap-2">
+                                {tab === 'dashboard' && <Container className="w-4 h-4" />}
+                                {tab === 'history' && <History className="w-4 h-4" />}
+                                {tab === 'ai' && <Sparkles className="w-4 h-4" />}
+                                {tab === 'spend' && <Cpu className="w-4 h-4" />}
+                                {tab}
+                            </span>
+                        </button>
+                    ))}
                 </div>
             </div>
 
-            <div className="flex-1 grid grid-cols-1 xl:grid-cols-3 gap-8 overflow-y-auto pr-2 custom-scrollbar">
-                <div className="xl:col-span-2 space-y-8">
-                    {/* Hero Spec Block */}
-                    <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-10 opacity-5">
-                            {equipment.type === 'truck' ? <Truck className="w-64 h-64" /> : <Container className="w-64 h-64" />}
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 relative z-10">
-                            <div className="space-y-6">
-                                <div>
-                                    <div className="relative inline-block">
-                                        <select
-                                            className={`appearance-none cursor-pointer pl-3 pr-8 py-1.5 rounded-full text-[10px] font-black uppercase border tracking-widest shadow-sm outline-none transition-all ${equipment.status === EquipmentStatus.ACTIVE ? 'bg-green-100 text-green-700 border-green-200' :
-                                                equipment.status === EquipmentStatus.IN_SHOP ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                                                    'bg-rose-100 text-rose-700 border-rose-200'
-                                                }`}
-                                            value={equipment.status}
-                                            onChange={(e) => onUpdateStatus && onUpdateStatus(e.target.value as EquipmentStatus)}
-                                        >
-                                            {Object.values(EquipmentStatus).map(s => (
-                                                <option key={s} value={s} className="bg-white text-slate-900">
-                                                    {s.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-current opacity-50">
-                                            <svg className="h-3 w-3 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{equipment.make} {equipment.model}</h2>
-                                    <p className="text-slate-500 font-bold uppercase text-xs tracking-[0.2em]">{equipment.year} Model • {equipment.type} Asset</p>
-                                </div>
-                                <div className="flex items-center gap-10 pt-4">
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">VIN Serial</label>
-                                        <p className="text-sm font-mono font-bold text-slate-800 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100 shadow-inner">{equipment.vin}</p>
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Registration</label>
-                                        <p className="text-sm font-black text-slate-900 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100 shadow-inner">{equipment.licensePlate || 'N/A'}</p>
-                                    </div>
-                                </div>
-                            </div>
+            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-8">
 
-                            <div className="grid grid-cols-2 gap-4">
-                                {[
-                                    { icon: ShieldCheck, label: 'Compliance', val: 'Current', color: 'text-blue-600' },
-                                    { icon: Wrench, label: 'Last Service', val: new Date(equipment.lastServiceDate).toLocaleDateString(), color: 'text-indigo-600' },
-                                    { icon: Cpu, label: 'Systems', val: '92% Health', color: 'text-emerald-600' },
-                                    { icon: History, label: 'Work Orders', val: equipmentHistory.length, color: 'text-slate-600' }
-                                ].map((stat, i) => (
-                                    <div key={i} className="p-6 rounded-[2rem] bg-slate-50 border border-slate-100 shadow-inner flex flex-col justify-center">
-                                        <stat.icon className={`w-6 h-6 ${stat.color} mb-2`} />
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</div>
-                                        <div className="text-sm font-black text-slate-800">{stat.val}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+                {/* DASHBOARD VIEW */}
+                {activeTab === 'dashboard' && (
+                    <div className="space-y-8 animate-in fade-in zoom-in duration-300">
+                        {/* Top Row: Specs + Spend */}
+                        <div className="flex flex-col xl:flex-row gap-8">
 
-                    {/* Audit History Timeline */}
-                    <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
-                        <div className="px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                            <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-xs tracking-widest">
-                                <History className="w-4 h-4 text-slate-400" /> Verified Maintenance Audit History
-                            </h3>
-                        </div>
-                        <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto custom-scrollbar">
-                            {equipmentHistory.length > 0 ? (
-                                equipmentHistory.map(wo => (
-                                    <div key={wo.id} className="p-10 flex items-start justify-between hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/app/maintenance/service-history/${wo.id}`)}>
-                                        <div className="space-y-3 flex-1 pr-12">
-                                            <div className="flex items-center gap-4">
-                                                <div className="text-base font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">{wo.woNumber || 'Draft'}</div>
-                                                {wo.media && wo.media.length > 0 && (
-                                                    <span className="flex items-center gap-1.5 text-[9px] bg-blue-50 px-2 py-0.5 rounded-lg text-blue-600 uppercase font-black tracking-widest border border-blue-100 shadow-sm">
-                                                        <FileText className="w-3 h-3" /> Invoice Attached
-                                                    </span>
-                                                )}
-                                                <span className="text-[9px] bg-emerald-50 px-2 py-0.5 rounded-lg text-emerald-600 uppercase font-black tracking-widest border border-emerald-100">Audit Pass</span>
+                            {/* LEFT: Main Spec Card */}
+                            <div className="flex-[3] bg-white rounded-[3rem] p-10 border border-slate-200 shadow-sm relative overflow-hidden">
+                                <span className={`inline-block px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border mb-6 ${equipment.status === EquipmentStatus.ACTIVE ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                                    equipment.status === EquipmentStatus.IN_SHOP ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                        'bg-rose-100 text-rose-700 border-rose-200'
+                                    }`}>
+                                    Status: {equipment.status}
+                                </span>
+
+                                <div className="flex flex-col md:flex-row gap-12 items-start relative z-10">
+                                    <div className="space-y-2 max-w-sm">
+                                        <h2 className="text-5xl font-black text-slate-900 tracking-tighter leading-[0.9]">{equipment.year} {equipment.make} {equipment.model}</h2>
+
+                                        <div className="flex gap-8 pt-6">
+                                            <div>
+                                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">VIN Number</div>
+                                                <div className="font-mono font-bold text-slate-800">{equipment.vin}</div>
                                             </div>
-                                            <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">{wo.vendor || 'Unknown Vendor'}</div>
-                                            <p className="text-sm text-slate-600 font-medium leading-relaxed max-w-2xl">{wo.description}</p>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                            <div className="text-xl font-mono font-black text-slate-900 tracking-tighter">${wo.totalCost?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? '0.00'}</div>
-                                            <div className="text-[10px] text-slate-400 font-black mt-1 uppercase tracking-widest">{new Date(wo.date).toLocaleDateString()}</div>
+                                            <div>
+                                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Registration</div>
+                                                <div className="font-bold text-slate-800">{equipment.licensePlate || 'N/A'}</div>
+                                            </div>
                                         </div>
                                     </div>
-                                ))
-                            ) : (
-                                <div className="p-24 text-center">
-                                    <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                                        <History className="w-10 h-10 text-slate-200" />
+
+                                    {/* 2x2 Stats Grid */}
+                                    <div className="grid grid-cols-2 gap-4 flex-1 w-full">
+                                        {[
+                                            { label: 'Compliance', val: 'Pass', icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
+                                            { label: 'Last Service', val: equipment.lastServiceDate, icon: Wrench, color: 'text-amber-600', bg: 'bg-amber-50' },
+                                            { label: 'Efficiency', val: '94%', icon: Sparkles, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                                            { label: 'System Health', val: 'Stable', icon: Cpu, color: 'text-indigo-600', bg: 'bg-indigo-50' }
+                                        ].map((s, i) => (
+                                            <div key={i} className={`${s.bg} p-5 rounded-[2rem] border border-slate-100/50`}>
+                                                <s.icon className={`w-5 h-5 ${s.color} mb-3`} />
+                                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{s.label}</div>
+                                                <div className="text-base font-black text-slate-900">{s.val}</div>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <p className="text-slate-400 font-black uppercase text-xs tracking-widest">No verified maintenance logs for this unit.</p>
                                 </div>
-                            )}
+                            </div>
+
+                            {/* RIGHT: Dark Spend Card */}
+                            <div className="flex-[2] bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden group shadow-2xl shadow-slate-900/20">
+                                <div className="absolute top-1/2 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none"></div>
+
+                                <div className="relative z-10 h-full flex flex-col justify-between space-y-8">
+                                    <div className="text-center space-y-2">
+                                        <div className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Life-to-Date Spend</div>
+                                        <div className="text-6xl font-black tracking-tighter text-blue-100">
+                                            ${equipmentHistory.reduce((sum, wo) => sum + (wo.totalCost || 0), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-800/50 rounded-[2rem] p-6 text-center border border-slate-700/50 backdrop-blur-sm">
+                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Maintenance Events</div>
+                                        <div className="text-3xl font-white font-black">{equipmentHistory.length}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Middle Row: Recalls */}
+                        <div className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div className="flex items-center gap-6">
+                                <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100">
+                                    <ShieldCheck className="w-8 h-8 text-rose-500" />
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-xl text-slate-900 tracking-tight">Vehicle Recalls</h3>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Official NHTSA Safety Directives</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-4">
+                                <button className="bg-slate-50 p-3 rounded-full hover:bg-slate-100 transition-all text-slate-400 hover:text-slate-600">
+                                    <RefreshCw className="w-5 h-5" />
+                                </button>
+                                <button className="bg-rose-500 hover:bg-rose-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-500/30 transition-all flex items-center gap-2">
+                                    <ShieldCheck className="w-4 h-4" /> 0 Active Recalls
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Bottom Row: Predictive */}
+                        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm p-24 text-center">
+                            <div className="bg-slate-50 w-24 h-24 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+                                <div className="flex items-end gap-1">
+                                    <div className="w-2 h-4 bg-slate-300 rounded-sm"></div>
+                                    <div className="w-2 h-8 bg-slate-300 rounded-sm"></div>
+                                    <div className="w-2 h-6 bg-slate-300 rounded-sm"></div>
+                                </div>
+                            </div>
+                            <h3 className="text-xl font-black text-slate-900 mb-2">Predictive Uptime Metrics</h3>
+                            <p className="text-slate-500 font-medium max-w-md mx-auto">Asset durability scoring and maintenance forecasting models are currently calibrating.</p>
                         </div>
                     </div>
-                </div>
+                )}
 
-                {/* Sidebar Intelligence */}
-                <div className="space-y-8">
-                    <div className="bg-slate-900 p-10 rounded-[3rem] shadow-2xl text-white relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/20 rounded-full blur-3xl -mr-10 -mt-10 animate-pulse"></div>
-                        <div className="flex items-center gap-4 mb-8 relative z-10">
-                            <div className="bg-blue-600 p-3 rounded-2xl shadow-xl shadow-blue-500/30">
-                                <Sparkles className="w-8 h-8 text-white" />
+                {/* HISTORY VIEW (Old Content) */}
+                {activeTab === 'history' && (
+                    <div className="animate-in slide-in-from-right-4 duration-300">
+                        {/* Audit History Timeline */}
+                        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-xs tracking-widest">
+                                    <History className="w-4 h-4 text-slate-400" /> Verified Maintenance Audit History
+                                </h3>
                             </div>
-                            <div>
-                                <h3 className="font-black text-xl tracking-tight">AI Fleet Expert</h3>
-                                <p className="text-[10px] text-blue-400 font-black tracking-[0.2em] uppercase mt-0.5">Contextual Grounding: Active</p>
+                            <div className="divide-y divide-slate-100 max-h-[800px] overflow-y-auto custom-scrollbar">
+                                {equipmentHistory.length > 0 ? (
+                                    equipmentHistory.map(wo => (
+                                        <div key={wo.id} className="p-10 flex items-start justify-between hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/app/maintenance/service-history/${wo.id}`)}>
+                                            <div className="space-y-3 flex-1 pr-12">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="text-base font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">{wo.woNumber || 'Draft'}</div>
+                                                    {wo.media && wo.media.length > 0 && (
+                                                        <span className="flex items-center gap-1.5 text-[9px] bg-blue-50 px-2 py-0.5 rounded-lg text-blue-600 uppercase font-black tracking-widest border border-blue-100 shadow-sm">
+                                                            <FileText className="w-3 h-3" /> Invoice Attached
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[9px] bg-emerald-50 px-2 py-0.5 rounded-lg text-emerald-600 uppercase font-black tracking-widest border border-emerald-100">Audit Pass</span>
+                                                </div>
+                                                <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">{wo.vendor || 'Unknown Vendor'}</div>
+                                                <p className="text-sm text-slate-600 font-medium leading-relaxed max-w-2xl">{wo.description}</p>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <div className="text-xl font-mono font-black text-slate-900 tracking-tighter">${wo.totalCost?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? '0.00'}</div>
+                                                <div className="text-[10px] text-slate-400 font-black mt-1 uppercase tracking-widest">{new Date(wo.date).toLocaleDateString()}</div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="p-24 text-center">
+                                        <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                            <History className="w-10 h-10 text-slate-200" />
+                                        </div>
+                                        <p className="text-slate-400 font-black uppercase text-xs tracking-widest">No verified maintenance logs for this unit.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
-                        <p className="text-sm text-slate-400 mb-10 leading-relaxed font-medium relative z-10">
-                            "I have analyzed <span className="text-white font-bold">{equipmentHistory.length} historical service records</span> for Unit {equipment.unitNumber}. Ask me for common failure trends, authorized vendor recommendations, or diagnostic reasoning."
-                        </p>
+                    </div>
+                )}
+
+                {/* AI & SPEND TABS (Placeholders for now, or repurpose existing AI view) */}
+                {activeTab === 'ai' && (
+                    <div className="bg-white p-20 rounded-[3rem] border border-slate-200 shadow-sm text-center animate-in zoom-in-95 duration-200">
+                        <div className="bg-blue-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                            <Sparkles className="w-12 h-12 text-blue-500" />
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-900 mb-4">Deep Intelligence Active</h3>
                         <button
                             onClick={() => setIsAiPanelOpen(true)}
-                            className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/30 relative z-10 active:scale-95"
+                            className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-blue-500/30 hover:bg-blue-700 transition-all active:scale-95"
                         >
-                            Consult Asset Expert
+                            Open AI Assistant Panel
                         </button>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* AI Chat Expert Panel */}

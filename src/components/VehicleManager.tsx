@@ -2,12 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
+import { fleetCategoriesApi, FleetCategory } from "@/lib/fleetCategoriesApi";
+import { equipmentTypesApi } from "@/lib/equipmentTypesApi";
+import { tenantsApi } from "@/lib/tenantsApi";
 
 import EquipmentDetail from "@/components/equipment/EquipmentDetail";
 import EquipmentList from "@/components/equipment/EquipmentList";
 import { workOrdersApi } from "@/lib/workOrdersApi";
 import { serviceHistoryApi } from "@/lib/serviceHistoryApi";
-import { Equipment, WorkOrder, EquipmentStatus, WorkOrderStatus, EquipmentLifecycleStatus, EquipmentOperationalStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
+import { Equipment, WorkOrder, EquipmentStatus, WorkOrderStatus, EquipmentLifecycleStatus, EquipmentOperationalStatus, WorkOrderPriority, WorkOrderCostSource, EquipmentTypeDto, FleetType } from "@/lib/types";
 
 const VehicleManager = () => {
   const location = useLocation();
@@ -18,6 +21,11 @@ const VehicleManager = () => {
   const [loading, setLoading] = useState(true);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [equipmentWorkOrders, setEquipmentWorkOrders] = useState<WorkOrder[]>([]);
+
+  // Cache for mapping logic
+  const [fleetCategories, setFleetCategories] = useState<FleetCategory[]>([]);
+  const [equipmentTypes, setEquipmentTypes] = useState<EquipmentTypeDto[]>([]);
+
   const { toast } = useToast();
 
   const fetchEquipment = useCallback(async () => {
@@ -40,6 +48,29 @@ const VehicleManager = () => {
 
   useEffect(() => {
     fetchEquipment();
+
+    // Pre-fetch categories and types for mapping new equipment
+    const loadConfig = async () => {
+      try {
+        const tenant = await tenantsApi.getCurrent();
+        if (tenant?.industryId) {
+          const cats = await fleetCategoriesApi.list(tenant.industryId);
+          setFleetCategories(cats);
+
+          // Fetch all types across categories (flat list simulation or parallel fetch)
+          // Since api needs categoryId, we'll fetch for each category
+          const allTypes: EquipmentTypeDto[] = [];
+          for (const cat of cats) {
+            const types = await equipmentTypesApi.list(tenant.industryId, cat.id);
+            allTypes.push(...types);
+          }
+          setEquipmentTypes(allTypes);
+        }
+      } catch (e) {
+        console.error("Failed to load mapping config", e);
+      }
+    };
+    loadConfig();
   }, [fetchEquipment]);
 
   // Fetch work orders when equipment is selected
@@ -126,9 +157,34 @@ const VehicleManager = () => {
 
   const handleAddEquipment = async (e: Omit<Equipment, 'id'>) => {
     try {
+      // Logic to find best matching Category and Type IDs based on user selection
+      let mappedCatId = e.fleetCategoryId;
+      let mappedTypeId = e.equipmentTypeId;
+
+      if (!mappedCatId && e.fleetType) {
+        // Try to map from fleetType string (TRUCK, TRAILER, etc.) to a Category Name
+        // Simple heuristic: Category Name contains "Truck", "Trailer", "Heavy"
+        const targetName = e.fleetType === 'TRUCK' ? 'Truck' : e.fleetType === 'TRAILER' ? 'Trailer' : 'Heavy';
+        const match = fleetCategories.find(c => c.name.toLowerCase().includes(targetName.toLowerCase()));
+        if (match) mappedCatId = match.id;
+        else if (fleetCategories.length > 0) mappedCatId = fleetCategories[0].id; // Fallback to first available
+      }
+
+      if (!mappedTypeId && e.specificType) {
+        // Try to find exact name match for specific type
+        const match = equipmentTypes.find(t => t.name.toLowerCase() === e.specificType?.toLowerCase());
+        if (match) mappedTypeId = match.id.toString();
+
+        // If not found, try to find one that matches fleetType to be safe
+        if (!mappedTypeId && mappedCatId) {
+          const fallbackMatch = equipmentTypes.find(t => t.fleetCategoryId === mappedCatId);
+          if (fallbackMatch) mappedTypeId = fallbackMatch.id.toString();
+        }
+      }
+
       const payload: any = {
-        equipmentTypeId: e.equipmentTypeId,
-        fleetCategoryId: e.fleetCategoryId,
+        equipmentTypeId: mappedTypeId,
+        fleetCategoryId: mappedCatId,
         unitNumber: e.unitNumber,
         displayName: e.unitNumber,
         vin: e.vin,
@@ -143,15 +199,27 @@ const VehicleManager = () => {
         inServiceDate: new Date().toISOString().split('T')[0],
         notes: e.notes,
         initialOdometer: (e as any).initialOdometer || 0,
-        initialHours: (e as any).initialHours || 0
+        initialHours: (e as any).initialHours || 0,
+        specs: {
+          licenseState: (e as any).licenseState
+        }
       };
       await equipmentApi.create(payload);
       toast({ title: "Equipment Added", description: `${e.unitNumber} has been successfully onboarded.` });
       fetchEquipment();
+      return null; // Success
     } catch (err: any) {
-      const errorMsg = err.response?.data?.message || err.response?.data?.title || err.message;
+      const status = err.response?.status;
+      let errorMsg = err.response?.data?.message || err.response?.data?.title || err.message;
+
+      if (status === 409) {
+        errorMsg = "An asset with this Unit Number or VIN already exists. Please check your records.";
+      }
+
       console.error("Onboarding error details:", err.response?.data);
-      toast({ title: "Onboarding Failed", description: errorMsg, variant: "destructive" });
+      toast({ title: status === 409 ? "Duplicate Asset" : "Onboarding Failed", description: errorMsg, variant: "destructive" });
+
+      return { status: status || 500, message: errorMsg }; // Return error
     }
   };
 

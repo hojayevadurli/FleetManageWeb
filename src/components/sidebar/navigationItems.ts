@@ -36,83 +36,23 @@ export const navigationItems: NavigationConfig = [
     icon: Home,
   },
   {
-    title: "AI Chat",
-    url: "/app/ai-chat",
-    icon: MessageCircle,
+    title: "All Assets",
+    url: "/app/equipment",
+    icon: Truck,
   },
   {
-    group: "Equipment",
-    items: [
-      {
-        title: "All Assets",
-        url: "/app/equipment",
-        icon: Truck,
-      },
-      {
-        title: "Fleet Map",
-        url: "/app/equipment/map",
-        icon: MapPin,
-      },
-    ],
+    title: "Service",
+    url: "/app/service",
+    icon: ClipboardList,
   },
   {
-    group: "Maintenance",
-    items: [
-      {
-        title: "Work Orders",
-        url: "/app/work-orders",
-        icon: ClipboardList,
-      },
-      {
-        title: "Service History",
-        url: "/app/maintenance/service-history",
-        icon: Wrench,
-      },
-      {
-        title: "Upcoming",
-        url: "/app/maintenance/upcoming",
-        icon: Calendar,
-      },
-    ],
+    title: "Shops List",
+    url: "/app/shops",
+    icon: Settings,
   },
   {
-    group: "Inspection",
-    items: [
-      {
-        title: "Create New Inspection",
-        url: "/app/inspections?tab=create",
-        icon: Plus,
-      },
-      {
-        title: "Inspection List",
-        url: "/app/inspections?tab=inspections",
-        icon: FileCheck,
-      },
-    ],
-  },
-  {
-    group: "Shops",
-    items: [
-      {
-        title: "Shops List",
-        url: "/app/shops",
-        icon: Settings,
-      },
-      {
-        title: "Vendor Analytics",
-        url: "/app/vendor-analytics",
-        icon: BarChart3,
-      },
-    ],
-  },
-  {
-    group: "Fleet Operations",
-    items: [
-      {
-        title: "Fuel Tracking",
-        url: "/app/operations/fuel",
-        icon: Fuel,
-      },
-    ],
+    title: "Account",
+    url: "/app/account",
+    icon: User,
   },
 ];

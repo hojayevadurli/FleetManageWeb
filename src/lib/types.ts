@@ -20,6 +20,7 @@ export enum EquipmentOperationalStatus {
 }
 
 // 63+ types supported now
+export type FleetType = 'TRUCK' | 'TRAILER' | 'HEAVY_EQUIPMENT';
 export type EquipmentType = string;
 
 export enum WorkOrderStatus {
@@ -144,6 +145,10 @@ export interface Equipment {
 
   // Flexible bag for extra properties if needed
   specs?: Record<string, string | number | boolean>;
+
+  // Categorization
+  fleetType?: 'TRUCK' | 'TRAILER' | 'HEAVY_EQUIPMENT';
+  specificType?: string; // e.g. "Sleeper Tractor", "Dry Van"
 
   // Department/Industry links
   fleetCategoryId?: number;

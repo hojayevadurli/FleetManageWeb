@@ -72,7 +72,7 @@ const WorkOrderWidget = () => {
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wrench className="h-5 w-5 text-orange-600" />
-            Work Orders
+            Service
           </div>
           <Badge variant="outline">{loading ? "…" : active.length}</Badge>
         </CardTitle>
@@ -87,11 +87,11 @@ const WorkOrderWidget = () => {
             <div className="text-sm text-gray-500 text-center py-4">Loading…</div>
           ) : active.length === 0 ? (
             <div className="text-sm text-gray-500 text-center py-4">
-              No active work orders
+              No active service
             </div>
           ) : (
             active.slice(0, 2).map((wo) => {
-              const title = wo.lines?.[0]?.description || wo.title || "Work Order";
+              const title = wo.lines?.[0]?.description || wo.title || "Service";
               return (
                 <div key={wo.id} className="flex justify-between items-center text-sm">
                   <div className="min-w-0">
@@ -112,7 +112,7 @@ const WorkOrderWidget = () => {
         </div>
 
         <Button variant="outline" size="sm" className="w-full" asChild>
-          <Link to="/app/work-orders">View All Orders</Link>
+          <Link to="/app/service">View All Service</Link>
         </Button>
       </CardContent>
     </Card>
