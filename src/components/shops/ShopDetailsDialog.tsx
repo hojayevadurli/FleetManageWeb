@@ -23,7 +23,8 @@ import {
 } from "lucide-react";
 import { Shop, ShopRating } from "./types/ShopTypes";
 import { shopsApi } from "@/lib/shopsApi";
-import { serviceHistoryApi, ServiceRecord } from "@/lib/serviceHistoryApi";
+import { workOrdersApi } from "@/lib/workOrdersApi";
+import { WorkOrderDto } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 interface ShopDetailsDialogProps {
@@ -34,7 +35,7 @@ interface ShopDetailsDialogProps {
 
 const ShopDetailsDialog = ({ shop, open, onOpenChange }: ShopDetailsDialogProps) => {
   const [ratings, setRatings] = useState<ShopRating[]>([]);
-  const [history, setHistory] = useState<ServiceRecord[]>([]);
+  const [history, setHistory] = useState<WorkOrderDto[]>([]);
   const [newRating, setNewRating] = useState(0);
   const [newReview, setNewReview] = useState("");
   const [loadingRatings, setLoadingRatings] = useState(false);
@@ -66,7 +67,7 @@ const ShopDetailsDialog = ({ shop, open, onOpenChange }: ShopDetailsDialogProps)
     if (!shop?.id) return;
     setLoadingHistory(true);
     try {
-      const data = await serviceHistoryApi.getShopHistory(shop.id);
+      const data = await workOrdersApi.list({ vendorId: shop.id });
       setHistory(data);
     } catch (error) {
       console.error('Error loading history:', error);
@@ -324,28 +325,28 @@ const ShopDetailsDialog = ({ shop, open, onOpenChange }: ShopDetailsDialogProps)
                             <div className="space-y-4">
                               <div className="flex items-center gap-3">
                                 <Badge variant="outline" className="rounded-lg bg-white border-slate-200 text-slate-600 font-black uppercase text-[10px] tracking-wider py-1">
-                                  {record.vehicle_type}
+                                  WO
                                 </Badge>
-                                <span className="font-black text-slate-900 text-lg">{record.vehicle_id}</span>
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">• {new Date(record.service_date).toLocaleDateString()}</span>
+                                <span className="font-black text-slate-900 text-lg">{record.equipmentId || 'Unknown Asset'}</span>
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">• {new Date(record.openedAt).toLocaleDateString()}</span>
                               </div>
-                              <p className="text-slate-600 font-medium leading-relaxed">{record.work_completed}</p>
+                              <p className="text-slate-600 font-medium leading-relaxed">{record.title}</p>
                             </div>
 
                             <div className="flex items-center gap-6 shrink-0">
                               <div className="text-right">
-                                {record.total_cost && (
-                                  <div className="font-black text-xl text-slate-900">${record.total_cost.toFixed(2)}</div>
-                                )}
-                                {record.mileage && (
+                                <div className="font-black text-xl text-slate-900">
+                                  ${(record.manualActualTotal || record.estimatedTotal || 0).toFixed(2)}
+                                </div>
+                                {record.odometerAtService && (
                                   <div className="text-xs font-bold text-slate-400 flex items-center justify-end gap-1 mt-1">
-                                    <Navigation className="w-3 h-3" /> {record.mileage.toLocaleString()} mi
+                                    <Navigation className="w-3 h-3" /> {record.odometerAtService.toLocaleString()} mi
                                   </div>
                                 )}
                               </div>
-                              {record.invoice_url && (
+                              {record.documents && record.documents.length > 0 && (
                                 <button
-                                  onClick={() => window.open(record.invoice_url, '_blank')}
+                                  onClick={() => window.open(record.documents![0].fileUrl, '_blank')}
                                   className="w-12 h-12 bg-white border border-slate-200 rounded-2xl flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-lg hover:-translate-y-1 transition-all"
                                 >
                                   <FileText className="w-5 h-5" />

@@ -6,7 +6,7 @@ import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
 import EquipmentDetail from "@/components/equipment/EquipmentDetail";
 import EquipmentList from "@/components/equipment/EquipmentList";
 import { workOrdersApi } from "@/lib/workOrdersApi";
-import { serviceHistoryApi } from "@/lib/serviceHistoryApi";
+
 import { Equipment, WorkOrder, EquipmentStatus, WorkOrderStatus, EquipmentLifecycleStatus, EquipmentOperationalStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
 
 const VehicleManager = () => {
@@ -50,10 +50,7 @@ const VehicleManager = () => {
         return;
       }
       try {
-        const [wos, shRecords] = await Promise.all([
-          workOrdersApi.list({ equipmentId: selectedEquipment.id }),
-          serviceHistoryApi.list(selectedEquipment.id)
-        ]);
+        const wos = await workOrdersApi.list({ equipmentId: selectedEquipment.id });
 
         const mappedWos: WorkOrder[] = wos.map(wo => ({
           id: wo.id,
@@ -74,8 +71,16 @@ const VehicleManager = () => {
           estimatedTotal: wo.estimatedTotal,
           manualActualTotal: wo.manualActualTotal,
           description: wo.notes || '',
-          vendor: '',
-          items: [],
+          vendor: wo.vendorName || '',
+          items: (wo.lines || []).map(l => ({
+            id: l.id || Math.random().toString(),
+            description: l.description,
+            quantity: l.qty,
+            unitPrice: l.unitPrice,
+            cost: l.qty * l.unitPrice,
+            type: l.type as any,
+            serviceType: l.type
+          })),
           media: wo.documents?.map(doc => ({
             url: doc.fileUrl,
             type: doc.fileType.includes('pdf') ? 'pdf' : 'image',
@@ -83,39 +88,7 @@ const VehicleManager = () => {
           })) || []
         }));
 
-        // Map ServiceHistory to WorkOrder-like structure for display
-        const mappedSh: WorkOrder[] = shRecords.map(r => ({
-          id: r.id,
-          woNumber: r.invoiceNumber || `SR-${r.id.slice(0, 5)}`,
-          equipmentId: r.equipmentId,
-          status: WorkOrderStatus.Completed,
-          priority: WorkOrderPriority.Normal,
-          date: r.invoiceDate || r.createdAt,
-          technician: "",
-          totalCost: r.totalAmount,
-          partsCost: r.lines?.filter(l => l.type === 'part').reduce((sum, l) => sum + l.amount, 0) || 0,
-          laborCost: r.lines?.filter(l => l.type === 'labor').reduce((sum, l) => sum + l.amount, 0) || 0,
-          title: r.summary || 'Service History',
-          complaint: r.summary || 'Routine Service',
-          costSource: WorkOrderCostSource.Invoiced,
-          estimatedTotal: r.totalAmount,
-          manualActualTotal: r.totalAmount,
-          description: r.summary || "Routine Service",
-          vendor: r.vendorNameRaw || "Professional Service",
-          items: r.lines?.map(l => ({
-            id: l.id,
-            serviceType: l.type,
-            description: l.description,
-            quantity: l.qty,
-            unitPrice: l.unitPrice,
-            cost: l.amount,
-            type: l.type as any
-          })) || [],
-          media: [], // Documents are linked differently now?
-          odometer: r.odometer
-        }));
-
-        const combined = [...mappedWos, ...mappedSh].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const combined = mappedWos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setEquipmentWorkOrders(combined);
       } catch (err) {
         console.error("Failed to fetch history for equipment", err);

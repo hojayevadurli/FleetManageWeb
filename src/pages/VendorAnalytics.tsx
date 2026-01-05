@@ -28,12 +28,13 @@ import {
     PieChart,
     Pie
 } from 'recharts';
-import { serviceHistoryApi, ServiceHistoryDto } from '@/lib/serviceHistoryApi';
+import { workOrdersApi } from "@/lib/workOrdersApi";
+import { WorkOrderDto, WorkOrderStatus } from "@/lib/types";
 import { Badge } from '@/components/ui/badge';
 
 const VendorAnalytics = () => {
     const [loading, setLoading] = useState(true);
-    const [records, setRecords] = useState<ServiceHistoryDto[]>([]);
+    const [records, setRecords] = useState<WorkOrderDto[]>([]);
     const [timeRange, setTimeRange] = useState('90'); // days
 
     useEffect(() => {
@@ -43,8 +44,10 @@ const VendorAnalytics = () => {
     const loadData = async () => {
         setLoading(true);
         try {
-            const data = await serviceHistoryApi.list();
-            setRecords(data || []);
+            const data = await workOrdersApi.list();
+            // Filter for completed items or use all, assuming analytics wants history
+            const history = data.filter(r => r.status === WorkOrderStatus.Completed || (r.status as any) === "Completed");
+            setRecords(history || []);
         } catch (err) {
             console.error("Failed to load vendor data", err);
         } finally {
@@ -54,7 +57,7 @@ const VendorAnalytics = () => {
 
     // Aggregate Data
     const vendorStats = records.reduce((acc: any, r) => {
-        const name = r.vendorNameRaw || r.vendorName || 'Unknown';
+        const name = (r as any).vendorName || r.vendorId || 'Unknown';
         if (!acc[name]) {
             acc[name] = {
                 name,
@@ -64,7 +67,7 @@ const VendorAnalytics = () => {
                 status: 'Standard'
             };
         }
-        acc[name].totalSpend += (r.totalAmount || r.total || 0);
+        acc[name].totalSpend += (r.estimatedTotal || 0);
         acc[name].orderCount += 1;
         return acc;
     }, {});

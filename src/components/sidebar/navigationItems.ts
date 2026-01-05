@@ -63,11 +63,7 @@ export const navigationItems: NavigationConfig = [
         url: "/app/work-orders",
         icon: ClipboardList,
       },
-      {
-        title: "Service History",
-        url: "/app/maintenance/service-history",
-        icon: Wrench,
-      },
+
       {
         title: "Upcoming",
         url: "/app/maintenance/upcoming",
