@@ -38,7 +38,7 @@ const ShopMap = () => {
   const markersRef = useRef<google.maps.Marker[]>([]);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
 
-  const GOOGLE_MAPS_API_KEY = "AIzaSyBsdzNMDKKScjkXlS08hSCN7KuQOg43tiw";
+  const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
   useEffect(() => {
     loadShops();

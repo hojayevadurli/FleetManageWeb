@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Loader } from "@googlemaps/js-api-loader";
 import {
   Globe, Search, ChevronRight, X, Tag, CheckCircle2, Loader2, ShieldCheck,
   MapPin, Phone, Star, Building2, User
 } from "lucide-react";
-import { ShopFormData } from "./types/ShopTypes";
+import { Shop, ShopFormData } from "./types/ShopTypes";
 import { searchVendorSuggestions, fetchDetailedVendorInfo } from "@/lib/gemini";
 import { useToast } from "@/hooks/use-toast";
 import { shopsApi } from "@/lib/shopsApi";
@@ -12,6 +13,7 @@ interface AddShopDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onShopAdded: () => void;
+  shopToEdit?: Shop | null; // New prop
 }
 
 const SERVICE_SPECIALTIES = [
@@ -25,7 +27,7 @@ const SERVICE_SPECIALTIES = [
   "Reefer"
 ];
 
-const AddShopDialog = ({ open, onOpenChange, onShopAdded }: AddShopDialogProps) => {
+const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopDialogProps) => {
   const [step, setStep] = useState<"search" | "details">("search");
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -45,20 +47,64 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded }: AddShopDialogProps) 
     hours_of_operation: {},
     specialties: [],
     latitude: "",
-    longitude: ""
+    longitude: "",
+    city: "",
+    state: "",
+    zip: ""
   });
 
   const { toast } = useToast();
 
-  // Reset state when dialog closes
+  // Reset state when dialog closes or shopToEdit changes
   useEffect(() => {
-    if (!open) {
-      setStep("search");
-      setSearchTerm("");
-      setSuggestions([]);
-      setSelectedMethod(null);
+    if (open) {
+      if (shopToEdit) {
+        setStep("details");
+        setSelectedMethod("manual");
+        setFormData({
+          shop_name: shopToEdit.shop_name,
+          address: shopToEdit.address,
+          contact_name: shopToEdit.contact_name || "",
+          labor_rate: shopToEdit.labor_rate?.toString() || "",
+          rate_category: shopToEdit.rate_category,
+          comment: shopToEdit.comment || "",
+          phone: shopToEdit.phone || "",
+          email: shopToEdit.email || "",
+          website: shopToEdit.website || "",
+          hours_of_operation: shopToEdit.hours_of_operation || {},
+          specialties: shopToEdit.specialties || [],
+          latitude: shopToEdit.latitude?.toString() || "",
+          longitude: shopToEdit.longitude?.toString() || "",
+          city: shopToEdit.city || "",
+          state: shopToEdit.state || "",
+          zip: shopToEdit.zip || ""
+        });
+      } else {
+        setStep("search");
+        setSearchTerm("");
+        setSuggestions([]);
+        setSelectedMethod(null);
+        setFormData({
+          shop_name: "",
+          address: "",
+          contact_name: "",
+          labor_rate: "",
+          rate_category: "green",
+          comment: "",
+          phone: "",
+          email: "",
+          website: "",
+          hours_of_operation: {},
+          specialties: [],
+          latitude: "",
+          longitude: "",
+          city: "",
+          state: "",
+          zip: ""
+        });
+      }
     }
-  }, [open]);
+  }, [open, shopToEdit]);
 
   const handleSearch = async () => {
     if (!searchTerm) return;
@@ -98,7 +144,10 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded }: AddShopDialogProps) 
         specialties: details.types || details.services || [],
         hours_of_operation: details.hours || {},
         latitude: details.latitude?.toString() || "",
-        longitude: details.longitude?.toString() || ""
+        longitude: details.longitude?.toString() || "",
+        city: details.city || "",
+        state: details.state || "",
+        zip: details.zip || ""
       }));
       setStep("details");
     } catch (error) {
@@ -115,9 +164,13 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded }: AddShopDialogProps) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const shopData = {
-        shopName: formData.shop_name,
-        address: formData.address,
+      const shopData: any = {
+        name: formData.shop_name,
+        address1: formData.address,
+        city: formData.city || "Unknown",
+        state: formData.state || "Unknown",
+        postalCode: formData.zip,
+        country: "USA", // Default to USA
         contactName: formData.contact_name || undefined,
         phone: formData.phone || undefined,
         email: formData.email || undefined,
@@ -131,37 +184,39 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded }: AddShopDialogProps) 
         longitude: formData.longitude ? parseFloat(formData.longitude) : undefined
       };
 
-      const data = await shopsApi.create(shopData);
+      console.log('Submitting shop data:', shopData); // Debug log
+
+      if (shopToEdit) {
+        await shopsApi.update(shopToEdit.id, shopData);
+        toast({
+          title: "Shop updated",
+          description: `${formData.shop_name} has been updated.`
+        });
+      } else {
+        const data = await shopsApi.create(shopData);
+        toast({
+          title: "Shop added successfully",
+          description: `${data.shop_name} has been added to your shops.`
+        });
+      }
 
       onShopAdded();
       onOpenChange(false);
+    } catch (error: any) {
+      console.error('Error saving shop:', error);
+      const errorMessage = error?.response?.data?.title || error?.response?.data?.message || error?.message || "Please try again.";
+      const validationErrors = error?.response?.data?.errors;
 
-      // Reset form
-      setFormData({
-        shop_name: "",
-        address: "",
-        contact_name: "",
-        labor_rate: "",
-        rate_category: "green",
-        comment: "",
-        phone: "",
-        email: "",
-        website: "",
-        hours_of_operation: {},
-        specialties: [],
-        latitude: "",
-        longitude: ""
-      });
+      let description = errorMessage;
+      if (validationErrors) {
+        description = Object.entries(validationErrors)
+          .map(([key, msgs]: [string, any]) => `${key}: ${msgs.join(', ')}`)
+          .join('\n');
+      }
 
       toast({
-        title: "Shop added successfully",
-        description: `${data.shop_name} has been added to your shops.`
-      });
-    } catch (error) {
-      console.error('Error adding shop:', error);
-      toast({
-        title: "Error adding shop",
-        description: "Please try again.",
+        title: `Error ${shopToEdit ? 'updating' : 'adding'} shop`,
+        description: description,
         variant: "destructive"
       });
     }
@@ -176,6 +231,98 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded }: AddShopDialogProps) 
     }));
   };
 
+  // Google Maps Autocomplete
+  const addressInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  useEffect(() => {
+    if (selectedMethod === "manual" && step === "details") {
+      // Small delay to ensure the input is mounted
+      const timer = setTimeout(() => {
+        initializeAutocomplete();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedMethod, step]);
+
+  const initializeAutocomplete = async () => {
+    try {
+      const loader = new Loader({
+        apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
+        version: "weekly",
+        libraries: ["places"],
+      });
+
+      await loader.load();
+
+      if (addressInputRef.current) {
+        autocompleteRef.current = new window.google.maps.places.Autocomplete(addressInputRef.current, {
+          types: ["address"],
+          fields: ["address_components", "geometry", "formatted_address"],
+        });
+
+        autocompleteRef.current.addListener("place_changed", () => {
+          const place = autocompleteRef.current?.getPlace();
+          if (!place) return;
+
+          let address = place.formatted_address || "";
+          let lat = "";
+          let lng = "";
+
+          if (place.geometry && place.geometry.location) {
+            lat = place.geometry.location.lat().toString();
+            lng = place.geometry.location.lng().toString();
+          }
+
+          // Extract address components
+          let city = "";
+          let state = "";
+          let zip = "";
+          let streetNumber = "";
+          let route = "";
+
+          if (place.address_components) {
+            for (const component of place.address_components) {
+              const types = component.types;
+              if (types.includes("locality")) {
+                city = component.long_name;
+              }
+              if (types.includes("administrative_area_level_1")) {
+                state = component.short_name;
+              }
+              if (types.includes("postal_code")) {
+                zip = component.long_name;
+              }
+              if (types.includes("street_number")) {
+                streetNumber = component.long_name;
+              }
+              if (types.includes("route")) {
+                route = component.long_name;
+              }
+            }
+          }
+
+          // Construct address if formatted_address is not preferred, but usually formatted_address is best for display
+          // and we can send components to backend.
+          // For now, we update address with formatted version or street + route
+          const finalAddress = address;
+
+          setFormData(prev => ({
+            ...prev,
+            address: finalAddress,
+            city,
+            state,
+            zip,
+            latitude: lat,
+            longitude: lng
+          }));
+        });
+      }
+    } catch (e) {
+      console.error("Failed to load Google Maps Autocomplete", e);
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -188,9 +335,11 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded }: AddShopDialogProps) 
           <div>
             <h2 className="text-2xl font-black tracking-tight flex items-center gap-3">
               <ShieldCheck className="w-8 h-8" />
-              Add Service Partner
+              {shopToEdit ? "Edit Service Partner" : "Add Service Partner"}
             </h2>
-            <p className="text-blue-100 font-medium opacity-90 mt-2 ml-1">Grow your trusted service network</p>
+            <p className="text-blue-100 font-medium opacity-90 mt-2 ml-1">
+              {shopToEdit ? "Update partner details" : "Grow your trusted service network"}
+            </p>
           </div>
           <button
             onClick={() => onOpenChange(false)}
@@ -314,11 +463,49 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded }: AddShopDialogProps) 
                   <div className="relative">
                     <MapPin className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
+                      ref={addressInputRef}
                       required
                       className="w-full pl-14 pr-6 py-5 bg-slate-50 border-0 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
-                      placeholder="123 Truck Stop Ln, Dallas TX..."
+                      placeholder="Start typing to search address..."
                       value={formData.address}
                       onChange={e => setFormData({ ...formData, address: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-6 gap-4 col-span-2">
+                  <div className="col-span-3 space-y-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">City</label>
+                    <input
+                      required
+                      className="w-full px-6 py-5 bg-slate-50 border-0 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                      placeholder="City"
+                      value={formData.city || ""}
+                      onChange={e => setFormData({ ...formData, city: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-span-1 space-y-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">State</label>
+                    <input
+                      required
+                      className="w-full px-6 py-5 bg-slate-50 border-0 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                      placeholder="State"
+                      value={formData.state || ""}
+                      onChange={e => setFormData({ ...formData, state: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Zip</label>
+                    <input
+                      className="w-full px-6 py-5 bg-slate-50 border-0 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                      placeholder="Zip"
+                      value={formData.zip || ""}
+                      onChange={e => setFormData({ ...formData, zip: e.target.value })}
                     />
                   </div>
                 </div>
@@ -394,18 +581,20 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded }: AddShopDialogProps) 
               </div>
 
               <div className="flex items-center gap-6 pt-6 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setStep("search")}
-                  className="px-8 py-4 rounded-2xl font-black text-slate-400 uppercase tracking-widest text-xs hover:bg-slate-50 transition-colors"
-                >
-                  Back
-                </button>
+                {!shopToEdit && (
+                  <button
+                    type="button"
+                    onClick={() => setStep("search")}
+                    className="px-8 py-4 rounded-2xl font-black text-slate-400 uppercase tracking-widest text-xs hover:bg-slate-50 transition-colors"
+                  >
+                    Back
+                  </button>
+                )}
                 <button
                   type="submit"
                   className="flex-1 bg-slate-900 text-white px-8 py-5 rounded-[2rem] font-black uppercase tracking-widest text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-95 flex items-center justify-center gap-3"
                 >
-                  Confirm & Add Shop <ChevronRight className="w-5 h-5" />
+                  {shopToEdit ? "Save Changes" : "Confirm & Add Shop"} <ChevronRight className="w-5 h-5" />
                 </button>
               </div>
             </form>

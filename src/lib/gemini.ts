@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { Equipment, WorkOrder, ReceiptParsedData, FuelParsedData } from "./types";
+import { Equipment, WorkOrder, ReceiptParsedData, FuelParsedData, Warranty } from "./types";
 
 // Vite env only
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
@@ -128,23 +128,40 @@ OUTPUT RULES:
 }`;
 
   try {
-    // ✅ Use a current model id. If 1.5 is retired for your key, 2.x will work better.
-    const res = await getAiClient().models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inlineData: { mimeType, data: base64Data } },
-            { text: prompt },
-          ],
-        },
-      ],
-    });
+    let res;
+    try {
+      res = await getAiClient().models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inlineData: { mimeType, data: base64Data } },
+              { text: prompt },
+            ],
+          },
+        ],
+      });
+    } catch (e) {
+      console.warn("gemini-2.0-flash receipt parsing failed, trying 1.5-flash...", e);
+      res = await getAiClient().models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inlineData: { mimeType, data: base64Data } },
+              { text: prompt },
+            ],
+          },
+        ],
+      });
+    }
 
     const text = res.text ?? "";
     const parsed = safeJsonParse<any>(text);
     return normalizeReceiptResult(parsed);
+
   } catch (error: any) {
     console.error("Receipt parsing error details:", error);
 
@@ -154,10 +171,6 @@ OUTPUT RULES:
       throw new Error("Daily AI quota exceeded. Please try again tomorrow or upgrade your plan.");
     }
 
-    if (error instanceof Error) {
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-    }
     return null;
   }
 };
@@ -197,24 +210,43 @@ OUTPUT RULES:
 }`;
 
   try {
-    const res = await getAiClient().models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inlineData: { mimeType, data: base64Data } },
-            { text: prompt },
-          ],
-        },
-      ],
-    });
+    let res;
+    try {
+      res = await getAiClient().models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inlineData: { mimeType, data: base64Data } },
+              { text: prompt },
+            ],
+          },
+        ],
+      });
+    } catch (e) {
+      console.warn("gemini-2.0-flash fuel parsing failed, trying 1.5-flash...", e);
+      res = await getAiClient().models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inlineData: { mimeType, data: base64Data } },
+              { text: prompt },
+            ],
+          },
+        ],
+      });
+    }
 
     const text = res.text ?? "";
     const parsed = safeJsonParse<any>(text);
-    if (!parsed) return null;
 
-    // Normalization
+    if (!parsed) {
+      throw new Error("AI returned empty or invalid JSON");
+    }
+
     return {
       businessName: String(parsed.businessName || ""),
       businessAddress: String(parsed.businessAddress || ""),
@@ -227,8 +259,9 @@ OUTPUT RULES:
       odometer: parsed.odometer ? Number(parsed.odometer) : undefined,
       state: parsed.state ? String(parsed.state) : undefined,
     };
+
   } catch (error) {
-    console.error("Fuel parsing error:", error);
+    console.warn("Fuel parsing error:", error);
     return null;
   }
 };
@@ -239,7 +272,8 @@ OUTPUT RULES:
 export const getEquipmentChatResponse = async (
   equipment: Equipment,
   history: WorkOrder[],
-  prompt: string
+  prompt: string,
+  warranties: Warranty[] = []
 ): Promise<{ text: string; sources: any[] }> => {
   const systemInstruction = `You are the specialized FleetManage.ai Expert Consultant for Unit ${equipment.unitNumber}.
 
@@ -251,6 +285,18 @@ ${JSON.stringify(
       desc: (h as any).description,
       vendor: (h as any).vendor,
       cost: (h as any).totalCost,
+    }))
+  )}
+
+WARRANTY COVERAGE:
+${JSON.stringify(
+    warranties.map(w => ({
+      provider: w.provider,
+      description: w.description,
+      status: w.status,
+      start: w.startDate,
+      end: w.endDate,
+      fileCount: w.files?.length || 0
     }))
   )}
 

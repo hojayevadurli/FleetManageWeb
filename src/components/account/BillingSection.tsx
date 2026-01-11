@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { CreditCard, Calendar, Download, Zap, Users, Truck } from "lucide-react";
-// import { supabase } from "@/integrations/supabase/client"; // Removed - using backend API
+// import { supabase } from "@/integrations/supabase/client"; 
 import { useAuth } from "@/components/auth/AuthContext";
 import { toast } from "sonner";
 
@@ -42,54 +42,25 @@ const BillingSection = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      fetchBillingData();
-    }
+    // Mock data loading
+    const loadMockData = async () => {
+      setLoading(true);
+      // Simulate delay
+      await new Promise(r => setTimeout(r, 500));
+
+      // Default to free/starter plan (null subscription implies free)
+      setSubscription(null);
+      setPaymentHistory([]);
+      setUsage([
+        { feature_name: "trucks", usage_count: 5, usage_limit: 5 },
+        { feature_name: "drivers", usage_count: 2, usage_limit: 10 }
+      ]);
+      setLoading(false);
+    };
+    loadMockData();
   }, [user]);
 
-  const fetchBillingData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch subscription data
-      const { data: subscriptionData } = await supabase
-        .from('billing_subscriptions')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single();
-      
-      if (subscriptionData) {
-        setSubscription(subscriptionData);
-      }
-
-      // Fetch payment history
-      const { data: paymentData } = await supabase
-        .from('payment_history')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('payment_date', { ascending: false })
-        .limit(10);
-      
-      if (paymentData) {
-        setPaymentHistory(paymentData);
-      }
-
-      // Fetch usage data
-      const { data: usageData } = await supabase
-        .from('usage_tracking')
-        .select('*')
-        .eq('user_id', user?.id);
-      
-      if (usageData) {
-        setUsage(usageData);
-      }
-    } catch (error) {
-      console.error('Error fetching billing data:', error);
-      toast.error("Failed to load billing information");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // const fetchBillingData = ... (removed)
 
   const handleUpgrade = () => {
     toast.info("Upgrade functionality coming soon!");
@@ -121,7 +92,7 @@ const BillingSection = () => {
       cancelled: 'bg-red-100 text-red-800',
       trialing: 'bg-blue-100 text-blue-800',
     };
-    
+
     return (
       <Badge className={statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -135,7 +106,7 @@ const BillingSection = () => {
       professional: { trucks: 25, drivers: 50, features: 'Advanced' },
       enterprise: { trucks: 'Unlimited', drivers: 'Unlimited', features: 'Premium' },
     };
-    
+
     return features[planName as keyof typeof features] || features.starter;
   };
 
@@ -177,7 +148,7 @@ const BillingSection = () => {
                 {subscription?.plan_name || 'Starter'} Plan
               </h3>
               <p className="text-sm text-gray-600">
-                {subscription?.plan_price 
+                {subscription?.plan_price
                   ? `${formatCurrency(subscription.plan_price)} per ${subscription.billing_cycle}`
                   : 'Free tier'
                 }
@@ -192,7 +163,7 @@ const BillingSection = () => {
               )}
             </div>
           </div>
-          
+
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="flex items-center gap-2">
               <Truck className="h-4 w-4 text-blue-600" />
@@ -219,8 +190,8 @@ const BillingSection = () => {
                   <span className="text-sm capitalize">{item.feature_name.replace('_', ' ')}</span>
                   <div className="flex items-center gap-2">
                     <div className="w-24 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full" 
+                      <div
+                        className="bg-blue-600 h-2 rounded-full"
                         style={{ width: `${Math.min((item.usage_count / item.usage_limit) * 100, 100)}%` }}
                       ></div>
                     </div>
@@ -254,7 +225,7 @@ const BillingSection = () => {
               View All
             </Button>
           </div>
-          
+
           {paymentHistory.length === 0 ? (
             <p className="text-sm text-gray-600 text-center py-4">
               No payment history available

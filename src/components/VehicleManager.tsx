@@ -277,12 +277,74 @@ const VehicleManager = () => {
     }
   };
 
+  const handleUpdateEquipment = async (data: any) => {
+    if (!selectedEquipment) return;
+    try {
+      // Map to API DTO
+      const payload: any = {
+        id: selectedEquipment.id,
+        equipmentTypeId: data.equipmentTypeId || selectedEquipment.equipmentTypeId,
+        fleetCategoryId: data.fleetCategoryId || selectedEquipment.fleetCategoryId,
+        unitNumber: data.unitNumber,
+        displayName: data.unitNumber,
+        vin: data.vin,
+        serialNumber: data.serialNumber,
+        plateNumber: data.licensePlate, // Map licensePlate to plateNumber
+        state: data.licenseState,
+        make: data.make,
+        model: data.model,
+        year: data.year,
+        status: data.status,
+        type: data.type,
+
+        // Operational Status mapping
+        operationalStatus: (() => {
+          switch (data.status) {
+            case EquipmentStatus.ACTIVE: return EquipmentOperationalStatus.Available;
+            case EquipmentStatus.IN_SHOP: return EquipmentOperationalStatus.InShop;
+            case EquipmentStatus.OUT_OF_SERVICE: return EquipmentOperationalStatus.OutOfService;
+            default: return EquipmentOperationalStatus.Available;
+          }
+        })(),
+        lifecycleStatus: data.status === EquipmentStatus.SOLD ? EquipmentLifecycleStatus.Sold :
+          data.status === EquipmentStatus.ARCHIVED ? EquipmentLifecycleStatus.Retired :
+            EquipmentLifecycleStatus.Active,
+
+        // Specs
+        length: data.length,
+        width: 0,
+        height: 0,
+        color: 'White', // Default
+        grossVehicleWeightRating: data.weightCapacity,
+
+        // Meters
+        currentOdometer: data.mileage,
+        currentHobbs: data.hours,
+
+        notes: selectedEquipment.notes
+      };
+
+      await equipmentApi.update(selectedEquipment.id, payload);
+
+      // Update local state
+      const updatedItem = { ...selectedEquipment, ...data };
+      setSelectedEquipment(updatedItem);
+      setEquipmentList(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+
+      toast({ title: "Equipment Updated", description: "Changes saved successfully." });
+    } catch (err: any) {
+      console.error("Update failed:", err);
+      toast({ title: "Update Failed", description: err.message || "Failed to save changes", variant: "destructive" });
+    }
+  };
+
   if (selectedEquipment) {
     return (
       <EquipmentDetail
         equipment={selectedEquipment}
         workOrders={equipmentWorkOrders}
         onBack={() => setSelectedEquipment(null)}
+        onUpdate={handleUpdateEquipment}
         onUpdateStatus={handleUpdateStatus}
         initialAiOpen={false}
       />

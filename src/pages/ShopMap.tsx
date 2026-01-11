@@ -1,111 +1,163 @@
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, Phone, Clock, Wrench } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader } from "@googlemaps/js-api-loader";
+import { Shop } from "@/components/shops/types/ShopTypes";
 
-const ShopMap = () => {
-  const shops = [
-    {
-      id: 1,
-      name: "Main Service Center",
-      address: "123 Industrial Blvd, Atlanta, GA 30309",
-      phone: "(404) 555-0123",
-      hours: "Mon-Fri: 6AM-8PM, Sat: 8AM-4PM",
-      bays: 8,
-      specialties: ["Engine Repair", "Transmission", "Electrical"],
-      coordinates: { lat: 33.7490, lng: -84.3880 }
-    },
-    {
-      id: 2,
-      name: "North Point Shop",
-      address: "456 Highway 85, Duluth, GA 30096",
-      phone: "(770) 555-0456",
-      hours: "Mon-Fri: 7AM-6PM",
-      bays: 4,
-      specialties: ["Brake Service", "Tire Replacement", "Oil Changes"],
-      coordinates: { lat: 34.0031, lng: -84.1447 }
-    },
-    {
-      id: 3,
-      name: "South Metro Facility",
-      address: "789 Commerce Dr, McDonough, GA 30253",
-      phone: "(678) 555-0789",
-      hours: "24/7 Emergency Service",
-      bays: 6,
-      specialties: ["Heavy Repairs", "Frame Work", "Welding"],
-      coordinates: { lat: 33.4473, lng: -84.1469 }
+interface ShopMapProps {
+  shops: Shop[];
+  center?: { lat: number; lng: number };
+}
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+
+const ShopMap = ({ shops, center }: ShopMapProps) => {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.Marker[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    initializeMap();
+  }, []);
+
+  useEffect(() => {
+    if (mapInstanceRef.current) {
+      updateMarkers();
     }
-  ];
+  }, [shops]);
+
+  useEffect(() => {
+    if (mapInstanceRef.current && center) {
+      mapInstanceRef.current.panTo(center);
+      mapInstanceRef.current.setZoom(12);
+    }
+  }, [center]);
+
+  const initializeMap = async () => {
+    if (!mapRef.current) return;
+
+    try {
+      const loader = new Loader({
+        apiKey: GOOGLE_MAPS_API_KEY,
+        version: "weekly",
+        libraries: ["places"],
+      });
+
+      await loader.load();
+
+      const map = new window.google.maps.Map(mapRef.current, {
+        zoom: 4,
+        center: center || { lat: 39.8283, lng: -98.5795 }, // Center of US
+        styles: mapStyle,
+        disableDefaultUI: false,
+        zoomControl: true,
+        streetViewControl: false,
+        mapTypeControl: false,
+      });
+
+      mapInstanceRef.current = map;
+      setLoading(false);
+      updateMarkers();
+    } catch (error) {
+      console.error('Error loading Google Maps:', error);
+      setLoading(false);
+    }
+  };
+
+  const updateMarkers = () => {
+    if (!mapInstanceRef.current || !window.google) return;
+
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current = [];
+
+    const bounds = new window.google.maps.LatLngBounds();
+    let hasPoints = false;
+
+    shops.forEach(shop => {
+      // Typically shops have lat/long. If not, we might need to geocode or skip.
+      // Assuming shop has latitude and longitude for now as per ShopCreatePayload
+      if (shop.latitude && shop.longitude) {
+        const pos = { lat: shop.latitude, lng: shop.longitude };
+
+        const marker = new window.google.maps.Marker({
+          position: pos,
+          map: mapInstanceRef.current,
+          title: shop.shop_name,
+          // Simple custom icon or default
+        });
+
+        const infoWindow = new window.google.maps.InfoWindow({
+          content: `
+            <div style="padding: 8px;">
+              <h3 style="font-weight: bold; margin-bottom: 4px;">${shop.shop_name}</h3>
+              <p style="font-size: 12px; color: #666;">${shop.address}</p>
+              <p style="font-size: 12px; color: #666;">${shop.phone || ''}</p>
+            </div>
+          `
+        });
+
+        marker.addListener("click", () => {
+          infoWindow.open({
+            anchor: marker,
+            map: mapInstanceRef.current,
+          });
+        });
+
+        markersRef.current.push(marker);
+        bounds.extend(pos);
+        hasPoints = true;
+      }
+    });
+
+    if (hasPoints && !center) {
+      mapInstanceRef.current.fitBounds(bounds);
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Shop Locations</h1>
-        <p className="text-gray-600">Find and contact our service locations</p>
-      </div>
-
-      {/* Map Placeholder */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Shop Locations Map</CardTitle>
-          <CardDescription>Interactive map showing all service locations</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
-            <div className="text-center">
-              <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Map integration would be implemented here</p>
-              <p className="text-sm text-gray-500">Google Maps, Mapbox, or similar service</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Shop Details */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {shops.map((shop) => (
-          <Card key={shop.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-blue-600" />
-                {shop.name}
-              </CardTitle>
-              <CardDescription>{shop.address}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-gray-500" />
-                <span className="text-sm">{shop.phone}</span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-gray-500" />
-                <span className="text-sm">{shop.hours}</span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Wrench className="h-4 w-4 text-gray-500" />
-                <span className="text-sm">{shop.bays} Service Bays</span>
-              </div>
-              
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
-                <div className="flex flex-wrap gap-1">
-                  {shop.specialties.map((specialty, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
-                    >
-                      {specialty}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+    <div className="w-full h-full relative">
+      {loading && (
+        <div className="absolute inset-0 bg-slate-100 flex items-center justify-center z-10">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      )}
+      <div ref={mapRef} className="w-full h-full min-h-[500px]" />
     </div>
   );
 };
+
+const mapStyle = [
+  {
+    "featureType": "administrative",
+    "elementType": "labels.text.fill",
+    "stylers": [{ "color": "#444444" }]
+  },
+  {
+    "featureType": "landscape",
+    "elementType": "all",
+    "stylers": [{ "color": "#f2f2f2" }]
+  },
+  {
+    "featureType": "poi",
+    "elementType": "all",
+    "stylers": [{ "visibility": "off" }]
+  },
+  {
+    "featureType": "road",
+    "elementType": "all",
+    "stylers": [{ "saturation": -100 }, { "lightness": 45 }]
+  },
+  {
+    "featureType": "road.highway",
+    "elementType": "all",
+    "stylers": [{ "visibility": "simplified" }]
+  },
+  {
+    "featureType": "water",
+    "elementType": "all",
+    "stylers": [{ "color": "#cbd5e1" }, { "visibility": "on" }]
+  }
+];
 
 export default ShopMap;

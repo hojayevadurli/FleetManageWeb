@@ -46,7 +46,7 @@ export const mapDtoToEquipment = (dto: EquipmentDto): Equipment => {
         dto.operationalStatus === EquipmentOperationalStatus.InShop ? EquipmentStatus.IN_SHOP :
           dto.operationalStatus === EquipmentOperationalStatus.OutOfService ? EquipmentStatus.OUT_OF_SERVICE :
             EquipmentStatus.ACTIVE,
-    lastServiceDate: new Date().toISOString(), // This might need a real field if available
+    lastServiceDate: dto.lastServiceDate || undefined,
     fleetCategoryId: dto.fleetCategoryId,
     fleetCategoryName: dto.fleetCategoryName,
     equipmentTypeId: dto.equipmentTypeId,

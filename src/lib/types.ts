@@ -131,6 +131,8 @@ export interface Equipment {
   status: EquipmentStatus;
   lastServiceDate?: string;
   acquiredDate?: string;
+
+
   inServiceDate?: string;
   outOfServiceDate?: string;
 
@@ -157,6 +159,16 @@ export interface Equipment {
   equipmentTypeName?: string;
 }
 
+export interface Warranty {
+  id: string;
+  description: string;
+  provider: string;
+  startDate?: string;
+  endDate?: string;
+  status: 'Active' | 'Expired' | 'Pending';
+  files?: { name: string; url: string; type: string }[];
+}
+
 // Backend DTO structure
 export interface EquipmentDto {
   id: string;
@@ -165,6 +177,7 @@ export interface EquipmentDto {
   equipmentTypeCode: string;
   fleetCategoryId: number;
   fleetCategoryName: string;
+  lastServiceDate?: string;
   unitNumber: string;
   displayName: string;
   vin: string;

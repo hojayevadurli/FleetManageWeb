@@ -41,7 +41,7 @@ interface FleetMapViewProps {
   vehicles: Vehicle[];
 }
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyBsdzNMDKKScjkXlS08hSCN7KuQOg43tiw";
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
 const FleetMapView = ({ vehicles }: FleetMapViewProps) => {
   const [loading, setLoading] = useState(false);

@@ -207,7 +207,7 @@ const WorkOrders = () => {
           <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Operational Fleet Directives</p>
         </div>
 
-        <Button className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-6 py-6 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-lg active:scale-95 transition-all" onClick={() => setIsCreateDialogOpen(true)}>
+        <Button size="lg" className="rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-lg active:scale-95 transition-all" onClick={() => setIsCreateDialogOpen(true)}>
           <Plus className="h-4 w-4" />
           New Work Order
         </Button>

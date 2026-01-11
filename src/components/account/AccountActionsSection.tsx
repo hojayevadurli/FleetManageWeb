@@ -16,6 +16,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+
+
 const AccountActionsSection = () => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -50,7 +52,7 @@ const AccountActionsSection = () => {
             Sign Out
           </Button>
         </div>
-        
+
         <div className="flex items-center justify-between p-4 border rounded-lg border-red-200">
           <div>
             <p className="font-medium text-red-700">Deactivate Account</p>
@@ -73,7 +75,7 @@ const AccountActionsSection = () => {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
+                <AlertDialogAction
                   onClick={handleDeactivateAccount}
                   className="bg-red-600 hover:bg-red-700"
                 >

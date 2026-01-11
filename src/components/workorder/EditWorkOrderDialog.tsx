@@ -75,6 +75,8 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
     service_date: string;
     title: string;
     complaint: string;
+    vendor_id?: string | null;
+    vendor_name?: string;
   }>({
     vehicle_id: "",
     vehicle_type: "truck",
@@ -82,10 +84,8 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
     odometer: "",
     service_date: "", // yyyy-mm-dd
     title: "",
-    service_date: "", // yyyy-mm-dd
-    title: "",
     complaint: "",
-    vendor_id: null as string | null,
+    vendor_id: null,
     vendor_name: ""
   });
 
@@ -114,7 +114,6 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
       vehicle_type: "truck", // Default or determine from vehicle selector
       status: workOrder.status,
       odometer: workOrder.odometerAtService?.toString() ?? "",
-      service_date: workOrder.openedAt ? new Date(workOrder.openedAt).toISOString().slice(0, 10) : "",
       service_date: workOrder.openedAt ? new Date(workOrder.openedAt).toISOString().slice(0, 10) : "",
       title: workOrder.title || "",
       complaint: workOrder.complaint || "",
@@ -170,6 +169,8 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
        */
       const body: WorkOrderUpsertDto = {
         equipmentId: editData.vehicle_id,
+        openedAt: serviceDateIso,
+        title: editData.title,
         complaint: editData.complaint.trim(),
         diagnosis: currentWo.diagnosis ?? null,
         resolution: currentWo.resolution ?? null,
@@ -181,7 +182,9 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
         manualActualTotal: currentWo.manualActualTotal,
         lines: computedLines,
         replaceDocuments: false,
-        documentIds: []
+        documentIds: [],
+        vendorId: editData.vendor_id || undefined,
+        odometerAtService: editData.odometer ? Number(editData.odometer) : undefined
       };
 
       await workOrdersApi.update(currentWo.id, body);
