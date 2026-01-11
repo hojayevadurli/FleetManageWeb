@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Search,
   Map as MapIcon,
@@ -7,17 +6,19 @@ import {
   Plus,
   Filter,
   Sparkles,
-  ChevronDown,
-  MapPin,
-  ArrowRight
 } from "lucide-react";
 import { Shop } from "@/components/shops/types/ShopTypes";
 import ShopCard from "@/components/shops/ShopCard";
-import ShopMap from "@/components/shops/ShopMap";
+import ShopMap from "@/pages/ShopMap"; // Updating import path to local file if it was moved or just using the one we edited
 import AddShopDialog from "@/components/shops/AddShopDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { shopsApi } from "@/lib/shopsApi";
+import { Loader } from "@googlemaps/js-api-loader";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
 const ShopsPage = () => {
   const [view, setView] = useState<'list' | 'map'>('list');
@@ -29,6 +30,11 @@ const ShopsPage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Map & Search States
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
   // Filter States
   const [tierFilter, setTierFilter] = useState('ALL');
   const [auditFilter, setAuditFilter] = useState('ALL');
@@ -36,6 +42,7 @@ const ShopsPage = () => {
 
   useEffect(() => {
     loadShops();
+    initializeGoogleMaps();
   }, []);
 
   useEffect(() => {
@@ -46,6 +53,7 @@ const ShopsPage = () => {
     setLoading(true);
     try {
       const data = await shopsApi.list();
+      console.log('Fetched shops:', data);
       setShops(data);
     } catch (error) {
       console.error('Error loading shops:', error);
@@ -56,6 +64,42 @@ const ShopsPage = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const initializeGoogleMaps = async () => {
+    try {
+      const loader = new Loader({
+        apiKey: GOOGLE_MAPS_API_KEY,
+        version: "weekly",
+        libraries: ["places"],
+      });
+
+      await loader.load();
+
+      if (searchInputRef.current) {
+        autocompleteRef.current = new window.google.maps.places.Autocomplete(searchInputRef.current, {
+          types: ['geocode', 'establishment'],
+          fields: ['geometry', 'name', 'formatted_address'],
+        });
+
+        autocompleteRef.current.addListener("place_changed", () => {
+          const place = autocompleteRef.current?.getPlace();
+          if (place && place.geometry && place.geometry.location) {
+            const lat = place.geometry.location.lat();
+            const lng = place.geometry.location.lng();
+
+            setSearchTerm(place.name || place.formatted_address || "");
+            setMapCenter({ lat, lng });
+
+            // If we are in list view, switching to map view might be nice, or just filtering
+            // For now, let's auto-switch to map view if they search for a location
+            setView('map');
+          }
+        });
+      }
+    } catch (e) {
+      console.error("Failed to load Google Maps Places", e);
     }
   };
 
@@ -116,28 +160,30 @@ const ShopsPage = () => {
 
           <div className="flex items-center gap-4">
             <div className="bg-white p-1.5 rounded-2xl border border-slate-200 flex shadow-sm">
-              <button
+              <Button
+                variant={view === 'list' ? 'default' : 'ghost'}
                 onClick={() => setView('list')}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'list' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'list' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 hover:bg-transparent'
                   }`}
               >
                 <List className="w-4 h-4" /> List
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={view === 'map' ? 'default' : 'ghost'}
                 onClick={() => setView('map')}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'map' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'map' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 hover:bg-transparent'
                   }`}
               >
                 <MapIcon className="w-4 h-4" /> Map
-              </button>
+              </Button>
             </div>
 
-            <button
+            <Button
               onClick={() => setIsAddShopOpen(true)}
-              className="bg-blue-600 text-white px-8 py-4.5 rounded-[1.5rem] flex items-center gap-3 font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 active:scale-95"
+              className="bg-blue-600 text-white h-auto px-8 py-4.5 rounded-[1.5rem] flex items-center gap-3 font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 active:scale-95"
             >
               <Plus className="w-5 h-5" /> Integrate Shop
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -145,17 +191,18 @@ const ShopsPage = () => {
         <div className="flex flex-col lg:flex-row items-center gap-6">
           <div className="relative flex-1 group w-full">
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
-            <input
+            <Input
+              ref={searchInputRef}
               type="text"
-              placeholder="Search within your trusted service cloud..."
-              className="w-full pl-16 pr-8 py-6 bg-white border border-slate-100 rounded-[2.5rem] text-sm font-black text-slate-900 outline-none shadow-sm focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all"
+              placeholder="Search or find location..."
+              className="w-full pl-16 pr-8 py-6 bg-white border border-slate-100 rounded-[2.5rem] text-sm font-black text-slate-900 outline-none shadow-sm focus-visible:ring-4 focus-visible:ring-blue-500/5 focus-visible:border-blue-500 transition-all h-auto"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button className="flex items-center gap-3 px-8 py-6 bg-white border border-slate-100 rounded-[2.5rem] text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 transition-all shadow-sm">
+          <Button variant="outline" className="flex items-center gap-3 px-8 py-6 bg-white border border-slate-100 rounded-[2.5rem] text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 hover:border-blue-100 transition-all shadow-sm h-auto">
             <Filter className="w-4 h-4" /> Apply Filters
-          </button>
+          </Button>
         </div>
 
         {/* Dark Filter Console */}
@@ -242,12 +289,7 @@ const ShopsPage = () => {
             </div>
           ) : (
             <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-sm overflow-hidden min-h-[600px] relative">
-              <ShopMap />
-              <div className="absolute top-10 left-10 z-10">
-                <button className="bg-white/90 backdrop-blur px-8 py-4 rounded-2xl shadow-2xl border border-white/20 flex items-center gap-3 font-black text-[10px] uppercase tracking-widest text-slate-900 hover:scale-105 transition-all active:scale-95">
-                  <Sparkles className="w-4 h-4 text-blue-600" /> Discover Local Capacity (AI)
-                </button>
-              </div>
+              <ShopMap shops={filteredShops} center={mapCenter} />
             </div>
           )}
         </div>

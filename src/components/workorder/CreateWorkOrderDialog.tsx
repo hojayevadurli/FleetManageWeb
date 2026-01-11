@@ -55,6 +55,9 @@ interface CreateWorkOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialCompanyName: string;
+  initialVehicleId?: string;
+  initialVehicleType?: string;
+  initialUnitNumber?: string;
   onAfterCreated?: () => Promise<void> | void;
 }
 
@@ -62,6 +65,9 @@ export default function CreateWorkOrderDialog({
   open,
   onOpenChange,
   initialCompanyName,
+  initialVehicleId,
+  initialVehicleType,
+  initialUnitNumber,
   onAfterCreated
 }: CreateWorkOrderDialogProps) {
   const [workOrderItems, setWorkOrderItems] = useState<WorkOrderItemData[]>([]);
@@ -84,8 +90,8 @@ export default function CreateWorkOrderDialog({
   const [previewType, setPreviewType] = useState<'image' | 'pdf'>('image');
 
   const [newWorkOrder, setNewWorkOrder] = useState<NewWorkOrderState>({
-    vehicle_id: "",
-    vehicle_type: "truck",
+    vehicle_id: initialVehicleId || "",
+    vehicle_type: initialVehicleType || "truck",
     priority: "normal",
     eta_date: "",
     eta_hours: "",
@@ -109,6 +115,21 @@ export default function CreateWorkOrderDialog({
     }).catch(console.error);
   }, []);
 
+  // Effect to reset/init form when props change or modal opens
+  useEffect(() => {
+    if (open) {
+      setNewWorkOrder(prev => ({
+        ...prev,
+        vehicle_id: initialVehicleId || "",
+        vehicle_type: initialVehicleType || "truck",
+        company_name: initialCompanyName
+      }));
+      if (initialVehicleId && initialUnitNumber) {
+        generateNextWorkOrderNumber(initialVehicleId, initialUnitNumber);
+      }
+    }
+  }, [open, initialVehicleId, initialVehicleType, initialUnitNumber, initialCompanyName]);
+
   const computedLines = useMemo(() => {
     const items = (workOrderItems ?? []).filter(x => x.description.trim());
     return items.map((item) => ({
@@ -120,27 +141,6 @@ export default function CreateWorkOrderDialog({
       partNumber: null
     }));
   }, [workOrderItems]);
-
-  const resetForm = () => {
-    setNewWorkOrder({
-      vehicle_id: "",
-      vehicle_type: "truck",
-      priority: "normal",
-      eta_date: "",
-      eta_hours: "",
-      company_name: initialCompanyName,
-      description: "",
-      vendor_id: null,
-      vendor_name: ""
-    });
-    setWorkOrderItems([]);
-    setSelectedFiles([]);
-    setDraftWorkOrderId(null);
-    setIsSubmitting(false);
-    setIsUploading(false);
-    setShowOptionalFields({ eta: false, attachments: false });
-    setPreviewUrl(null);
-  };
 
   const generateNextWorkOrderNumber = async (vehicleId: string, unitNumber: string) => {
     try {
@@ -378,7 +378,7 @@ export default function CreateWorkOrderDialog({
     onOpenChange(isOpen);
   };
 
-  const createDisabled = isSubmitting || !newWorkOrder.vehicle_id || computedLines.length === 0;
+  const createDisabled = isSubmitting || !newWorkOrder.vehicle_id || (computedLines.length === 0 && !newWorkOrder.description?.trim());
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

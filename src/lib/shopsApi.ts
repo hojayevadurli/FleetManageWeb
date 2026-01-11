@@ -15,6 +15,7 @@ export interface ShopCreatePayload {
     city: string;      // Required by backend
     state: string;     // Required by backend
     postalCode?: string;
+    country?: string;  // Required by backend
     contactName?: string;
     phone?: string;
     email?: string;
@@ -30,12 +31,37 @@ export interface ShopCreatePayload {
 
 export interface ShopUpdatePayload extends Partial<ShopCreatePayload> { }
 
+const mapBackendShopToShop = (data: any): Shop => ({
+    id: data.id,
+    shop_id: data.shopId || data.id,
+    shop_name: data.name || data.shopName || "Unknown Shop",
+    address: data.address1 || data.address || "",
+    contact_name: data.contactName,
+    labor_rate: data.laborRate || 0,
+    rate_category: (data.rateCategory || data.networkTier || 'green').toLowerCase() as 'green' | 'orange' | 'red',
+    comment: data.comment || data.notes,
+    phone: data.phone,
+    email: data.email,
+    website: data.website,
+    hours_of_operation: data.hoursOfOperation,
+    specialties: data.specialties || [],
+    latitude: data.latitude,
+    longitude: data.longitude,
+    average_rating: data.averageRating || 0,
+    total_reviews: data.reviewCount || 0,
+    created_at: data.createdAt || new Date().toISOString(),
+    updated_at: data.updatedAt || new Date().toISOString(),
+    city: data.city,
+    state: data.state,
+    zip: data.postalCode
+});
+
 export const shopsApi = {
     // GET /api/service-partners
     async list(): Promise<Shop[]> {
         try {
-            const response = await api.get<Shop[]>("/service-partners");
-            return response.data;
+            const response = await api.get<any[]>("/service-partners");
+            return response.data.map(mapBackendShopToShop);
         } catch (error) {
             console.error("Error fetching shops:", error);
             return [];
@@ -45,8 +71,8 @@ export const shopsApi = {
     // GET /api/service-partners/{id}
     async get(id: string): Promise<Shop | null> {
         try {
-            const response = await api.get<Shop>(`/service-partners/${id}`);
-            return response.data;
+            const response = await api.get<any>(`/service-partners/${id}`);
+            return mapBackendShopToShop(response.data);
         } catch (error) {
             console.error(`Error fetching shop ${id}:`, error);
             return null;
@@ -55,14 +81,14 @@ export const shopsApi = {
 
     // POST /api/service-partners
     async create(payload: ShopCreatePayload): Promise<Shop> {
-        const response = await api.post<Shop>("/service-partners", payload);
-        return response.data;
+        const response = await api.post<any>("/service-partners", payload);
+        return mapBackendShopToShop(response.data);
     },
 
     // PUT /api/service-partners/{id}
     async update(id: string, payload: ShopUpdatePayload): Promise<Shop> {
-        const response = await api.put<Shop>(`/service-partners/${id}`, payload);
-        return response.data;
+        const response = await api.put<any>(`/service-partners/${id}`, payload);
+        return mapBackendShopToShop(response.data);
     },
 
     // DELETE /api/service-partners/{id}

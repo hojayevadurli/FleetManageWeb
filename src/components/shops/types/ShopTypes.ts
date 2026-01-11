@@ -20,6 +20,9 @@ export interface Shop {
   image_url?: string;
   created_at: string;
   updated_at: string;
+  city?: string;
+  state?: string;
+  zip?: string;
 }
 
 export interface ShopRating {
@@ -56,4 +59,7 @@ export interface ShopFormData {
   specialties: string[];
   latitude: string;
   longitude: string;
+  city?: string;
+  state?: string;
+  zip?: string;
 }

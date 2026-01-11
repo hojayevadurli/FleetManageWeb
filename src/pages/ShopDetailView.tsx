@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
 import {
     ArrowLeft,
     Share2,
@@ -18,11 +19,14 @@ import {
     Navigation,
     Trophy,
     Activity,
-    Award
+    Award,
+    Trash2,
+    Edit
 } from 'lucide-react';
-// import { supabase } from "@/integrations/supabase/client"; // Removed - using backend API
+import { shopsApi } from '@/lib/shopsApi';
 import { Shop } from '@/components/shops/types/ShopTypes';
 import { useToast } from '@/hooks/use-toast';
+import AddShopDialog from '@/components/shops/AddShopDialog';
 
 const ShopDetailView = () => {
     const { id } = useParams<{ id: string }>();
@@ -30,22 +34,19 @@ const ShopDetailView = () => {
     const { toast } = useToast();
     const [shop, setShop] = useState<Shop | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
     useEffect(() => {
         if (id) loadShop();
     }, [id]);
 
     const loadShop = async () => {
+        if (!id) return;
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('shops')
-                .select('*')
-                .eq('id', id)
-                .single();
-
-            if (error) throw error;
-            setShop(data as any);
+            const data = await shopsApi.get(id);
+            if (!data) throw new Error("Shop not found");
+            setShop(data);
         } catch (error) {
             console.error('Error loading shop:', error);
             toast({
@@ -55,6 +56,27 @@ const ShopDetailView = () => {
             });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!shop || !id) return;
+        if (confirm('Are you sure you want to delete this shop? This action cannot be undone.')) {
+            try {
+                await shopsApi.delete(id);
+                toast({
+                    title: "Shop deleted",
+                    description: "The shop has been removed from your list."
+                });
+                navigate('/app/shops');
+            } catch (error) {
+                console.error('Error deleting shop:', error);
+                toast({
+                    title: "Error deleting shop",
+                    description: "Please try again.",
+                    variant: "destructive"
+                });
+            }
         }
     };
 
@@ -73,26 +95,56 @@ const ShopDetailView = () => {
         <div className="min-h-screen bg-[#F8FAFC] pb-20">
             {/* Top Bar */}
             <div className="max-w-7xl mx-auto px-8 py-10 flex items-center justify-between">
-                <button
+                <Button
+                    variant="ghost"
                     onClick={() => navigate('/app/shops')}
-                    className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-all group"
+                    className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-all group hover:bg-transparent pl-0"
                 >
                     <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                     Back to Directory
-                </button>
+                </Button>
 
                 <div className="flex items-center gap-4">
-                    <button className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-slate-900 transition-all">
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setIsEditDialogOpen(true)}
+                        className="h-12 w-12 rounded-xl border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200"
+                        title="Edit Shop"
+                    >
+                        <Edit className="w-5 h-5" />
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleDelete}
+                        className="h-12 w-12 rounded-xl border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200"
+                        title="Delete Shop"
+                    >
+                        <Trash2 className="w-5 h-5" />
+                    </Button>
+                    <div className="w-px h-8 bg-slate-200 mx-2" />
+                    <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl border-slate-200 text-slate-400 hover:text-slate-900">
                         <Share2 className="w-5 h-5" />
-                    </button>
-                    <button className="bg-slate-900 text-white px-8 py-3.5 rounded-xl flex items-center gap-2 font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl active:scale-95">
+                    </Button>
+                    <Button variant="secondary" className="h-12 px-8 rounded-xl flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-xl active:scale-95">
                         <MessageSquare className="w-4 h-4" /> Write Audit
-                    </button>
-                    <button className="bg-blue-600 text-white px-8 py-3.5 rounded-xl flex items-center gap-3 font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 active:scale-95">
+                    </Button>
+                    <Button className="h-12 px-8 rounded-xl flex items-center gap-3 font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-95">
                         <Send className="w-4 h-4" /> Dispatch WO
-                    </button>
+                    </Button>
                 </div>
             </div>
+
+            <AddShopDialog
+                open={isEditDialogOpen}
+                onOpenChange={setIsEditDialogOpen}
+                onShopAdded={() => {
+                    loadShop(); // Reload details after edit
+                    setIsEditDialogOpen(false);
+                }}
+                shopToEdit={shop}
+            />
 
             <div className="max-w-7xl mx-auto px-8 grid grid-cols-1 xl:grid-cols-3 gap-10">
                 {/* Main Hero & Info */}
@@ -235,15 +287,16 @@ const ShopDetailView = () => {
                             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/10 to-transparent" />
                         </div>
 
-                        <button
+                        <Button
+                            variant="outline"
                             onClick={() => {
                                 const url = `https://www.google.com/maps/dir/?api=1&destination=${shop.latitude},${shop.longitude}`;
                                 window.open(url, '_blank');
                             }}
-                            className="w-full py-5 bg-slate-50 text-slate-900 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-slate-100 transition-all active:scale-95 shadow-sm"
+                            className="w-full h-auto py-5 border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 shadow-sm hover:bg-slate-50 text-slate-900"
                         >
                             <Navigation className="w-4 h-4 fill-slate-900" /> Open Navigation
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>

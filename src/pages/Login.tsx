@@ -3,6 +3,7 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { api } from "@/lib/Api";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { industriesApi, Industry } from "@/lib/industriesApi";
+import { Button } from "@/components/ui/button";
 
 export default function Login() {
   const { signIn, signUp } = useAuth();
@@ -181,39 +182,42 @@ export default function Login() {
           {!isForgotPassword && !isSignUp && (
             <p>
               Don&apos;t have an account?{" "}
-              <button
+              <Button
+                variant="link"
                 type="button"
                 onClick={switchToSignUp}
-                className="text-blue-600 hover:underline"
+                className="text-blue-600 hover:underline p-0 h-auto font-normal"
               >
                 Create company
-              </button>
+              </Button>
             </p>
           )}
 
           {isSignUp && (
             <p>
               Already have an account?{" "}
-              <button
+              <Button
+                variant="link"
                 type="button"
                 onClick={switchToLogin}
-                className="text-blue-600 hover:underline"
+                className="text-blue-600 hover:underline p-0 h-auto font-normal"
               >
                 Sign in
-              </button>
+              </Button>
             </p>
           )}
 
           {isForgotPassword && (
             <p>
               Remember your password?{" "}
-              <button
+              <Button
+                variant="link"
                 type="button"
                 onClick={switchToLogin}
-                className="text-blue-600 hover:underline"
+                className="text-blue-600 hover:underline p-0 h-auto font-normal"
               >
                 Back to sign in
-              </button>
+              </Button>
             </p>
           )}
         </div>

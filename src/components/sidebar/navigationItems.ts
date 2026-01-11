@@ -46,24 +46,9 @@ export const navigationItems: NavigationConfig = [
     icon: ClipboardList,
   },
   {
-    group: "Maintenance",
-    items: [
-      {
-        title: "Work Orders",
-        url: "/app/work-orders",
-        icon: ClipboardList,
-      },
-      {
-        title: "Upcoming",
-        url: "/app/maintenance/upcoming",
-        icon: Calendar,
-      },
-      {
-        title: "Shops List",
-        url: "/app/shops",
-        icon: Settings,
-      },
-    ],
+    title: "Shops List",
+    url: "/app/shops",
+    icon: Settings,
   },
   {
     title: "Account",
