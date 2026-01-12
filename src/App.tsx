@@ -146,6 +146,8 @@ const App = () => (
             <Route path="/" element={<RootRoute />} />
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            {/* Backend sends /reset link */}
+            <Route path="/reset" element={<ResetPassword />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/app/*" element={
               <ProtectedRoute>
