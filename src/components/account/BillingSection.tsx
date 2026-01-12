@@ -1,265 +1,94 @@
-
-import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { CreditCard, Calendar, Download, Zap, Users, Truck } from "lucide-react";
-// import { supabase } from "@/integrations/supabase/client"; 
-import { useAuth } from "@/components/auth/AuthContext";
+import { CreditCard, Clock, Truck } from "lucide-react";
 import { toast } from "sonner";
 
-interface Subscription {
-  id: string;
-  plan_name: string;
-  plan_price: number;
-  billing_cycle: string;
-  status: string;
-  current_period_end: string;
-  cancel_at_period_end: boolean;
-}
-
-interface PaymentHistory {
-  id: string;
-  amount: number;
-  currency: string;
-  status: string;
-  payment_date: string;
-  invoice_url?: string;
-}
-
-interface UsageData {
-  feature_name: string;
-  usage_count: number;
-  usage_limit: number;
-}
-
 const BillingSection = () => {
-  const { user } = useAuth();
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
-  const [usage, setUsage] = useState<UsageData[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Hardcoded for demo/trial purposes as requested
+  const trialDaysRemaining = 18;
+  const trialEndDate = "January 28, 2026";
+  const truckCount = 5;
+  const pricePerTruck = 5;
+  const estimatedMonthlyCost = truckCount * pricePerTruck;
 
-  useEffect(() => {
-    // Mock data loading
-    const loadMockData = async () => {
-      setLoading(true);
-      // Simulate delay
-      await new Promise(r => setTimeout(r, 500));
-
-      // Default to free/starter plan (null subscription implies free)
-      setSubscription(null);
-      setPaymentHistory([]);
-      setUsage([
-        { feature_name: "trucks", usage_count: 5, usage_limit: 5 },
-        { feature_name: "drivers", usage_count: 2, usage_limit: 10 }
-      ]);
-      setLoading(false);
-    };
-    loadMockData();
-  }, [user]);
-
-  // const fetchBillingData = ... (removed)
-
-  const handleUpgrade = () => {
-    toast.info("Upgrade functionality coming soon!");
+  const handleAddPaymentMethod = () => {
+    toast.info("Payment method flow coming soon!");
   };
-
-  const handleManageBilling = () => {
-    toast.info("Billing management portal coming soon!");
-  };
-
-  const formatCurrency = (amount: number, currency = 'usd') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency.toUpperCase(),
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusColors = {
-      active: 'bg-green-100 text-green-800',
-      past_due: 'bg-yellow-100 text-yellow-800',
-      cancelled: 'bg-red-100 text-red-800',
-      trialing: 'bg-blue-100 text-blue-800',
-    };
-
-    return (
-      <Badge className={statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
-  };
-
-  const getPlanFeatures = (planName: string) => {
-    const features = {
-      starter: { trucks: 5, drivers: 10, features: 'Basic' },
-      professional: { trucks: 25, drivers: 50, features: 'Advanced' },
-      enterprise: { trucks: 'Unlimited', drivers: 'Unlimited', features: 'Premium' },
-    };
-
-    return features[planName as keyof typeof features] || features.starter;
-  };
-
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Billing & Subscription
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="animate-pulse space-y-4">
-            <div className="h-20 bg-gray-200 rounded"></div>
-            <div className="h-32 bg-gray-200 rounded"></div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const planFeatures = subscription ? getPlanFeatures(subscription.plan_name) : getPlanFeatures('starter');
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CreditCard className="h-5 w-5" />
+    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden w-full">
+      <div className="p-6 border-b border-slate-100">
+        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3">
+          <CreditCard className="w-5 h-5 text-slate-400" />
           Billing & Subscription
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Current Plan */}
-        <div className="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold capitalize">
-                {subscription?.plan_name || 'Starter'} Plan
-              </h3>
-              <p className="text-sm text-gray-600">
-                {subscription?.plan_price
-                  ? `${formatCurrency(subscription.plan_price)} per ${subscription.billing_cycle}`
-                  : 'Free tier'
-                }
-              </p>
-            </div>
-            <div className="text-right">
-              {subscription?.status && getStatusBadge(subscription.status)}
-              {subscription?.current_period_end && (
-                <p className="text-sm text-gray-600 mt-1">
-                  Renews {formatDate(subscription.current_period_end)}
-                </p>
-              )}
-            </div>
-          </div>
+        </h2>
+        <p className="text-sm font-medium text-slate-500 mt-2 ml-9">
+          Manage your subscription and payment details
+        </p>
+      </div>
 
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <Truck className="h-4 w-4 text-blue-600" />
-              <span>{planFeatures.trucks} Trucks</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-blue-600" />
-              <span>{planFeatures.drivers} Drivers</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-blue-600" />
-              <span>{planFeatures.features} Features</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Usage Statistics */}
-        {usage.length > 0 && (
+      <div className="p-6 space-y-8">
+        {/* Trial Status Card */}
+        <div className="p-6 rounded-2xl bg-orange-50 border border-orange-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h4 className="font-medium mb-3">Current Usage</h4>
-            <div className="space-y-3">
-              {usage.map((item) => (
-                <div key={item.feature_name} className="flex items-center justify-between">
-                  <span className="text-sm capitalize">{item.feature_name.replace('_', ' ')}</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{ width: `${Math.min((item.usage_count / item.usage_limit) * 100, 100)}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-sm text-gray-600">
-                      {item.usage_count}/{item.usage_limit}
-                    </span>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="w-5 h-5 text-orange-600" />
+              <h3 className="font-bold text-orange-900">Trial Status</h3>
             </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex gap-3">
-          <Button onClick={handleUpgrade} className="flex-1">
-            Upgrade Plan
-          </Button>
-          <Button variant="outline" onClick={handleManageBilling}>
-            Manage Billing
-          </Button>
-        </div>
-
-        <Separator />
-
-        {/* Payment History */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-medium">Recent Payments</h4>
-            <Button variant="ghost" size="sm">
-              View All
-            </Button>
-          </div>
-
-          {paymentHistory.length === 0 ? (
-            <p className="text-sm text-gray-600 text-center py-4">
-              No payment history available
+            <p className="text-orange-800 font-medium">
+              <span className="font-black">{trialDaysRemaining} days remaining</span> in your trial
             </p>
-          ) : (
-            <div className="space-y-2">
-              {paymentHistory.slice(0, 5).map((payment) => (
-                <div key={payment.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className="text-sm font-medium">
-                        {formatCurrency(payment.amount, payment.currency)}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        {formatDate(payment.payment_date)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(payment.status)}
-                    {payment.invoice_url && (
-                      <Button variant="ghost" size="sm">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            <p className="text-sm text-orange-600/80 font-medium mt-1">
+              Trial ends: {trialEndDate}
+            </p>
+          </div>
+          <div className="bg-white/50 px-4 py-2 rounded-xl border border-orange-100">
+            <p className="text-xs font-bold text-orange-800 uppercase tracking-wider">Status</p>
+            <p className="font-black text-orange-600">Active Trial</p>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Pricing Calculation */}
+        <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100">
+          <h3 className="font-bold text-slate-900 mb-4">Projected Monthly Cost</h3>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between py-2 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
+                  <Truck className="w-4 h-4" />
+                </div>
+                <span className="font-medium text-slate-700">Current Fleet Size</span>
+              </div>
+              <span className="font-bold text-slate-900">{truckCount} trucks</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-slate-200">
+              <span className="font-medium text-slate-700 ml-11">Price per truck</span>
+              <span className="font-bold text-slate-900">${pricePerTruck}.00 / month</span>
+            </div>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Current Plan</p>
+                <h3 className="text-3xl font-bold text-slate-900">Professional Plan</h3>
+                <p className="text-slate-500 mt-2">Billed monthly • Next billing date: Jan 1, 2026</p>
+              </div>
+              <div className="text-right">
+                <h3 className="text-3xl font-bold text-slate-900">$49<span className="text-lg text-slate-500 font-medium">/mo</span></h3>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Call to Action */}
+        <div className="flex justify-end">
+          <Button
+            onClick={handleAddPaymentMethod}
+            className="bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 px-6 py-6"
+          >
+            Add Payment Method
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 };
 

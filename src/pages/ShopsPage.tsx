@@ -18,7 +18,7 @@ import { Loader } from "@googlemaps/js-api-loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
 
 const ShopsPage = () => {
   const [view, setView] = useState<'list' | 'map'>('list');
@@ -39,6 +39,7 @@ const ShopsPage = () => {
   const [tierFilter, setTierFilter] = useState('ALL');
   const [auditFilter, setAuditFilter] = useState('ALL');
   const [priceFilter, setPriceFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('name');
 
   useEffect(() => {
     loadShops();
@@ -46,8 +47,9 @@ const ShopsPage = () => {
   }, []);
 
   useEffect(() => {
+    console.log("ShopsPage: filtering shops...", { shopsCount: shops.length, filters: { searchTerm, tierFilter, auditFilter, priceFilter, sortBy } });
     filterShops();
-  }, [shops, searchTerm, tierFilter, auditFilter, priceFilter]);
+  }, [shops, searchTerm, tierFilter, auditFilter, priceFilter, sortBy]);
 
   const loadShops = async () => {
     setLoading(true);
@@ -140,6 +142,18 @@ const ShopsPage = () => {
       });
     }
 
+    // Sorting
+    if (sortBy === 'name') {
+      filtered.sort((a, b) => a.shop_name.localeCompare(b.shop_name));
+    } else if (sortBy === 'rating') {
+      filtered.sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0));
+    } else if (sortBy === 'rate') {
+      filtered.sort((a, b) => (a.labor_rate || 0) - (b.labor_rate || 0));
+    } else if (sortBy === 'recent') {
+      filtered.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    }
+
+    console.log("ShopsPage: filteredShops count:", filtered.length);
     setFilteredShops(filtered);
   };
 
@@ -179,10 +193,11 @@ const ShopsPage = () => {
             </div>
 
             <Button
+              variant="outline"
               onClick={() => setIsAddShopOpen(true)}
-              className="bg-blue-600 text-white h-auto px-8 py-4.5 rounded-[1.5rem] flex items-center gap-3 font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 active:scale-95"
+              className="px-6 py-3 rounded-[1rem] border-2 border-blue-600 text-blue-600 font-bold text-xs uppercase tracking-widest hover:bg-blue-50 transition-all active:scale-95 flex items-center gap-2 h-auto"
             >
-              <Plus className="w-5 h-5" /> Integrate Shop
+              <Plus className="w-4 h-4" /> Add Shop
             </Button>
           </div>
         </div>
@@ -267,6 +282,28 @@ const ShopsPage = () => {
 
         {/* Content Area */}
         <div className="pt-4">
+          {/* Shop Count & Sorting */}
+          {!loading && (
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-sm font-bold text-slate-500">
+                Showing <span className="text-slate-900 font-black">{filteredShops.length}</span> of <span className="text-slate-900 font-black">{shops.length}</span> vendors
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sort by:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                >
+                  <option value="name">Name</option>
+                  <option value="rating">Rating</option>
+                  <option value="rate">Labor Rate</option>
+                  <option value="recent">Recently Added</option>
+                </select>
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[3rem] border border-slate-100 italic font-black text-slate-300 uppercase tracking-[0.3em]">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
@@ -282,8 +319,17 @@ const ShopsPage = () => {
                 />
               ))}
               {filteredShops.length === 0 && (
-                <div className="col-span-full py-20 text-center bg-white rounded-[3rem] border border-slate-100">
-                  <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No shops match your criteria</p>
+                <div className="col-span-full py-16 text-center bg-white rounded-[3rem] border border-slate-100">
+                  <div className="space-y-4">
+                    <p className="text-lg font-black text-slate-400">No vendors found</p>
+                    <p className="text-sm text-slate-400">Try adjusting your filters or add a new vendor</p>
+                    <button
+                      onClick={() => setIsAddShopOpen(true)}
+                      className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all"
+                    >
+                      + Add Vendor
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -300,6 +346,7 @@ const ShopsPage = () => {
         open={isAddShopOpen}
         onOpenChange={setIsAddShopOpen}
         onShopAdded={loadShops}
+        existingShops={shops}
       />
     </div>
   );
