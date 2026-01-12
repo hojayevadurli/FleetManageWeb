@@ -7,14 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/components/auth/AuthContext";
 import { AppLogo } from "@/components/auth/AppLogo";
+import { api } from "@/lib/Api";
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { updatePassword } = useAuth();
-  
+  // Remove useAuth since we'll call API directly
+  // const { updatePassword } = useAuth(); 
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -23,14 +24,13 @@ const ResetPassword = () => {
   const [isValidToken, setIsValidToken] = useState(false);
   const [isCheckingToken, setIsCheckingToken] = useState(true);
 
-  // Extract token from URL parameters
-  const accessToken = searchParams.get('access_token');
-  const refreshToken = searchParams.get('refresh_token');
-  const type = searchParams.get('type');
+  // Extract token and email from URL parameters (sent by backend)
+  const token = searchParams.get('token');
+  const email = searchParams.get('email');
 
   useEffect(() => {
-    // Validate that we have the necessary tokens for password reset
-    if (type === 'recovery' && accessToken && refreshToken) {
+    // Validate that we have the necessary parameters
+    if (token && email) {
       setIsValidToken(true);
     } else {
       setIsValidToken(false);
@@ -39,11 +39,11 @@ const ResetPassword = () => {
       }
     }
     setIsCheckingToken(false);
-  }, [accessToken, refreshToken, type, isCheckingToken]);
+  }, [token, email, isCheckingToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       toast.error("Passwords do not match");
       return;
@@ -57,16 +57,28 @@ const ResetPassword = () => {
     setIsLoading(true);
 
     try {
-      const { error } = await updatePassword(password);
-      
-      if (error) {
-        toast.error(error.message);
-      } else {
-        toast.success("Password updated successfully! Please sign in with your new password.");
-        navigate("/login");
-      }
+      // Call the backend endpoint directly
+      // API call expects: { email, token, newPassword }
+      await api.post("/Auth/reset-password", {
+        email,
+        token,
+        newPassword: password
+      });
+
+      toast.success("Password updated successfully! Please sign in with your new password.");
+      navigate("/login");
+
     } catch (error: any) {
-      toast.error(error.message || "An error occurred while updating your password");
+      console.error(error);
+      const msg = error?.response?.data;
+      // Backend might return array of errors or string
+      if (Array.isArray(msg)) {
+        toast.error(msg[0]?.description || "Failed to reset password");
+      } else if (typeof msg === 'string') {
+        toast.error(msg);
+      } else {
+        toast.error("An error occurred while updating your password");
+      }
     } finally {
       setIsLoading(false);
     }
