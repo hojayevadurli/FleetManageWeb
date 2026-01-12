@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
 import {
   Globe, Search, ChevronRight, X, Tag, CheckCircle2, Loader2, ShieldCheck,
-  MapPin, Phone, Star, Building2, User
+  MapPin, Phone, Star, Building2, User, Sparkles
 } from "lucide-react";
 import { Shop, ShopFormData } from "./types/ShopTypes";
 import { searchVendorSuggestions, fetchDetailedVendorInfo } from "@/lib/gemini";
@@ -13,7 +13,8 @@ interface AddShopDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onShopAdded: () => void;
-  shopToEdit?: Shop | null; // New prop
+  shopToEdit?: Shop | null;
+  existingShops?: Shop[]; // For duplicate detection
 }
 
 const SERVICE_SPECIALTIES = [
@@ -27,7 +28,7 @@ const SERVICE_SPECIALTIES = [
   "Reefer"
 ];
 
-const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopDialogProps) => {
+const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingShops = [] }: AddShopDialogProps) => {
   const [step, setStep] = useState<"search" | "details">("search");
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -53,14 +54,49 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
     zip: ""
   });
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [autoFilledName, setAutoFilledName] = useState(false); // New state for visual indicator
+
+  const validate = (data: ShopFormData) => {
+    const newErrors: Record<string, string> = {};
+
+    if (!data.shop_name.trim()) newErrors.shop_name = "Shop name is required";
+    if (!data.address.trim()) newErrors.address = "Address is required";
+    if (!data.city.trim()) newErrors.city = "City is required";
+    if (!data.state.trim()) newErrors.state = "State is required";
+    if (!data.zip?.trim()) newErrors.zip = "Zip code is required";
+
+    // Phone validation (North American format roughly: (XXX) XXX-XXXX or XXX-XXX-XXXX or XXXXXXXXXX)
+    const phoneRegex = /^(\+?1[-.]?)?\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
+    if (data.phone && !phoneRegex.test(data.phone)) {
+      newErrors.phone = "Invalid phone format. Ex: (555) 123-4567";
+    }
+
+    return newErrors;
+  };
+
+  useEffect(() => {
+    if (selectedMethod === "manual" || step === "details") {
+      setErrors(validate(formData));
+    }
+    console.log("AddShopDialog: formData updated:", formData);
+  }, [formData, selectedMethod, step]);
+
+  const handleBlur = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
   const { toast } = useToast();
 
   // Reset state when dialog closes or shopToEdit changes
   useEffect(() => {
+    console.log("AddShopDialog: Initialization Effect Triggered. Open:", open, "ShopToEdit:", shopToEdit?.id);
     if (open) {
       if (shopToEdit) {
-        setStep("details");
-        setSelectedMethod("manual");
+        // ... (existing logic)
         setFormData({
           shop_name: shopToEdit.shop_name,
           address: shopToEdit.address,
@@ -80,10 +116,11 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
           zip: shopToEdit.zip || ""
         });
       } else {
-        setStep("search");
+        console.log("AddShopDialog: Opening directly to manual entry form");
+        setStep("details"); // Skip the selection step
+        setSelectedMethod("manual"); // Set to manual entry
         setSearchTerm("");
         setSuggestions([]);
-        setSelectedMethod(null);
         setFormData({
           shop_name: "",
           address: "",
@@ -105,6 +142,10 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
       }
     }
   }, [open, shopToEdit]);
+
+  useEffect(() => {
+    console.log("AddShopDialog: Latitude changed to:", formData.latitude);
+  }, [formData.latitude]);
 
   const handleSearch = async () => {
     if (!searchTerm) return;
@@ -163,6 +204,50 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Final validation check
+    const validationErrors = validate(formData);
+    setErrors(validationErrors);
+    setTouched({
+      shop_name: true,
+      address: true,
+      city: true,
+      state: true,
+      phone: true
+    });
+
+    if (Object.keys(validationErrors).length > 0) {
+      toast({
+        title: "Please fix form errors",
+        description: "Some required fields are missing or invalid.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    // Check for duplicates (only when adding, not editing)
+    if (!shopToEdit) {
+      const normalizedName = formData.shop_name.toLowerCase().trim();
+      const normalizedAddress = formData.address.toLowerCase().trim();
+
+      const duplicate = existingShops.find(shop =>
+        shop.shop_name.toLowerCase().trim() === normalizedName ||
+        shop.address.toLowerCase().trim() === normalizedAddress
+      );
+
+      if (duplicate) {
+        setIsSubmitting(false);
+        toast({
+          title: "Duplicate Shop Detected",
+          description: `A shop with this ${duplicate.shop_name.toLowerCase() === normalizedName ? 'name' : 'address'} already exists.`,
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     try {
       const shopData: any = {
         name: formData.shop_name,
@@ -188,23 +273,29 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
 
       if (shopToEdit) {
         await shopsApi.update(shopToEdit.id, shopData);
+        // No success screen for edit, just toast
         toast({
           title: "Shop updated",
           description: `${formData.shop_name} has been updated.`
         });
+        onShopAdded();
+        onOpenChange(false);
       } else {
-        const data = await shopsApi.create(shopData);
-        toast({
-          title: "Shop added successfully",
-          description: `${data.shop_name} has been added to your shops.`
-        });
+        await shopsApi.create(shopData);
+        setShowSuccess(true);
+        // Delay closing to show success animation
+        setTimeout(() => {
+          onShopAdded();
+          onOpenChange(false);
+          setShowSuccess(false); // Reset
+        }, 2000);
       }
-
-      onShopAdded();
-      onOpenChange(false);
     } catch (error: any) {
+      // ... existing error handling
       console.error('Error saving shop:', error);
+      setIsSubmitting(false); // Only reset if error
       const errorMessage = error?.response?.data?.title || error?.response?.data?.message || error?.message || "Please try again.";
+      // ... rest of error handling logic needs to be preserved or re-implemented since we are replacing the block
       const validationErrors = error?.response?.data?.errors;
 
       let description = errorMessage;
@@ -222,6 +313,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
     }
   };
 
+
   const toggleSpecialty = (specialty: string) => {
     setFormData(prev => ({
       ...prev,
@@ -233,91 +325,122 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
 
   // Google Maps Autocomplete
   const addressInputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const shopNameInputRef = useRef<HTMLInputElement>(null); // New ref for shop name
+  const addressAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const shopNameAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null); // New ref
 
   useEffect(() => {
+    console.log("AddShopDialog: Autocomplete effect triggered", { selectedMethod, step });
     if (selectedMethod === "manual" && step === "details") {
-      // Small delay to ensure the input is mounted
+      // Increased delay to ensure the input is mounted
       const timer = setTimeout(() => {
+        console.log("AddShopDialog: Calling initializeAutocomplete after delay");
         initializeAutocomplete();
-      }, 100);
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [selectedMethod, step]);
 
-  const initializeAutocomplete = async () => {
-    try {
-      const loader = new Loader({
-        apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-        version: "weekly",
-        libraries: ["places"],
-      });
+  const extractPlaceDetails = (place: google.maps.places.PlaceResult) => {
+    const lat = place.geometry?.location?.lat()?.toString() || (place.geometry?.location as any)?.lat?.toString() || "";
+    const lng = place.geometry?.location?.lng()?.toString() || (place.geometry?.location as any)?.lng?.toString() || "";
 
+    let streetNumber = "";
+    let route = "";
+    let city = "";
+    let state = "";
+    let zip = "";
+
+    if (place.address_components) {
+      for (const component of place.address_components) {
+        if (component.types.includes("street_number")) streetNumber = component.long_name;
+        if (component.types.includes("route")) route = component.long_name;
+        if (component.types.includes("locality")) city = component.long_name;
+        if (component.types.includes("administrative_area_level_1")) state = component.short_name;
+        if (component.types.includes("postal_code")) zip = component.long_name;
+      }
+    }
+
+    // Build street address only (e.g., "301 W Gerri Ln")
+    const streetAddress = [streetNumber, route].filter(Boolean).join(" ");
+
+    return {
+      name: place.name || "",
+      address: streetAddress || place.formatted_address || "",
+      city,
+      state,
+      zip,
+      latitude: lat,
+      longitude: lng,
+      phone: place.formatted_phone_number || "",
+      website: place.website || "",
+    };
+  };
+
+  const initializeAutocomplete = async () => {
+    console.log("AddShopDialog: initializeAutocomplete called");
+    console.log("AddShopDialog: shopNameInputRef.current:", shopNameInputRef.current);
+    console.log("AddShopDialog: addressInputRef.current:", addressInputRef.current);
+
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
+    if (!apiKey) {
+      console.error("AddShopDialog: No API key!");
+      return;
+    }
+
+    try {
+      const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
       await loader.load();
+      console.log("AddShopDialog: Google Maps loaded");
+
+      // Helper to update form with place details
+      const handlePlaceSelect = (instance: google.maps.places.Autocomplete, isShopName: boolean) => {
+        const place = instance.getPlace();
+        console.log("AddShopDialog: handlePlaceSelect called, place:", place);
+        if (!place) return;
+
+        const details = extractPlaceDetails(place);
+        console.log("AddShopDialog: Place selected:", details);
+
+        setFormData(prev => ({
+          ...prev,
+          ...(isShopName ? { shop_name: details.name } : {}),
+          // Always update address and location when a place is selected
+          address: details.address || prev.address,
+          city: details.city || prev.city,
+          state: details.state || prev.state,
+          zip: details.zip || prev.zip,
+          latitude: details.latitude || prev.latitude,
+          longitude: details.longitude || prev.longitude,
+          phone: details.phone || prev.phone,
+          website: details.website || prev.website
+        }));
+      };
 
       if (addressInputRef.current) {
-        autocompleteRef.current = new window.google.maps.places.Autocomplete(addressInputRef.current, {
+        console.log("AddShopDialog: Setting up ADDRESS autocomplete");
+        addressAutocompleteRef.current = new window.google.maps.places.Autocomplete(addressInputRef.current, {
           types: ["address"],
           fields: ["address_components", "geometry", "formatted_address"],
         });
-
-        autocompleteRef.current.addListener("place_changed", () => {
-          const place = autocompleteRef.current?.getPlace();
-          if (!place) return;
-
-          let address = place.formatted_address || "";
-          let lat = "";
-          let lng = "";
-
-          if (place.geometry && place.geometry.location) {
-            lat = place.geometry.location.lat().toString();
-            lng = place.geometry.location.lng().toString();
-          }
-
-          // Extract address components
-          let city = "";
-          let state = "";
-          let zip = "";
-          let streetNumber = "";
-          let route = "";
-
-          if (place.address_components) {
-            for (const component of place.address_components) {
-              const types = component.types;
-              if (types.includes("locality")) {
-                city = component.long_name;
-              }
-              if (types.includes("administrative_area_level_1")) {
-                state = component.short_name;
-              }
-              if (types.includes("postal_code")) {
-                zip = component.long_name;
-              }
-              if (types.includes("street_number")) {
-                streetNumber = component.long_name;
-              }
-              if (types.includes("route")) {
-                route = component.long_name;
-              }
-            }
-          }
-
-          // Construct address if formatted_address is not preferred, but usually formatted_address is best for display
-          // and we can send components to backend.
-          // For now, we update address with formatted version or street + route
-          const finalAddress = address;
-
-          setFormData(prev => ({
-            ...prev,
-            address: finalAddress,
-            city,
-            state,
-            zip,
-            latitude: lat,
-            longitude: lng
-          }));
-        });
+        addressAutocompleteRef.current.addListener("place_changed", () =>
+          handlePlaceSelect(addressAutocompleteRef.current!, false));
+      } else {
+        console.error("AddShopDialog: addressInputRef.current is NULL!");
       }
+
+      if (shopNameInputRef.current) {
+        console.log("AddShopDialog: Setting up SHOP NAME autocomplete");
+        shopNameAutocompleteRef.current = new window.google.maps.places.Autocomplete(shopNameInputRef.current, {
+          types: ["establishment"],
+          fields: ["name", "formatted_address", "address_components", "geometry", "formatted_phone_number", "website"],
+        });
+        shopNameAutocompleteRef.current.addListener("place_changed", () =>
+          handlePlaceSelect(shopNameAutocompleteRef.current!, true));
+      } else {
+        console.error("AddShopDialog: shopNameInputRef.current is NULL!");
+      }
+
     } catch (e) {
       console.error("Failed to load Google Maps Autocomplete", e);
     }
@@ -335,7 +458,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
           <div>
             <h2 className="text-2xl font-black tracking-tight flex items-center gap-3">
               <ShieldCheck className="w-8 h-8" />
-              {shopToEdit ? "Edit Service Partner" : "Add Service Partner"}
+              {shopToEdit ? "Edit Vendor" : "Add Vendor"}
             </h2>
             <p className="text-blue-100 font-medium opacity-90 mt-2 ml-1">
               {shopToEdit ? "Update partner details" : "Grow your trusted service network"}
@@ -413,6 +536,21 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
                   </div>
 
                   <div className="space-y-4">
+                    {suggestions.length === 0 && !isSearching && searchTerm && (
+                      <div className="text-center py-10">
+                        <p className="text-slate-400 font-medium">No shops found matching "{searchTerm}"</p>
+                        <button
+                          onClick={() => {
+                            setSelectedMethod("manual");
+                            setStep("details");
+                          }}
+                          className="mt-4 text-blue-600 font-bold text-sm hover:underline"
+                        >
+                          Enter manually instead
+                        </button>
+                      </div>
+                    )}
+
                     {suggestions.map((shop, idx) => (
                       <button
                         key={idx}
@@ -442,33 +580,88 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
               )}
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="p-8 space-y-8">
+            <form onSubmit={handleSubmit} className="p-8 space-y-8 relative">
+              {isSubmitting && (
+                <div className="absolute inset-0 bg-white/80 z-20 flex items-center justify-center rounded-[2.5rem]">
+                  <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+                    <p className="font-bold text-slate-500 animate-pulse">Saving Shop...</p>
+                  </div>
+                </div>
+              )}
+
+              {showSuccess && (
+                <div className="absolute inset-0 bg-green-500 z-30 flex items-center justify-center rounded-[2.5rem] animate-in fade-in duration-300">
+                  <div className="flex flex-col items-center gap-6 text-white text-center p-8">
+                    <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center animate-bounce">
+                      <CheckCircle2 className="w-12 h-12 text-green-500" />
+                    </div>
+                    <h3 className="text-3xl font-black">Success!</h3>
+                    <p className="text-lg font-medium opacity-90">{formData.shop_name} has been added.</p>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-3 col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Shop Name</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      Shop Name <span className="text-red-500">*</span>
+                      {autoFilledName && (
+                        <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full animate-in zoom-in">
+                          <Sparkles className="w-3 h-3" />
+                          <span className="text-[9px]">Auto-filled</span>
+                        </span>
+                      )}
+                    </label>
+                    {touched.shop_name && errors.shop_name && <span className="text-xs font-bold text-red-500">{errors.shop_name}</span>}
+                  </div>
                   <div className="relative">
-                    <Globe className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <Globe className={`absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 ${touched.shop_name && errors.shop_name ? "text-red-400" : "text-slate-400"}`} />
                     <input
+                      ref={shopNameInputRef}
                       required
-                      className="w-full pl-14 pr-6 py-5 bg-slate-50 border-0 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
-                      placeholder="e.g. Joe's Heavy Duty Repair"
-                      value={formData.shop_name}
-                      onChange={e => setFormData({ ...formData, shop_name: e.target.value })}
+                      className={`w-full pl-14 pr-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.shop_name && errors.shop_name ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
+                      placeholder="Enter shop name or search..."
+                      defaultValue={formData.shop_name}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({ ...prev, shop_name: val }));
+                        if (autoFilledName) setAutoFilledName(false);
+                      }}
+                      onBlur={() => handleBlur('shop_name')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                        }
+                      }}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-3 col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Address</label>
+                  <div className="flex justify-between">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Address <span className="text-red-500">*</span></label>
+                    {touched.address && errors.address && <span className="text-xs font-bold text-red-500">{errors.address}</span>}
+                  </div>
                   <div className="relative">
-                    <MapPin className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <MapPin className={`absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 ${touched.address && errors.address ? "text-red-400" : "text-slate-400"}`} />
+                    {formData.latitude && formData.longitude && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500 animate-in zoom-in">
+                        <CheckCircle2 className="w-5 h-5" />
+                      </div>
+                    )}
+
                     <input
                       ref={addressInputRef}
                       required
-                      className="w-full pl-14 pr-6 py-5 bg-slate-50 border-0 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                      className={`w-full pl-14 pr-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.address && errors.address ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
                       placeholder="Start typing to search address..."
-                      value={formData.address}
-                      onChange={e => setFormData({ ...formData, address: e.target.value })}
+                      defaultValue={formData.address}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({ ...prev, address: val }));
+                      }}
+                      onBlur={() => handleBlur('address')}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
@@ -480,45 +673,63 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
 
                 <div className="grid grid-cols-6 gap-4 col-span-2">
                   <div className="col-span-3 space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">City</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">City <span className="text-red-500">*</span></label>
                     <input
                       required
-                      className="w-full px-6 py-5 bg-slate-50 border-0 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                      className={`w-full px-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.city && errors.city ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
                       placeholder="City"
                       value={formData.city || ""}
-                      onChange={e => setFormData({ ...formData, city: e.target.value })}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({ ...prev, city: val }));
+                      }}
+                      onBlur={() => handleBlur('city')}
                     />
                   </div>
                   <div className="col-span-1 space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">State</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">State <span className="text-red-500">*</span></label>
                     <input
                       required
-                      className="w-full px-6 py-5 bg-slate-50 border-0 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                      className={`w-full px-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.state && errors.state ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
                       placeholder="State"
                       value={formData.state || ""}
-                      onChange={e => setFormData({ ...formData, state: e.target.value })}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({ ...prev, state: val }));
+                      }}
+                      onBlur={() => handleBlur('state')}
                     />
                   </div>
                   <div className="col-span-2 space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Zip</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Zip <span className="text-red-500">*</span></label>
                     <input
-                      className="w-full px-6 py-5 bg-slate-50 border-0 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                      className={`w-full px-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.zip && errors.zip ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
                       placeholder="Zip"
                       value={formData.zip || ""}
-                      onChange={e => setFormData({ ...formData, zip: e.target.value })}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({ ...prev, zip: val }));
+                      }}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone</label>
+                  <div className="flex justify-between">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone</label>
+                    {touched.phone && errors.phone && <span className="text-xs font-bold text-red-500">{errors.phone}</span>}
+                  </div>
                   <div className="relative">
-                    <Phone className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <Phone className={`absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 ${touched.phone && errors.phone ? "text-red-400" : "text-slate-400"}`} />
                     <input
-                      className="w-full pl-14 pr-6 py-5 bg-slate-50 border-0 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                      className={`w-full pl-14 pr-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.phone && errors.phone ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
                       placeholder="(555) 123-4567"
                       value={formData.phone}
-                      onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({ ...prev, phone: val }));
+                      }}
+                      onBlur={() => handleBlur('phone')}
                     />
                   </div>
                 </div>
@@ -529,32 +740,38 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
                     <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 font-black">$</span>
                     <input
                       type="number"
-                      className="w-full pl-14 pr-6 py-5 bg-slate-50 border-0 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                      className="w-full pl-14 pr-6 py-5 bg-slate-50 border-2 border-transparent rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all focus:border-blue-500"
                       placeholder="0.00"
                       value={formData.labor_rate}
-                      onChange={e => setFormData({ ...formData, labor_rate: e.target.value })}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => ({ ...prev, labor_rate: val }));
+                      }}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-3 col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Priority Tier</label>
-                  <div className="flex gap-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Vendor Preference</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                     {[
-                      { id: "green", label: "Preferred", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-                      { id: "orange", label: "Standard", color: "bg-orange-50 text-orange-700 border-orange-200" },
-                      { id: "red", label: "Restricted", color: "bg-rose-50 text-rose-700 border-rose-200" }
+                      { id: "purple", label: "New", desc: "Trial stage", color: "bg-violet-50 text-violet-700 border-violet-200" },
+                      { id: "blue", label: "Partner", desc: "Contracted rates", color: "bg-blue-50 text-blue-700 border-blue-200" },
+                      { id: "green", label: "Preferred", desc: "Top rated", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+                      { id: "orange", label: "Standard", desc: "General use", color: "bg-orange-50 text-orange-700 border-orange-200" },
+                      { id: "red", label: "Restricted", desc: "Avoid use", color: "bg-rose-50 text-rose-700 border-rose-200" }
                     ].map(tier => (
                       <button
                         key={tier.id}
                         type="button"
-                        onClick={() => setFormData({ ...formData, rate_category: tier.id as any })}
-                        className={`flex-1 py-4 px-6 rounded-2xl border-2 transition-all font-black uppercase tracking-wide text-xs ${formData.rate_category === tier.id
+                        onClick={() => setFormData(prev => ({ ...prev, rate_category: tier.id as any }))}
+                        className={`py-3 px-3 rounded-xl border-2 transition-all text-left ${formData.rate_category === tier.id
                           ? tier.color + " ring-4 ring-blue-500/10"
                           : "bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100"
                           }`}
                       >
-                        {tier.label}
+                        <div className="font-black uppercase tracking-wide text-[10px]">{tier.label}</div>
+                        <div className={`text-[9px] mt-0.5 font-medium ${formData.rate_category === tier.id ? "opacity-70" : "opacity-50"}`}>{tier.desc}</div>
                       </button>
                     ))}
                   </div>
@@ -592,7 +809,8 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit }: AddShopD
                 )}
                 <button
                   type="submit"
-                  className="flex-1 bg-slate-900 text-white px-8 py-5 rounded-[2rem] font-black uppercase tracking-widest text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-95 flex items-center justify-center gap-3"
+                  disabled={isSubmitting || Object.keys(errors).length > 0}
+                  className="flex-1 bg-slate-900 text-white px-8 py-5 rounded-[2rem] font-black uppercase tracking-widest text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:active:scale-100"
                 >
                   {shopToEdit ? "Save Changes" : "Confirm & Add Shop"} <ChevronRight className="w-5 h-5" />
                 </button>

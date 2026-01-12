@@ -13,7 +13,8 @@ import {
   Calendar,
   ClipboardList,
   Fuel,
-  BarChart3
+  BarChart3,
+  Store
 } from "lucide-react";
 
 export interface NavigationItem {
@@ -48,11 +49,11 @@ export const navigationItems: NavigationConfig = [
   {
     title: "Shops List",
     url: "/app/shops",
-    icon: Settings,
+    icon: Store,
   },
   {
-    title: "Account",
-    url: "/app/account",
-    icon: User,
+    title: "Settings",
+    url: "/app/settings",
+    icon: Settings,
   },
 ];

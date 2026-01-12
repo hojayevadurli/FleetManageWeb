@@ -57,6 +57,15 @@ export async function me(): Promise<User> {
   return data;
 }
 
+export async function updateProfile(data: { fullName: string; phone?: string }): Promise<User> {
+  const response = await api.put<User>("/Auth/profile", data);
+  return response.data;
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await api.post("/Auth/change-password", { currentPassword, newPassword });
+}
+
 export function isAuthenticated() {
   return !!getToken();
 }

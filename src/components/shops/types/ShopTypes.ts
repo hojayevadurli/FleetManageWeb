@@ -1,4 +1,6 @@
 
+export type ShopRateCategory = 'purple' | 'green' | 'orange' | 'red' | 'blue' | 'black';
+
 export interface Shop {
   id: string;
   shop_name: string;
@@ -6,7 +8,7 @@ export interface Shop {
   contact_name?: string;
   shop_id: string;
   labor_rate: number;
-  rate_category: 'green' | 'orange' | 'red';
+  rate_category: ShopRateCategory;
   comment?: string;
   phone?: string;
   email?: string;
@@ -50,7 +52,7 @@ export interface ShopFormData {
   address: string;
   contact_name: string;
   labor_rate: string;
-  rate_category: 'green' | 'orange' | 'red';
+  rate_category: ShopRateCategory;
   comment: string;
   phone: string;
   email: string;

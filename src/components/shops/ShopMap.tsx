@@ -71,7 +71,7 @@ const ShopMap = () => {
       // Now we can safely use google.maps
       const map = new window.google.maps.Map(mapRef.current, {
         zoom: 10,
-        center: { lat: 33.7490, lng: -84.3880 }, // Default to Atlanta
+        center: { lat: 41.8781, lng: -87.6298 }, // Default to Chicago
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,

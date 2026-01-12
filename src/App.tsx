@@ -23,13 +23,18 @@ import InspectionsPage from "./pages/InspectionsPage";
 import ShopsPage from "./pages/ShopsPage";
 import ShopMap from "./pages/ShopMap";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
-import Account from "./components/Account";
 import AIChatPage from "./pages/AIChatPage";
 import FleetMap from "./pages/FleetMap";
 import ServiceRecordDetailPage from "./pages/ServiceRecordDetailPage";
 import FuelTracking from "./pages/FuelTracking";
 import VendorAnalytics from "./pages/VendorAnalytics";
 import ShopDetailView from "./pages/ShopDetailView";
+
+import SettingsLayout from "./pages/settings/SettingsLayout";
+import AccountTab from "./pages/settings/tabs/AccountTab";
+import BillingTab from "./pages/settings/tabs/BillingTab";
+import PreferencesTab from "./pages/settings/tabs/PreferencesTab";
+import TeamTab from "./pages/settings/tabs/TeamTab";
 
 const queryClient = new QueryClient();
 
@@ -169,11 +174,22 @@ const App = () => (
                           <Route path="/inspections" element={<InspectionsPage />} />
                           <Route path="/shops" element={<ShopsPage />} />
                           <Route path="/shops/:id" element={<ShopDetailView />} />
-                          <Route path="/shops/map" element={<ShopMap />} />
+                          <Route path="/shops/map" element={<ShopMap shops={[]} />} />
                           <Route path="/vendor-analytics" element={<VendorAnalytics />} />
                           <Route path="/operations/fuel" element={<FuelTracking />} />
                           <Route path="/ai-chat" element={<AIChatPage />} />
-                          <Route path="/account" element={<Account />} />
+                          <Route path="/ai-chat" element={<AIChatPage />} />
+
+                          {/* Settings Routes */}
+                          <Route path="/settings" element={<SettingsLayout />}>
+                            <Route index element={<Navigate to="account" replace />} />
+                            <Route path="account" element={<AccountTab />} />
+                            <Route path="billing" element={<BillingTab />} />
+                            <Route path="preferences" element={<PreferencesTab />} />
+                            <Route path="team" element={<TeamTab />} />
+                          </Route>
+                          <Route path="/account" element={<Navigate to="/app/settings/account" replace />} />
+
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </div>
