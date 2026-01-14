@@ -83,7 +83,7 @@ export default function Login() {
           // 🔥 show exact backend message from signIn
           setError(res.error);
         } else {
-          window.location.href = "/App";
+          window.location.href = "/app";
         }
       }
     } catch (err: any) {
