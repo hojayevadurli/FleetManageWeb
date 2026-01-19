@@ -5,14 +5,17 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import WorkOrderFilters from "@/components/workorder/WorkOrderFilters";
-import WorkOrderList from "@/components/workorder/WorkOrderList";
+import WorkOrderList, { VendorData } from "@/components/workorder/WorkOrderList";
 import CreateWorkOrderDialog from "@/components/workorder/CreateWorkOrderDialog";
 import EditWorkOrderDialog from "@/components/workorder/EditWorkOrderDialog";
+import ServiceMetrics from "@/components/workorder/ServiceMetrics";
 
 import { WorkOrderDto, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
 import { workOrdersApi, WorkOrderUpsertDto } from "@/lib/workOrdersApi";
 import { equipmentApi } from "@/lib/equipmentApi";
 import { shopsApi } from "@/lib/shopsApi";
+
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 // Use the SAME key your axios interceptor uses
 function useApiToken() {
@@ -36,7 +39,7 @@ const WorkOrders = () => {
 
   // Maps for displaying names
   const [equipmentMap, setEquipmentMap] = useState<Record<string, string>>({});
-  const [vendorMap, setVendorMap] = useState<Record<string, string>>({});
+  const [vendorMap, setVendorMap] = useState<Record<string, VendorData>>({});
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | WorkOrderDto["status"]>("all");
@@ -45,6 +48,7 @@ const WorkOrders = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrderDto | null>(null);
+  const [workOrderToDelete, setWorkOrderToDelete] = useState<WorkOrderDto | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -72,10 +76,13 @@ const WorkOrders = () => {
       });
       setEquipmentMap(eMap);
 
-      const vMap: Record<string, string> = {};
+      const vMap: Record<string, VendorData> = {};
       shopData.forEach((s: any) => {
-        // standardized on 'id' and 'name' usually
-        vMap[s.id] = s.name || s.shopName || "Unknown Vendor";
+        vMap[s.id] = {
+          name: s.shop_name || s.name || "Unknown Vendor",
+          rating: s.average_rating || 0,
+          reviews: s.total_reviews || 0
+        };
       });
       setVendorMap(vMap);
 
@@ -108,7 +115,7 @@ const WorkOrders = () => {
 
         // Check maps too for better search
         const unitNumber = (equipmentMap[w.equipmentId] || "").toLowerCase();
-        const vendorName = (w.vendorId ? (vendorMap[w.vendorId] || "") : "").toLowerCase();
+        const vendorName = (w.vendorId ? (vendorMap[w.vendorId]?.name || "") : "").toLowerCase();
 
         return (
           woNumber.includes(s) ||
@@ -142,6 +149,7 @@ const WorkOrders = () => {
         vendorId: wo.vendorId ?? null,
         workOrderNumber: wo.workOrderNumber ?? null,
         odometerAtService: wo.odometerAtService ?? null,
+        hoursAtService: wo.hoursAtService ?? null,
         openedAt: wo.openedAt,
         closedAt: wo.closedAt ?? null,
         title: wo.title,
@@ -177,6 +185,19 @@ const WorkOrders = () => {
   const handleEditWorkOrder = (wo: WorkOrderDto) => {
     setSelectedWorkOrder(wo);
     setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteWorkOrder = async () => {
+    if (!workOrderToDelete) return;
+    try {
+      await workOrdersApi.delete(workOrderToDelete.id);
+      toast.success("Work order deleted");
+      setWorkOrderToDelete(null);
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete work order");
+    }
   };
 
   if (!token) {
@@ -227,6 +248,8 @@ const WorkOrders = () => {
         onWorkOrderUpdated={loadData}
       />
 
+      <ServiceMetrics workOrders={workOrders} />
+
       <WorkOrderFilters
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
@@ -242,7 +265,26 @@ const WorkOrders = () => {
         onUpdateStatus={updateWorkOrderStatus}
         onCreateClick={() => setIsCreateDialogOpen(true)}
         onViewDetails={(id) => navigate(`/app/maintenance/service-history/${id}`)}
+        onDelete={(wo) => setWorkOrderToDelete(wo)}
+        onRateService={handleEditWorkOrder}
       />
+
+      <AlertDialog open={!!workOrderToDelete} onOpenChange={(open) => !open && setWorkOrderToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Work Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. All associated data including receipts, line items, and audit records will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteWorkOrder} className="bg-red-600 hover:bg-red-700 focus:ring-red-600">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

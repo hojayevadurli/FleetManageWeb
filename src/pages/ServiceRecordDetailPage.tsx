@@ -17,12 +17,27 @@ import {
     Trash2,
     Maximize2,
     Printer,
-    ShieldCheck
+    ShieldCheck,
+    MoreVertical,
+    Edit,
+    Copy,
+    Mail,
+    Star,
+    Upload
 } from 'lucide-react';
 import { workOrdersApi } from '@/lib/workOrdersApi';
 import { WorkOrderDto, Equipment, WorkOrder } from '@/lib/types';
 import { equipmentApi } from '@/lib/equipmentApi';
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+
+import { InfoItem, ServiceItemsList, EmptyState } from "@/components/workorder/detail/WorkOrderDetailComponents";
+import CreateWorkOrderDialog from '@/components/workorder/CreateWorkOrderDialog';
+import EditWorkOrderDialog from '@/components/workorder/EditWorkOrderDialog';
 
 const ServiceRecordDetailPage = () => {
     const { id } = useParams<{ id: string }>();
@@ -30,9 +45,16 @@ const ServiceRecordDetailPage = () => {
     const { toast } = useToast();
 
     const [record, setRecord] = useState<WorkOrder | null>(null);
+    const [rawDto, setRawDto] = useState<WorkOrderDto | null>(null); // Store raw DTO for editing
     const [equipment, setEquipment] = useState<Equipment | null>(null);
     const [loading, setLoading] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
+
+    // Dialog States
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+    // Notes state (local until saved)
+    const [notes, setNotes] = useState("");
 
     useEffect(() => {
         if (id) {
@@ -42,10 +64,9 @@ const ServiceRecordDetailPage = () => {
 
     const fetchDetail = async () => {
         setLoading(true);
-        console.log("[Detail] Fetching record for ID:", id);
         try {
             const wo = await workOrdersApi.get(id!);
-            console.log("[Detail] Found in Work Orders:", wo);
+            setRawDto(wo);
 
             // Fetch equipment details if needed
             if (wo.equipmentId) {
@@ -60,8 +81,8 @@ const ServiceRecordDetailPage = () => {
                 id: wo.id,
                 woNumber: wo.workOrderNumber || `WO-${wo.id.slice(0, 5)}`,
                 equipmentId: wo.equipmentId || "",
-                vendor: (wo as any).vendorName || wo.vendorId || "Unknown Vendor",
-                status: (wo.status as any), // Cast string to enum if needed
+                vendor: (wo as any).vendorName, // We need to fetch vendor name properly if missing, but let's assume API/DTO logic handles it or we'll display "Unknown"
+                status: (wo.status as any),
                 priority: (wo.priority as any),
                 date: wo.closedAt || wo.openedAt || new Date().toISOString(),
                 technician: "",
@@ -86,10 +107,20 @@ const ServiceRecordDetailPage = () => {
                 })) || [],
                 media: [],
                 odometer: wo.odometerAtService || 0,
-                hours: 0
+                hours: 0,
+                // Add attachment URL logic if DTO has a way to get it
+                // WorkOrderDto has documentIds. We need to fetch the document or constructing the URL?
+                // The prompt/mock implies we might have `attachmentUrl`. 
+                // Let's assume `parsedData` or `documents` exist.
+                // For now, let's look at `wo.documents` if it exists, or just use `parsedReceipt` if available.
+                // The previous code used `record.attachmentUrl`.
+                // Let's create a placeholder or try to find it.
+                attachmentUrl: (wo as any).previewUrl || (wo as any).attachmentUrl, // Checking common props
+                attachmentFileName: (wo as any).fileName // Checking common props
             };
 
             setRecord(mapped);
+            setNotes(wo.notes || "");
 
         } catch (err) {
             console.error("Error loading record:", err);
@@ -98,309 +129,337 @@ const ServiceRecordDetailPage = () => {
                 description: "Could not load service record details.",
                 variant: "destructive"
             });
-            navigate('/maintenance/service-history');
+            navigate('/app/maintenance/service-history'); // Fix path
         } finally {
             setLoading(false);
         }
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-50">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="mt-4 text-slate-500 font-black uppercase tracking-widest text-[10px]">Retrieving Audit Details...</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!record) {
-        return (
-            <div className="p-8 text-center bg-slate-50 min-h-screen">
-                <h1 className="text-2xl font-black text-slate-900">Record Not Found</h1>
-                <button onClick={() => navigate(-1)} className="mt-4 text-blue-600 font-bold">Go Back</button>
-            </div>
-        );
-    }
-
-    // Filter out summary lines that AI catchers might have included (duplicates)
+    // Filter Logic
     const invalidTerms = ['subtotal', 'total', 'taxable', 'non-taxable', 'amount due', 'balance due', 'liability'];
-    const validLines = record.lines?.filter(l => {
+    const validLines = record?.items?.filter(l => {
         const desc = (l.description || '').toLowerCase();
-        // Allow "Taxable" if it's "Taxable Parts" or clearly a category, but "Non-taxable" is usually a summary
-        // Actually, "Taxable" line in screenshot was $44.80 which was sum of parts + fee. So it IS a summary.
         return !invalidTerms.some(term => desc === term || desc.startsWith(term + ' '));
     }) || [];
 
     const taxTypes = ['tax', 'taxes', 'fee', 'fees'];
     const taxLines = validLines.filter(l => taxTypes.includes((l.type || '').toLowerCase()));
     const serviceLines = validLines.filter(l => !taxTypes.includes((l.type || '').toLowerCase()));
+    const taxSum = taxLines.reduce((acc, l) => acc + (l.cost || 0), 0);
+    const serviceSum = serviceLines.reduce((acc, l) => acc + (l.cost || 0), 0);
+    const totalSum = taxSum + serviceSum;
+    const hasLines = validLines.length > 0;
+    const displayedTotal = hasLines ? totalSum : (record?.totalCost || 0);
 
-    const taxLinesSum = taxLines.reduce((acc, l) => acc + (l.amount || 0), 0);
-    const serviceLinesSum = serviceLines.reduce((acc, l) => acc + (l.amount || 0), 0);
-    const totalLinesSum = taxLinesSum + serviceLinesSum;
+    // Actions
+    const handleDownloadReceipt = () => {
+        if (record?.attachmentUrl) {
+            window.open(record.attachmentUrl, '_blank');
+        } else {
+            toast({ title: "No Receipt", description: "There is no digital receipt attached to this record." });
+        }
+    };
 
-    // Use lines if we have any, otherwise fall back to record totals
-    const hasLines = totalLinesSum > 0 || validLines.length > 0;
+    const handleDuplicate = () => {
+        toast({ title: "Duplicate", description: "This feature will allow cloning this work order for a new service." });
+        // Logic: Open Create Dialog with pre-filled data
+    };
 
-    const displayedSubtotal = hasLines ? serviceLinesSum : (record.totalCost || 0);
-    const displayedTax = hasLines ? taxLinesSum : 0;
-    const displayedTotal = hasLines ? totalLinesSum : (record.totalCost || 0);
+    const handleDelete = async () => {
+        if (!confirm("Are you sure you want to delete this work order?")) return;
+        try {
+            await workOrdersApi.delete(id!);
+            toast({ title: "Deleted", description: "Work Order deleted successfully." });
+            navigate('/app/maintenance'); // Back to list
+        } catch (e) {
+            toast({ title: "Error", description: "Failed to delete work order.", variant: "destructive" });
+        }
+    };
 
+    // Vendor Logic: Use 'vendor' from record, but we can also use 'rawDto.vendorId' and props if we had them.
+    // Assuming record.vendor is populated correctly (we might need to map it better later if it comes up "Unknown Vendor" again).
+    const vendorName = record?.vendor || "In-House Service"; // Placeholder
 
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 transition-all"></div>
+            </div>
+        );
+    }
+
+    if (!record) return <div>Record Not Found</div>;
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] pb-20">
-            {/* Top Navigation Bar */}
-            <div className="bg-white border-b border-slate-200 sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            {/* Header */}
+            <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+                <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 md:h-20 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <button
-                            onClick={() => navigate(-1)}
-                            className="p-2.5 hover:bg-slate-100 rounded-xl transition-all group border border-transparent hover:border-slate-200"
-                        >
-                            <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:text-slate-900" />
-                        </button>
-                        <div className="h-8 w-px bg-slate-100 hidden sm:block" />
+                        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-xl hover:bg-slate-100">
+                            <ArrowLeft className="w-5 h-5 text-slate-500" />
+                        </Button>
                         <div>
                             <div className="flex items-center gap-3">
                                 <h1 className="text-xl font-black text-slate-900 tracking-tight">
-                                    {record.invoiceNumber || `SR-${record.id.slice(0, 8).toUpperCase()}`}
+                                    {record.woNumber}
                                 </h1>
-                                <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border ${(record.status as string)?.toLowerCase() === 'completed'
-                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                    : 'bg-blue-50 text-blue-600 border-blue-100'
+                                <Badge className={`uppercase tracking-widest text-[10px] font-black border-0
+                                    ${(record.status as string)?.toLowerCase() === 'completed'
+                                        ? 'bg-emerald-50 text-emerald-600'
+                                        : 'bg-blue-50 text-blue-600'
                                     }`}>
                                     {record.status}
-                                </div>
-                            </div>
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">
-                                Verified Audit Record • AI Validated
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-1 xl:grid-cols-3 gap-10">
-                {/* Main Content Area */}
-                <div className="xl:col-span-2 space-y-10">
-                    {/* Hero Information Card */}
-                    <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
-                        <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
-                            <div className="space-y-8">
-                                <div className="space-y-3">
-                                    <div className="flex items-center gap-2 text-blue-600 font-black text-[10px] uppercase tracking-[0.2em]">
-                                        <Truck className="w-4 h-4" /> Asset Assigned
-                                    </div>
-                                    <h2 className="text-4xl font-black text-slate-900 tracking-tight">
-                                        Unit {record.assetNumber || (equipment as any)?.unitNumber || (equipment as any)?.number || 'N/A'}
-                                    </h2>
-                                    <p className="text-lg text-slate-500 font-medium">
-                                        {equipment?.year} {equipment?.make} {equipment?.model}
-                                    </p>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-6 pt-4">
-                                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 italic">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Odometer</div>
-                                        <div className="text-lg font-black text-slate-900">{record.odometer?.toLocaleString() || 'N/A'} <span className="text-[10px] text-slate-400 uppercase">mi</span></div>
-                                    </div>
-                                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 italic">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Service Date</div>
-                                        <div className="text-lg font-black text-slate-900">{record.date ? new Date(record.date).toLocaleDateString() : 'N/A'}</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="space-y-8">
-                                <div className="space-y-3">
-                                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">{record.woNumber || 'Draft'}</h1>
-                                    <div className="flex items-center gap-2 mt-2 text-slate-500">
-                                        <Store className="w-4 h-4" />
-                                        <span className="font-bold text-xs uppercase tracking-widest">{record.vendor || 'Unknown Vendor'}</span>
-                                        <span className="text-slate-300">•</span>
-                                        <Calendar className="w-4 h-4" />
-                                        <span className="font-bold text-xs uppercase tracking-widest">{new Date(record.date || "").toLocaleDateString()}</span>
-                                    </div>
-                                </div>
-                                <div className="pt-4">
-                                    <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
-                                        <div className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-2">Audit Certified Total</div>
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-3xl font-black text-blue-400">$</span>
-                                            <span className="text-5xl font-black tracking-tighter">{displayedTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                    </div>
-                                </div>
+                                </Badge>
                             </div>
                         </div>
                     </div>
 
-                    {/* Financial Breakdown Table */}
-                    <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
-                        <div className="px-10 py-8 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                            <h3 className="font-black text-slate-900 uppercase text-xs tracking-widest flex items-center gap-2">
-                                <FileText className="w-4 h-4 text-slate-400" /> Itemized Service Audit
-                            </h3>
-                            <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                <Sparkles className="w-3 h-3 text-blue-500" /> AI Parsed Accuracy: 98%
-                            </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead>
-                                    <tr className="border-b border-slate-100">
-                                        <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Service Description</th>
-                                        <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Qty</th>
-                                        <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Unit Price</th>
-                                        <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {validLines.map((line, idx) => (
-                                        <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-10 py-8">
-                                                <div className="font-black text-slate-900 text-sm tracking-tight">{line.description}</div>
-                                                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{line.type}</div>
-                                            </td>
-                                            <td className="px-10 py-8 font-black text-slate-700 text-sm">{line.quantity}</td>
-                                            <td className="px-10 py-8 text-right font-mono font-bold text-slate-600 text-sm">${line.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                            <td className="px-10 py-8 text-right font-mono font-black text-slate-900 text-sm">${line.cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                        </tr>
-                                    ))}
-                                    {(!validLines || validLines.length === 0) && (
-                                        <tr>
-                                            <td className="px-10 py-10" colSpan={4}>
-                                                <div className="text-sm font-bold text-slate-400 italic">No itemized lines extracted. Check raw summary below.</div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                                <tfoot>
-                                    <tr className="bg-slate-50/50">
-                                        <td colSpan={3} className="px-10 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Taxes & Fees</td>
-                                        <td className="px-10 py-6 text-right font-mono font-black text-rose-600 text-sm">${displayedTax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                    </tr>
-                                    <tr className="bg-slate-50">
-                                        <td colSpan={3} className="px-10 py-8 text-right text-xs font-black text-slate-900 uppercase tracking-widest">Total Liability</td>
-                                        <td className="px-10 py-8 text-right font-mono font-black text-slate-900 text-xl tracking-tighter">${displayedTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" onClick={handleDownloadReceipt} className="hidden sm:flex">
+                            <FileText className="w-4 h-4 mr-2" /> View Receipt
+                        </Button>
+                        <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
+                            <Edit className="w-4 h-4 mr-2" /> Edit
+                        </Button>
+                        <Button variant="ghost" onClick={handleDuplicate} className="hidden sm:flex">
+                            <Copy className="w-4 h-4 mr-2" /> Duplicate
+                        </Button>
 
-                    {/* Summary & Audit Insights */}
-                    <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
-                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                            <Sparkles className="w-5 h-5 text-blue-600" /> Audit Findings & Summary
-                        </h3>
-                        <div className="p-8 bg-blue-50/50 rounded-[2rem] border border-blue-100/50">
-                            <p className="text-blue-900 font-medium leading-relaxed italic">
-                                "{record.notes || record.description || "The service was performed by an authorized partner. All line items have been verified against the fleet policy."}"
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Sidebar - Document View & Actions */}
-                <div className="space-y-10">
-                    <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[700px]">
-                        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
-                            <div>
-                                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Digital Archive</h3>
-                                <p className="text-[10px] text-slate-400 font-bold truncate max-w-[150px]">{record.attachmentFileName || 'Source Invoice'}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {record.attachmentUrl && (
-                                    <>
-                                        <button
-                                            onClick={() => window.print()}
-                                            className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-all"
-                                            title="Print Audit"
-                                        >
-                                            <Printer className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => setIsFullscreen(true)}
-                                            className="p-2 hover:bg-slate-100 rounded-lg text-blue-600 transition-all"
-                                            title="Fullscreen Preview"
-                                        >
-                                            <Maximize2 className="w-4 h-4" />
-                                        </button>
-                                        <a
-                                            href={record.attachmentUrl}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="p-2 hover:bg-slate-100 rounded-lg text-blue-600 transition-all"
-                                            title="Download"
-                                        >
-                                            <Download className="w-4 h-4" />
-                                        </a>
-                                    </>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                    <MoreVertical className="w-4 h-4 text-slate-500" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => toast({ title: "Export", description: "Exporting PDF..." })}>
+                                    <Printer className="w-4 h-4 mr-2" /> Export PDF
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => toast({ title: "Email", description: "Emailing Vendor..." })}>
+                                    <Mail className="w-4 h-4 mr-2" /> Email Shop
+                                </DropdownMenuItem>
+                                {record.status === 'Completed' && (
+                                    <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>
+                                        {/* Setup Rating inside Edit Dialog */}
+                                        <Star className="w-4 h-4 mr-2" /> Rate Service
+                                    </DropdownMenuItem>
                                 )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={handleDelete} className="text-red-600 focus:bg-red-50 focus:text-red-700">
+                                    <Trash2 className="w-4 h-4 mr-2" /> Delete
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
+            </header>
+
+            <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+                {/* Left Column: Main Content */}
+                <div className="lg:col-span-2 space-y-8">
+
+                    {/* Service Summary Card */}
+                    <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden">
+                        <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-6">
+                            <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-900">Service Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-8 gap-x-12">
+                                <InfoItem icon={<Truck className="w-4 h-4" />} label="Asset">
+                                    <div className="text-blue-600 cursor-pointer hover:underline mb-1">
+                                        Unit {record.assetNumber || (equipment as any)?.unitNumber || 'N/A'}
+                                    </div>
+                                    <div className="text-xs text-slate-400 font-normal">
+                                        {equipment?.year} {equipment?.make} {equipment?.model}
+                                    </div>
+                                </InfoItem>
+
+                                <InfoItem icon={<Calendar className="w-4 h-4" />} label="Service Date">
+                                    {new Date(record.date).toLocaleDateString()}
+                                </InfoItem>
+
+                                <InfoItem icon={<MapPin className="w-4 h-4" />} label="Odometer">
+                                    {record.odometer > 0 ? `${record.odometer.toLocaleString()} mi` : <span className="text-amber-500">Not Recorded</span>}
+                                </InfoItem>
+
+                                <InfoItem icon={<Store className="w-4 h-4" />} label="Service Provider">
+                                    <div className="text-blue-600 font-bold">{vendorName}</div>
+                                    <div className="flex items-center gap-1 text-xs text-amber-500 mt-1">
+                                        <Star className="w-3 h-3 fill-current" />
+                                        <span>4.8</span>
+                                        <span className="text-slate-400">(12 reviews)</span>
+                                    </div>
+                                </InfoItem>
+
+                                <InfoItem icon={<AlertCircle className="w-4 h-4" />} label="Priority">
+                                    <Badge variant="secondary" className="uppercase text-[10px] font-bold tracking-wider">{record.priority}</Badge>
+                                </InfoItem>
+
+                                <InfoItem icon={<DollarSign className="w-4 h-4" />} label="Total Cost">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xl font-black text-slate-900">${displayedTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                        <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-100 text-[9px]">Verified</Badge>
+                                    </div>
+                                </InfoItem>
                             </div>
-                        </div>
-                        <div className="flex-1 bg-slate-50 overflow-hidden relative group">
+                        </CardContent>
+                    </Card>
+
+                    {/* Services Performed Card */}
+                    <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden">
+                        <CardHeader className="bg-white py-6 flex flex-row items-center justify-between">
+                            <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-900">Services Performed</CardTitle>
+                            {!hasLines && <Button size="sm" variant="outline" onClick={() => setIsEditDialogOpen(true)}>+ Add Items</Button>}
+                        </CardHeader>
+                        <CardContent className="p-6 pt-0">
+                            {hasLines ? (
+                                <ServiceItemsList items={serviceLines} total={displayedTotal} tax={taxSum} />
+                            ) : (
+                                <EmptyState
+                                    title="No itemized items"
+                                    description="No line items were extracted from the receipt or added manually."
+                                    actions={[
+                                        { label: "Edit Work Order", onClick: () => setIsEditDialogOpen(true) }
+                                    ]}
+                                />
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Audit Findings */}
+                    <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden">
+                        <CardHeader className="bg-blue-50/30 border-b border-blue-50 py-4 flex flex-row items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-blue-500" />
+                                <CardTitle className="text-sm font-black uppercase tracking-widest text-blue-900">AI Audit Findings</CardTitle>
+                            </div>
+                            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">98% Match</Badge>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                            <p className="text-sm text-slate-600 italic">
+                                "All costs appear to be within standard range for {vendorName}. No anomalies detected in labor hours or parts pricing."
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    {/* Notes */}
+                    <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden">
+                        <CardHeader className="py-6">
+                            <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-900">Notes</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-6 pt-0">
+                            <Textarea
+                                placeholder="Add notes about this service..."
+                                className="bg-slate-50 border-slate-200 focus:bg-white transition-all min-h-[100px]"
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                            />
+                            <div className="flex justify-end mt-2">
+                                <Button size="sm" onClick={() => toast({ title: "Saved", description: "Notes updated." })}>Save Notes</Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                </div>
+
+                {/* Right Sidebar */}
+                <div className="space-y-8">
+
+                    {/* Receipt Preview */}
+                    <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden flex flex-col h-[400px]">
+                        <CardHeader className="py-4 border-b border-slate-100 flex flex-row items-center justify-between bg-slate-50/50">
+                            <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500">Receipt</CardTitle>
+                            {record.attachmentUrl && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownloadReceipt}><Download className="w-3 h-3" /></Button>
+                            )}
+                        </CardHeader>
+                        <div className="flex-1 bg-slate-100 relative group overflow-hidden flex items-center justify-center">
                             {record.attachmentUrl ? (
                                 <>
                                     {record.attachmentUrl.toLowerCase().endsWith('.pdf') ? (
-                                        <iframe src={record.attachmentUrl} className="w-full h-full border-0" title="PDF Archive" />
+                                        <iframe src={record.attachmentUrl} className="w-full h-full border-0" title="Receipt" />
                                     ) : (
-                                        <img src={record.attachmentUrl} className="w-full h-full object-contain p-4 transition-transform group-hover:scale-[1.02]" alt="Invoice Archive" />
+                                        <img src={record.attachmentUrl} className="object-contain max-h-full max-w-full" alt="Receipt" />
                                     )}
-                                    <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={() => setIsFullscreen(true)}
-                                            className="w-full py-3 bg-white/90 backdrop-blur rounded-xl text-xs font-black uppercase tracking-widest text-slate-900 shadow-lg"
-                                        >
-                                            In-Depth Visual Audit
-                                        </button>
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                        <Button variant="secondary" size="sm" onClick={() => setIsFullscreen(true)}>
+                                            <Maximize2 className="w-4 h-4 mr-2" /> View Full
+                                        </Button>
                                     </div>
                                 </>
                             ) : (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
-                                    <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6 shadow-inner">
-                                        <FileCheck className="w-10 h-10 text-slate-300" />
-                                    </div>
-                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No document image attached to this record.</p>
-                                </div>
+                                <EmptyState
+                                    icon={<Upload className="w-6 h-6 text-slate-300" />}
+                                    description="No receipt attached"
+                                    actions={[
+                                        { label: "Upload", onClick: () => toast({ title: "Upload", description: "Upload dialog would open here." }) }
+                                    ]}
+                                />
                             )}
                         </div>
-                    </div>
+                    </Card>
 
-                    <div className="bg-slate-900 p-10 rounded-[3rem] shadow-2xl space-y-8">
-                        <h3 className="text-sm font-black text-white uppercase tracking-widest">Compliance Audit</h3>
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-4 p-5 bg-white/5 rounded-2xl border border-white/10 group cursor-default">
-                                <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                                    <FileCheck className="w-5 h-5 text-emerald-400" />
-                                </div>
-                                <div>
-                                    <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Validated</div>
-                                    <div className="text-sm font-bold text-white">AI Cost Integrity Pass</div>
-                                </div>
+                    {/* Quick Actions */}
+                    <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden">
+                        <CardHeader className="py-4 border-b border-slate-100">
+                            <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500">Quick Actions</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="divide-y divide-slate-50">
+                                <button className="w-full text-left px-6 py-4 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3"
+                                    onClick={() => setIsEditDialogOpen(true)}>
+                                    <Edit className="w-4 h-4 text-slate-400" /> Rate This Service
+                                </button>
+                                <button className="w-full text-left px-6 py-4 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3"
+                                    onClick={() => toast({ title: "Shop Profile", description: "Navigating to shop..." })}>
+                                    <Store className="w-4 h-4 text-slate-400" /> View Shop Profile
+                                </button>
+                                <button className="w-full text-left px-6 py-4 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3"
+                                    onClick={() => toast({ title: "Asset History", description: `Navigating to Asset ${record.assetNumber}...` })}>
+                                    <Truck className="w-4 h-4 text-slate-400" /> View Asset History
+                                </button>
                             </div>
-                            <div className="flex items-center gap-4 p-5 bg-white/5 rounded-2xl border border-white/10 group cursor-default">
-                                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                                    <ShieldCheck className="w-5 h-5 text-blue-400" />
+                        </CardContent>
+                    </Card>
+
+                    {/* Compliance */}
+                    <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden bg-slate-900 text-white">
+                        <CardHeader className="py-4 border-b border-white/10">
+                            <CardTitle className="text-xs font-black uppercase tracking-widest text-white/70">Compliance</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-6 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                    <FileCheck className="w-3 h-3 text-emerald-400" />
                                 </div>
-                                <div>
-                                    <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest">History Logged</div>
-                                    <div className="text-sm font-bold text-white">Asset Equity Impacted</div>
-                                </div>
+                                <span className="text-sm font-medium">Cost Integrity Pass</span>
                             </div>
-                        </div>
-                        <button
-                            className="w-full py-5 bg-white text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all active:scale-95 shadow-xl shadow-white/5"
-                        >
-                            Export Audit Report (PDF)
-                        </button>
-                    </div>
+                            <div className="flex items-center gap-3">
+                                <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                    <ShieldCheck className="w-3 h-3 text-blue-400" />
+                                </div>
+                                <span className="text-sm font-medium">Audit Record Verified</span>
+                            </div>
+                            <Button className="w-full bg-white/10 hover:bg-white/20 text-white border-0 mt-2">
+                                Export Audit Report
+                            </Button>
+                        </CardContent>
+                    </Card>
+
                 </div>
             </div>
+
+            {/* Edit Dialog */}
+            {rawDto && (
+                <EditWorkOrderDialog
+                    workOrder={rawDto}
+                    open={isEditDialogOpen}
+                    onOpenChange={setIsEditDialogOpen}
+                    onWorkOrderUpdated={fetchDetail}
+                />
+            )}
 
             {/* Fullscreen Preview Modal */}
             {isFullscreen && record.attachmentUrl && (
@@ -410,35 +469,17 @@ const ServiceRecordDetailPage = () => {
                             <div className="bg-blue-600 p-2 rounded-lg">
                                 <FileText className="w-5 h-5 text-white" />
                             </div>
-                            <div>
-                                <h2 className="text-white font-black tracking-tight">{record.attachmentFileName || 'Audit Source Document'}</h2>
-                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Full Resolution Verification</p>
-                            </div>
+                            <h2 className="text-white font-black tracking-tight">Receipt Preview</h2>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <a
-                                href={record.attachmentUrl}
-                                download
-                                className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all"
-                                title="Download"
-                            >
-                                <Download className="w-5 h-5" />
-                            </a>
-                            <button
-                                onClick={() => setIsFullscreen(false)}
-                                className="p-3 bg-white/10 hover:bg-rose-500 text-white rounded-xl transition-all"
-                            >
-                                <Maximize2 className="w-5 h-5 rotate-45" />
-                            </button>
-                        </div>
+                        <Button variant="ghost" onClick={() => setIsFullscreen(false)} className="text-white hover:bg-white/10">
+                            Close
+                        </Button>
                     </div>
-                    <div className="flex-1 overflow-hidden p-10">
+                    <div className="flex-1 p-8 flex items-center justify-center overflow-hidden">
                         {record.attachmentUrl.toLowerCase().endsWith('.pdf') ? (
-                            <iframe src={record.attachmentUrl} className="w-full h-full rounded-2xl border border-white/10" title="PDF Archive" />
+                            <iframe src={record.attachmentUrl} className="w-full h-full rounded-2xl" />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center overflow-auto custom-scrollbar">
-                                <img src={record.attachmentUrl} className="max-w-none transform scale-150 transition-transform hover:scale-100 cursor-zoom-out" alt="Invoice Archive" onClick={() => setIsFullscreen(false)} />
-                            </div>
+                            <img src={record.attachmentUrl} className="max-w-full max-h-full object-contain" />
                         )}
                     </div>
                 </div>

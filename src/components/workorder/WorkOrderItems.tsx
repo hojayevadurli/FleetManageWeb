@@ -1,10 +1,8 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Edit2, Check, X, Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 
 export interface WorkOrderItemData {
   description: string;
@@ -32,18 +30,9 @@ const WorkOrderItems = ({ items, onItemsChange }: WorkOrderItemsProps) => {
     onItemsChange([...items, { description, price: 0, quantity: 1 }]);
   };
 
-  const handleUpdateItem = (index: number, field: keyof WorkOrderItemData, value: string | number) => {
+  const handleUpdateDescription = (index: number, value: string) => {
     const newItems = [...items];
-    const currentItem = newItems[index];
-
-    if (field === 'description') {
-      currentItem.description = value as string;
-    } else if (field === 'price') {
-      currentItem.price = parseFloat(value as string) || 0;
-    } else if (field === 'quantity') {
-      currentItem.quantity = parseFloat(value as string) || 0;
-    }
-
+    newItems[index].description = value;
     onItemsChange(newItems);
   };
 
@@ -51,21 +40,25 @@ const WorkOrderItems = ({ items, onItemsChange }: WorkOrderItemsProps) => {
     onItemsChange(items.filter((_, i) => i !== index));
   };
 
+  const totalCost = items.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <Label className="text-base font-semibold">Work Order Items</Label>
+        <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+          📋 Services Performed
+        </h3>
       </div>
 
       {/* Quick Add Pills */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 mb-2">
         {quickAddItems.map((item) => (
           <Button
             key={item}
             type="button"
             variant="outline"
             size="sm"
-            className="text-xs rounded-full"
+            className="text-[10px] h-7 px-3 rounded-full bg-slate-50 border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors"
             onClick={() => handleQuickAdd(item)}
           >
             + {item}
@@ -73,103 +66,67 @@ const WorkOrderItems = ({ items, onItemsChange }: WorkOrderItemsProps) => {
         ))}
       </div>
 
-      <div className="border rounded-xl overflow-hidden bg-white shadow-sm">
-        <table className="w-full text-sm item-table">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr>
-              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest w-[40%]">Service Description</th>
-              <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-[15%]">Qty</th>
-              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-[20%]">Unit Price</th>
-              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-[20%]">Amount</th>
-              <th className="px-6 py-4 w-[5%]"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        {items.length === 0 ? (
+          <div className="p-8 text-center bg-slate-50/50">
+            <p className="text-slate-400 text-xs italic mb-4">No services listed yet.</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mx-auto"
+              onClick={() => onItemsChange([...items, { description: "", quantity: 1, price: 0 }])}
+            >
+              <Plus className="h-4 w-4 mr-2" /> Add Service
+            </Button>
+          </div>
+        ) : (
+          <ul className="divide-y divide-slate-100">
             {items.map((item, index) => (
-              <tr key={index} className="group hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-4">
+              <li key={index} className="group flex items-center p-3 hover:bg-slate-50 transition-colors">
+                <span className="text-slate-300 mr-3 text-lg">•</span>
+                <div className="flex-1">
                   <Input
                     value={item.description}
-                    onChange={(e) => handleUpdateItem(index, 'description', e.target.value)}
-                    className="border-transparent bg-transparent hover:bg-white focus:bg-white px-0 font-bold text-slate-900 placeholder:text-slate-300 transition-all"
-                    placeholder="Description"
+                    onChange={(e) => handleUpdateDescription(index, e.target.value)}
+                    className="border-transparent bg-transparent hover:bg-white focus:bg-white px-2 h-8 font-medium text-slate-700 placeholder:text-slate-300 transition-all text-sm w-full"
+                    placeholder="Describe service performed..."
                   />
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <Input
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) => handleUpdateItem(index, 'quantity', e.target.value)}
-                    className="border-transparent bg-transparent hover:bg-white focus:bg-white px-0 text-center font-bold text-slate-700 h-8 w-20 mx-auto"
-                  />
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="relative">
-                    <span className="absolute left-auto right-full mr-2 top-1.5 text-slate-400 text-xs">$</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={item.price || ''}
-                      onChange={(e) => handleUpdateItem(index, 'price', e.target.value)}
-                      className="border-transparent bg-transparent hover:bg-white focus:bg-white text-right font-mono font-bold text-slate-600 h-8 w-24 ml-auto"
-                      placeholder="0.00"
-                    />
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-right font-mono font-black text-slate-900">
-                  ${((item.price || 0) * (item.quantity || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-                <td className="px-4 py-4 text-right">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
-                    onClick={() => handleDeleteItem(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
-
-            {/* Empty State / Add Row */}
-            {items.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 text-xs italic">
-                  No items added. Use the quick add buttons above or click "Add Item" below.
-                </td>
-              </tr>
-            )}
-          </tbody>
-          <tfoot className="bg-slate-50/50 border-t border-slate-100">
-            <tr>
-              <td colSpan={5} className="px-2 py-2">
+                </div>
                 <Button
                   type="button"
                   variant="ghost"
-                  className="w-full justify-start text-slate-500 hover:text-blue-600 hover:bg-blue-50 py-6"
-                  onClick={() => onItemsChange([...items, { description: "New Item", quantity: 1, price: 0 }])}
+                  size="icon"
+                  className="h-7 w-7 text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                  onClick={() => handleDeleteItem(index)}
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Item
+                  <Trash2 className="h-3 w-3" />
                 </Button>
-              </td>
-            </tr>
-          </tfoot>
-        </table>
+              </li>
+            ))}
+            {/* Footer Add Button */}
+            <li className="bg-slate-50/50 p-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-xs text-slate-400 hover:text-blue-600 h-8"
+                onClick={() => onItemsChange([...items, { description: "", quantity: 1, price: 0 }])}
+              >
+                <Plus className="h-3 w-3 mr-2" /> Add Another Line Item
+              </Button>
+            </li>
+          </ul>
+        )}
       </div>
 
-      {items.length > 0 && (
-        <div className="flex justify-end gap-6 px-6 text-sm">
-          <div className="text-slate-500 uppercase font-bold text-[10px] tracking-widest py-1">Total Estimated Cost</div>
-          <div className="font-mono font-black text-lg text-slate-900">
-            ${items.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </div>
+      {/* Total Cost Display at Bottom */}
+      <div className="flex justify-end items-center gap-4 pt-2">
+        <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Total Cost</span>
+        <div className="font-mono font-black text-xl text-slate-900 bg-slate-100 px-3 py-1 rounded-lg">
+          ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
-      )}
+      </div>
     </div>
   );
 };

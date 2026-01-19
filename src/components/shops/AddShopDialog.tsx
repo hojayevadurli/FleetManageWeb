@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
 import {
   Globe, Search, ChevronRight, X, Tag, CheckCircle2, Loader2, ShieldCheck,
   MapPin, Phone, Star, Building2, User, Sparkles
 } from "lucide-react";
-import { Shop, ShopFormData } from "./types/ShopTypes";
+import { Shop, ShopFormData, VENDOR_PREFERENCE_CONFIG, PREFERENCE_TO_RATE_CATEGORY, SERVICE_SPECIALTIES } from "./types/ShopTypes";
 import { searchVendorSuggestions, fetchDetailedVendorInfo } from "@/lib/gemini";
 import { useToast } from "@/hooks/use-toast";
 import { shopsApi } from "@/lib/shopsApi";
@@ -12,26 +12,17 @@ import { shopsApi } from "@/lib/shopsApi";
 interface AddShopDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onShopAdded: () => void;
+  onShopAdded: (shop?: Shop) => void;
   shopToEdit?: Shop | null;
   existingShops?: Shop[]; // For duplicate detection
+  initialData?: Partial<ShopFormData>;
 }
 
-const SERVICE_SPECIALTIES = [
-  "General Repair",
-  "Tires",
-  "Engine",
-  "Body Work",
-  "Towing",
-  "Electrical",
-  "Trailers",
-  "Reefer"
-];
-
-const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingShops = [] }: AddShopDialogProps) => {
+const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingShops = [], initialData }: AddShopDialogProps) => {
   const [step, setStep] = useState<"search" | "details">("search");
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [selectedMethod, setSelectedMethod] = useState<"search" | "manual" | null>(null);
 
@@ -41,6 +32,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
     contact_name: "",
     labor_rate: "",
     rate_category: "green",
+    vendor_preference: "PREFERRED", // Added default
     comment: "",
     phone: "",
     email: "",
@@ -103,6 +95,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
           contact_name: shopToEdit.contact_name || "",
           labor_rate: shopToEdit.labor_rate?.toString() || "",
           rate_category: shopToEdit.rate_category,
+          vendor_preference: shopToEdit.vendor_preference || "STANDARD",
           comment: shopToEdit.comment || "",
           phone: shopToEdit.phone || "",
           email: shopToEdit.email || "",
@@ -116,32 +109,61 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
           zip: shopToEdit.zip || ""
         });
       } else {
-        console.log("AddShopDialog: Opening directly to manual entry form");
-        setStep("details"); // Skip the selection step
-        setSelectedMethod("manual"); // Set to manual entry
-        setSearchTerm("");
-        setSuggestions([]);
-        setFormData({
-          shop_name: "",
-          address: "",
-          contact_name: "",
-          labor_rate: "",
-          rate_category: "green",
-          comment: "",
-          phone: "",
-          email: "",
-          website: "",
-          hours_of_operation: {},
-          specialties: [],
-          latitude: "",
-          longitude: "",
-          city: "",
-          state: "",
-          zip: ""
-        });
+        console.log("AddShopDialog: Opening with initialData or defaults");
+        // Check if we have initial data (e.g. from receipt parse)
+        if (initialData && Object.keys(initialData).length > 0) {
+          setStep("details");
+          setSelectedMethod("manual");
+          setFormData({
+            shop_name: initialData.shop_name || "",
+            address: initialData.address || "",
+            contact_name: initialData.contact_name || "",
+            labor_rate: initialData.labor_rate || "",
+            rate_category: initialData.rate_category || "green",
+            vendor_preference: initialData.vendor_preference || "PREFERRED",
+            comment: initialData.comment || "",
+            phone: initialData.phone || "",
+            email: initialData.email || "",
+            website: initialData.website || "",
+            hours_of_operation: initialData.hours_of_operation || {},
+            specialties: initialData.specialties || [],
+            latitude: initialData.latitude || "",
+            longitude: initialData.longitude || "",
+            city: initialData.city || "",
+            state: initialData.state || "",
+            zip: initialData.zip || ""
+          });
+          // Auto-fill indicator
+          if (initialData.shop_name) setAutoFilledName(true);
+        } else {
+          console.log("AddShopDialog: Opening directly to manual entry form");
+          setStep("details"); // Skip the selection step
+          setSelectedMethod("manual"); // Set to manual entry
+          setSearchTerm("");
+          setSuggestions([]);
+          setFormData({
+            shop_name: "",
+            address: "",
+            contact_name: "",
+            labor_rate: "",
+            rate_category: "green",
+            vendor_preference: "PREFERRED",
+            comment: "",
+            phone: "",
+            email: "",
+            website: "",
+            hours_of_operation: {},
+            specialties: [],
+            latitude: "",
+            longitude: "",
+            city: "",
+            state: "",
+            zip: ""
+          });
+        }
       }
     }
-  }, [open, shopToEdit]);
+  }, [open, shopToEdit, initialData]);
 
   useEffect(() => {
     console.log("AddShopDialog: Latitude changed to:", formData.latitude);
@@ -164,6 +186,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSelectVendor = async (vendor: any) => {
     setIsSearching(true);
     try {
@@ -249,6 +272,43 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
     }
 
     try {
+      // Parse coordinates - ensure we capture them even if they're "0"
+      let parsedLat = formData.latitude ? parseFloat(formData.latitude) : null;
+      let parsedLng = formData.longitude ? parseFloat(formData.longitude) : null;
+
+      // Geocoding Fallback if coordinates are missing but address exists
+      if ((!parsedLat || !parsedLng) && formData.address && formData.city && formData.state && window.google) {
+        try {
+          console.log("AddShopDialog: Attempting to geocode address...");
+          const geocoder = new window.google.maps.Geocoder();
+          const addressToGeocode = `${formData.address}, ${formData.city}, ${formData.state} ${formData.zip}`;
+
+          const result = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+            geocoder.geocode({ address: addressToGeocode }, (results, status) => {
+              if (status === 'OK' && results) resolve(results);
+              else reject(status);
+            });
+          });
+
+          if (result[0]?.geometry?.location) {
+            parsedLat = result[0].geometry.location.lat();
+            parsedLng = result[0].geometry.location.lng();
+            console.log("AddShopDialog: Geocoding successful:", { parsedLat, parsedLng });
+          }
+        } catch (gstError) {
+          console.error("AddShopDialog: Geocoding failed:", gstError);
+          // Non-blocking, proceed with what we have
+        }
+      }
+
+      console.log('AddShopDialog: Coordinates before submit:', {
+        rawLat: formData.latitude,
+        rawLng: formData.longitude,
+        parsedLat,
+        parsedLng
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const shopData: any = {
         name: formData.shop_name,
         address1: formData.address,
@@ -261,35 +321,39 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
         email: formData.email || undefined,
         website: formData.website || undefined,
         laborRate: formData.labor_rate ? parseFloat(formData.labor_rate) : undefined,
-        rateCategory: formData.rate_category,
+        rateCategory: PREFERENCE_TO_RATE_CATEGORY[formData.vendor_preference], // Derive category from preference
+        vendorPreference: formData.vendor_preference,
         comment: formData.comment || undefined,
         hoursOfOperation: Object.keys(formData.hours_of_operation).length > 0 ? formData.hours_of_operation : undefined,
         specialties: formData.specialties.length > 0 ? formData.specialties : undefined,
-        latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
-        longitude: formData.longitude ? parseFloat(formData.longitude) : undefined
+        // Always include latitude/longitude - send null if not available rather than undefined
+        latitude: parsedLat !== null && !isNaN(parsedLat) ? parsedLat : null,
+        longitude: parsedLng !== null && !isNaN(parsedLng) ? parsedLng : null
       };
 
       console.log('Submitting shop data:', shopData); // Debug log
+      console.log('Submitting coordinates:', { latitude: shopData.latitude, longitude: shopData.longitude }); // Extra debug
 
       if (shopToEdit) {
-        await shopsApi.update(shopToEdit.id, shopData);
+        const updatedShop = await shopsApi.update(shopToEdit.id, shopData);
         // No success screen for edit, just toast
         toast({
           title: "Shop updated",
           description: `${formData.shop_name} has been updated.`
         });
-        onShopAdded();
+        onShopAdded(updatedShop);
         onOpenChange(false);
       } else {
-        await shopsApi.create(shopData);
+        const newShop = await shopsApi.create(shopData);
         setShowSuccess(true);
         // Delay closing to show success animation
         setTimeout(() => {
-          onShopAdded();
+          onShopAdded(newShop);
           onOpenChange(false);
           setShowSuccess(false); // Reset
         }, 2000);
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       // ... existing error handling
       console.error('Error saving shop:', error);
@@ -301,6 +365,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
       let description = errorMessage;
       if (validationErrors) {
         description = Object.entries(validationErrors)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .map(([key, msgs]: [string, any]) => `${key}: ${msgs.join(', ')}`)
           .join('\n');
       }
@@ -329,20 +394,93 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
   const addressAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const shopNameAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null); // New ref
 
-  useEffect(() => {
-    console.log("AddShopDialog: Autocomplete effect triggered", { selectedMethod, step });
-    if (selectedMethod === "manual" && step === "details") {
-      // Increased delay to ensure the input is mounted
-      const timer = setTimeout(() => {
-        console.log("AddShopDialog: Calling initializeAutocomplete after delay");
-        initializeAutocomplete();
-      }, 300);
-      return () => clearTimeout(timer);
+  // Live Map Preview Logic
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.Marker | null>(null);
+
+  // Initialize Map
+  // Update Map Location
+  const updateMapLocation = useCallback(() => {
+    if (!mapInstanceRef.current || !window.google) return;
+
+    const lat = parseFloat(formData.latitude);
+    const lng = parseFloat(formData.longitude);
+
+    if (!isNaN(lat) && !isNaN(lng)) {
+      const pos = { lat, lng };
+      mapInstanceRef.current.panTo(pos);
+      mapInstanceRef.current.setZoom(15);
+
+      // Create marker if it doesn't exist
+      if (!markerRef.current) {
+        markerRef.current = new window.google.maps.Marker({
+          map: mapInstanceRef.current,
+          animation: google.maps.Animation.DROP,
+          icon: {
+            path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+            fillColor: "#3b82f6", // Blue-500
+            fillOpacity: 1,
+            strokeWeight: 2,
+            strokeColor: "#FFFFFF",
+            scale: 1.5,
+            anchor: new google.maps.Point(12, 22),
+            labelOrigin: new google.maps.Point(12, -10),
+          }
+        });
+      }
+      markerRef.current.setPosition(pos);
+      markerRef.current.setMap(mapInstanceRef.current);
+    } else {
+      // If no coordinates, remove marker
+      markerRef.current?.setMap(null);
     }
-  }, [selectedMethod, step]);
+  }, [formData.latitude, formData.longitude]);
+
+  // Initialize Map
+  useEffect(() => {
+    if (step === "details" && mapRef.current && !mapInstanceRef.current) {
+      // Delay to ensure container is rendered
+      setTimeout(() => {
+        if (!mapRef.current || mapInstanceRef.current) return;
+
+        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
+        if (!apiKey) return;
+
+        const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
+        loader.load().then(() => {
+          const defaultCenter = { lat: 41.8781, lng: -87.6298 }; // Chicago
+          mapInstanceRef.current = new window.google.maps.Map(mapRef.current!, {
+            center: defaultCenter,
+            zoom: 10,
+            disableDefaultUI: true,
+            zoomControl: true,
+            streetViewControl: false,
+            mapTypeControl: false,
+            styles: [
+              {
+                "featureType": "poi",
+                "stylers": [{ "visibility": "off" }]
+              }
+            ]
+          });
+          // Update marker if we already have coordinates
+          if (formData.latitude && formData.longitude) {
+            updateMapLocation();
+          }
+        }).catch(e => console.error("Error loading map:", e));
+      }, 500);
+    }
+  }, [step, updateMapLocation, formData.latitude, formData.longitude]);
+
+  useEffect(() => {
+    updateMapLocation();
+  }, [updateMapLocation]);
 
   const extractPlaceDetails = (place: google.maps.places.PlaceResult) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const lat = place.geometry?.location?.lat()?.toString() || (place.geometry?.location as any)?.lat?.toString() || "";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const lng = place.geometry?.location?.lng()?.toString() || (place.geometry?.location as any)?.lng?.toString() || "";
 
     let streetNumber = "";
@@ -445,6 +583,19 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
       console.error("Failed to load Google Maps Autocomplete", e);
     }
   };
+
+  useEffect(() => {
+    console.log("AddShopDialog: Autocomplete effect triggered", { selectedMethod, step });
+    if (selectedMethod === "manual" && step === "details") {
+      // Increased delay to ensure the input is mounted
+      const timer = setTimeout(() => {
+        console.log("AddShopDialog: Calling initializeAutocomplete after delay");
+        initializeAutocomplete();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMethod, step]);
 
   if (!open) return null;
 
@@ -622,7 +773,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                       required
                       className={`w-full pl-14 pr-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.shop_name && errors.shop_name ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
                       placeholder="Enter shop name or search..."
-                      defaultValue={formData.shop_name}
+                      value={formData.shop_name}
                       onChange={e => {
                         const val = e.target.value;
                         setFormData(prev => ({ ...prev, shop_name: val }));
@@ -640,7 +791,15 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
 
                 <div className="space-y-3 col-span-2">
                   <div className="flex justify-between">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Address <span className="text-red-500">*</span></label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      Address <span className="text-red-500">*</span>
+                      {initialData?.address && (
+                        <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full animate-in zoom-in">
+                          <Sparkles className="w-3 h-3" />
+                          <span className="text-[9px]">Auto-filled</span>
+                        </span>
+                      )}
+                    </label>
                     {touched.address && errors.address && <span className="text-xs font-bold text-red-500">{errors.address}</span>}
                   </div>
                   <div className="relative">
@@ -656,7 +815,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                       required
                       className={`w-full pl-14 pr-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.address && errors.address ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
                       placeholder="Start typing to search address..."
-                      defaultValue={formData.address}
+                      value={formData.address}
                       onChange={e => {
                         const val = e.target.value;
                         setFormData(prev => ({ ...prev, address: val }));
@@ -714,9 +873,35 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                   </div>
                 </div>
 
+                <div className="col-span-2 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <MapPin className="w-3 h-3" /> Location Preview
+                    </label>
+                  </div>
+                  <div className="w-full h-80 rounded-[2rem] overflow-hidden border-2 border-slate-100 shadow-sm relative group">
+                    <div ref={mapRef} className="w-full h-full bg-slate-50" />
+                    {(!formData.latitude || !formData.longitude) && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-slate-50/50 backdrop-blur-[1px] z-10">
+                        <p className="text-sm font-bold text-slate-400 bg-white/80 px-4 py-2 rounded-full shadow-sm border border-slate-100">
+                          Select an address to see location
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      Phone
+                      {initialData?.phone && (
+                        <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full animate-in zoom-in">
+                          <Sparkles className="w-3 h-3" />
+                          <span className="text-[9px]">Auto-filled</span>
+                        </span>
+                      )}
+                    </label>
                     {touched.phone && errors.phone && <span className="text-xs font-bold text-red-500">{errors.phone}</span>}
                   </div>
                   <div className="relative">
@@ -754,24 +939,20 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                 <div className="space-y-3 col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Vendor Preference</label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                    {[
-                      { id: "purple", label: "New", desc: "Trial stage", color: "bg-violet-50 text-violet-700 border-violet-200" },
-                      { id: "blue", label: "Partner", desc: "Contracted rates", color: "bg-blue-50 text-blue-700 border-blue-200" },
-                      { id: "green", label: "Preferred", desc: "Top rated", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-                      { id: "orange", label: "Standard", desc: "General use", color: "bg-orange-50 text-orange-700 border-orange-200" },
-                      { id: "red", label: "Restricted", desc: "Avoid use", color: "bg-rose-50 text-rose-700 border-rose-200" }
-                    ].map(tier => (
+                    {Object.entries(VENDOR_PREFERENCE_CONFIG).map(([key, config]) => (
                       <button
-                        key={tier.id}
+                        key={key}
                         type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, rate_category: tier.id as any }))}
-                        className={`py-3 px-3 rounded-xl border-2 transition-all text-left ${formData.rate_category === tier.id
-                          ? tier.color + " ring-4 ring-blue-500/10"
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        onClick={() => setFormData(prev => ({ ...prev, vendor_preference: key as any }))}
+                        className={`py-3 px-3 rounded-xl border-2 transition-all text-left ${formData.vendor_preference === key
+                          ? config.bgColor + " " + config.textColor + " " + config.borderHex + " ring-4 ring-blue-500/10"
                           : "bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100"
                           }`}
+                        style={formData.vendor_preference === key ? { borderColor: config.borderHex } : {}}
                       >
-                        <div className="font-black uppercase tracking-wide text-[10px]">{tier.label}</div>
-                        <div className={`text-[9px] mt-0.5 font-medium ${formData.rate_category === tier.id ? "opacity-70" : "opacity-50"}`}>{tier.desc}</div>
+                        <div className="font-black uppercase tracking-wide text-[10px]">{config.label}</div>
+                        <div className={`text-[9px] mt-0.5 font-medium ${formData.vendor_preference === key ? "opacity-70" : "opacity-50"}`}>{config.description}</div>
                       </button>
                     ))}
                   </div>
