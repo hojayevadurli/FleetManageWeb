@@ -13,7 +13,7 @@ import {
   Filter,
   Locate
 } from "lucide-react";
-// import { supabase } from "@/integrations/supabase/client"; // Removed - using backend API
+import { shopsApi } from "@/lib/shopsApi";
 import { Shop } from "./types/ShopTypes";
 import { Loader } from "@googlemaps/js-api-loader";
 
@@ -38,7 +38,7 @@ const ShopMap = () => {
   const markersRef = useRef<google.maps.Marker[]>([]);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
 
-  const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+  const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyAeI6_E9c4EMx9T4t_FjyVUGSTN38GV69c";
 
   useEffect(() => {
     loadShops();
@@ -88,24 +88,10 @@ const ShopMap = () => {
 
   const loadShops = async () => {
     try {
-      const { data, error } = await supabase
-        .from('shops')
-        .select('*')
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null)
-        .order('shop_name');
-
-      if (error) throw error;
-
-      // Type cast the data to ensure rate_category is properly typed
-      const typedShops = (data || []).map(shop => ({
-        ...shop,
-        rate_category: shop.rate_category as 'green' | 'orange' | 'red',
-        hours_of_operation: shop.hours_of_operation as Record<string, string>,
-        specialties: shop.specialties as string[]
-      }));
-
-      setShops(typedShops);
+      const data = await shopsApi.list();
+      // Filter out shops without valid coordinates
+      const validShops = data.filter(s => s.latitude && s.longitude);
+      setShops(validShops);
     } catch (error) {
       console.error('Error loading shops:', error);
     } finally {

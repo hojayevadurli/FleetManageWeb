@@ -9,7 +9,7 @@ interface ShopMapProps {
   center?: { lat: number; lng: number };
 }
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyAeI6_E9c4EMx9T4t_FjyVUGSTN38GV69c";
 
 const ShopMap = ({ shops, center }: ShopMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);

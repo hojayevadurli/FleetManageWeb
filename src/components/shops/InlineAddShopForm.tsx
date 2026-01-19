@@ -104,7 +104,7 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
 
     useEffect(() => {
         const initMaps = async () => {
-            const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
+            const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyAeI6_E9c4EMx9T4t_FjyVUGSTN38GV69c";
             if (!apiKey) return;
 
             const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
