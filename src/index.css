@@ -63,17 +63,27 @@
   .animate-float {
     animation: float 6s ease-in-out infinite;
   }
+
   .animate-float-delayed {
     animation: float 6s ease-in-out 3s infinite;
   }
+
   .animate-pulse-slow {
     animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
-  
+
   @keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
-    100% { transform: translateY(0px); }
+    0% {
+      transform: translateY(0px);
+    }
+
+    50% {
+      transform: translateY(-20px);
+    }
+
+    100% {
+      transform: translateY(0px);
+    }
   }
 }
 
@@ -84,17 +94,20 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   margin-top: 4px;
   font-family: 'Inter', sans-serif;
-  z-index: 10000 !important; /* Ensure it appears above modals */
+  z-index: 10000 !important;
+  /* Ensure it appears above modals */
+  position: absolute !important;
+  pointer-events: auto !important;
 }
 
 .pac-item {
   padding: 12px 16px;
-  cursor: pointer;
+  cursor: pointer !important;
   border-top: 1px solid #f1f5f9;
 }
 
 .pac-item:hover {
-  background-color: #f8fafc;
+  background-color: #f8fafc !important;
 }
 
 .pac-item-query {
