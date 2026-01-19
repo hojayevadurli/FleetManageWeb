@@ -209,10 +209,12 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
             const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
             await loader.load();
 
+
             // Autocomplete
             if (addressInputRef.current && !addressAutocompleteRef.current) {
                 addressAutocompleteRef.current = new window.google.maps.places.Autocomplete(addressInputRef.current, {
                     types: ["address"],
+                    componentRestrictions: { country: 'us' },
                     fields: ["address_components", "geometry", "formatted_address"],
                 });
                 addressAutocompleteRef.current.addListener("place_changed", () => {
@@ -243,16 +245,26 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
     }, [updateMap]);
 
     const handlePlaceSelect = (place: google.maps.places.PlaceResult) => {
-        let streetNumber = "", route = "", city = "", state = "", zip = "";
-        if (place.address_components) {
-            for (const component of place.address_components) {
-                if (component.types.includes("street_number")) streetNumber = component.long_name;
-                if (component.types.includes("route")) route = component.long_name;
-                if (component.types.includes("locality")) city = component.long_name;
-                if (component.types.includes("administrative_area_level_1")) state = component.short_name;
-                if (component.types.includes("postal_code")) zip = component.long_name;
-            }
-        }
+        if (!place.address_components) return;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const components = place.address_components as any[];
+
+        const getComponent = (type: string) => {
+            const comp = components.find(c => c.types.includes(type));
+            return comp?.long_name || '';
+        };
+
+        const getShortComponent = (type: string) => {
+            const comp = components.find(c => c.types.includes(type));
+            return comp?.short_name || '';
+        };
+
+        const streetNumber = getComponent('street_number');
+        const route = getComponent('route');
+        const city = getComponent('locality') || getComponent('sublocality');
+        const state = getShortComponent('administrative_area_level_1');
+        const zip = getComponent('postal_code');
 
         const lat = place.geometry?.location?.lat()?.toString() || "";
         const lng = place.geometry?.location?.lng()?.toString() || "";
@@ -260,7 +272,9 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
         setFormData(prev => ({
             ...prev,
             address: `${streetNumber} ${route}`.trim() || place.formatted_address || "",
-            city, state, zip,
+            city,
+            state,
+            zip,
             latitude: lat,
             longitude: lng
         }));
