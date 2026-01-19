@@ -12,6 +12,87 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
+// Helper to parse address
+const parseAddressComponents = (addressString: string) => {
+    if (!addressString) return { city: '', state: '', zip: '' };
+
+    // Pattern 1: "435 W US-6 Valparaiso IN 46385"
+    const pattern1 = /([A-Za-z\s]+?)\s+([A-Z]{2})\s*(\d{5})?$/;
+
+    // Pattern 2: "435 W US-6 Valparaiso IN" (no zip)
+    const pattern2 = /([A-Za-z\s]+?)\s+([A-Z]{2})$/;
+
+    let match = addressString.match(pattern1);
+    if (match) {
+        return {
+            city: match[1].trim(),
+            state: match[2].trim(),
+            zip: match[3] || ''
+        };
+    }
+
+    match = addressString.match(pattern2);
+    if (match) {
+        return {
+            city: match[1].trim(),
+            state: match[2].trim(),
+            zip: ''
+        };
+    }
+
+    // Try to find state abbreviation and work backwards
+    const stateMatch = addressString.match(/\b([A-Z]{2})\b/);
+    if (stateMatch) {
+        const state = stateMatch[1];
+        const beforeState = addressString.substring(0, stateMatch.index).trim();
+        const words = beforeState.split(/\s+/);
+        const city = words.slice(-2).join(' '); // Take last 1-2 words as city
+
+        return {
+            city: city,
+            state: state,
+            zip: ''
+        };
+    }
+
+    return { city: '', state: '', zip: '' };
+};
+
+const geocodeAddress = async (address: string) => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI"; // Use fallback
+
+    try {
+        const response = await fetch(
+            `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
+        );
+
+        const data = await response.json();
+
+        if (data.status === 'OK' && data.results.length > 0) {
+            const result = data.results[0];
+            const location = result.geometry.location;
+
+            // Extract city, state, zip from address components
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const components = result.address_components as any[];
+            const city = components.find(c => c.types.includes('locality'))?.long_name || '';
+            const state = components.find(c => c.types.includes('administrative_area_level_1'))?.short_name || '';
+            const zip = components.find(c => c.types.includes('postal_code'))?.long_name || '';
+
+            return {
+                lat: location.lat,
+                lng: location.lng,
+                city,
+                state,
+                zip
+            };
+        }
+    } catch (error) {
+        console.error('Geocoding error:', error);
+    }
+    return null;
+};
+
 interface InlineAddShopFormProps {
     initialData?: Partial<ShopFormData>;
     onSuccess: (shop: Shop) => void;
@@ -54,18 +135,36 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
     // Initialize with Props
     useEffect(() => {
         if (initialData) {
+            const parsed = parseAddressComponents(initialData.address || "");
+
             setFormData(prev => ({
                 ...prev,
                 shop_name: initialData.shop_name || "",
                 address: initialData.address || "",
-                city: initialData.city || "",
-                state: initialData.state || "",
-                zip: initialData.zip || "",
+                city: initialData.city || parsed.city || "",
+                state: initialData.state || parsed.state || "",
+                zip: initialData.zip || parsed.zip || "",
                 phone: initialData.phone || "",
                 latitude: initialData.latitude || "",
                 longitude: initialData.longitude || "",
                 vendor_preference: "NEW"
             }));
+
+            // If we have address but no coords, geocode
+            if (initialData.address && (!initialData.latitude || !initialData.longitude)) {
+                geocodeAddress(initialData.address).then(result => {
+                    if (result) {
+                        setFormData(prev => ({
+                            ...prev,
+                            latitude: result.lat.toString(),
+                            longitude: result.lng.toString(),
+                            city: prev.city || result.city || "",
+                            state: prev.state || result.state || "",
+                            zip: prev.zip || result.zip || ""
+                        }));
+                    }
+                });
+            }
         }
     }, [initialData]);
 
@@ -104,7 +203,7 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
 
     useEffect(() => {
         const initMaps = async () => {
-            const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyAeI6_E9c4EMx9T4t_FjyVUGSTN38GV69c";
+            const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
             if (!apiKey) return;
 
             const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
