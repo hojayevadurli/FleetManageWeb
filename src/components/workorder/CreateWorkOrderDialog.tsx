@@ -140,6 +140,7 @@ export default function CreateWorkOrderDialog({
   const refreshVendors = async () => {
     try {
       const data = await shopsApi.list();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mapped = data.map((s: any) => ({
         id: s.id,
         name: s.shop_name || s.name || "Unknown Shop",
@@ -202,7 +203,7 @@ export default function CreateWorkOrderDialog({
         setStatus(WorkOrderStatus.Draft);
       }
     }
-  }, [workOrderType]);
+  }, [workOrderType, status]);
 
   const computedLines = useMemo(() => {
     const items = (workOrderItems ?? []).filter(x => x.description.trim());
@@ -286,6 +287,7 @@ export default function CreateWorkOrderDialog({
       documentIds: []
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const id = (created as any)?.id || (created as any)?.Id; // ✅ handle both
     if (!id) {
       throw new Error("Draft creation failed: backend did not return work order id.");
@@ -406,6 +408,7 @@ export default function CreateWorkOrderDialog({
       await onAfterCreated?.();
       resetForm();
       onOpenChange(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Failed to create work order.");
