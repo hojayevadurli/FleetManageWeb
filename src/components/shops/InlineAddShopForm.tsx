@@ -128,6 +128,8 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
     // Refs for Google Maps
     const addressInputRef = useRef<HTMLInputElement>(null);
     const addressAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+    const shopNameInputRef = useRef<HTMLInputElement>(null);
+    const shopNameAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<google.maps.Map | null>(null);
     const markerRef = useRef<google.maps.Marker | null>(null);
@@ -210,7 +212,7 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
             await loader.load();
 
 
-            // Autocomplete
+            // Address Autocomplete
             if (addressInputRef.current && !addressAutocompleteRef.current) {
                 addressAutocompleteRef.current = new window.google.maps.places.Autocomplete(addressInputRef.current, {
                     types: ["address"],
@@ -220,6 +222,19 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
                 addressAutocompleteRef.current.addListener("place_changed", () => {
                     const place = addressAutocompleteRef.current?.getPlace();
                     if (place) handlePlaceSelect(place);
+                });
+            }
+
+            // Shop Name Autocomplete
+            if (shopNameInputRef.current && !shopNameAutocompleteRef.current) {
+                shopNameAutocompleteRef.current = new window.google.maps.places.Autocomplete(shopNameInputRef.current, {
+                    types: ["establishment"],
+                    componentRestrictions: { country: 'us' },
+                    fields: ["name", "formatted_address", "address_components", "geometry", "formatted_phone_number", "website"],
+                });
+                shopNameAutocompleteRef.current.addListener("place_changed", () => {
+                    const place = shopNameAutocompleteRef.current?.getPlace();
+                    if (place) handleShopSelect(place);
                 });
             }
 
@@ -247,6 +262,52 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
     const handlePlaceSelect = (place: google.maps.places.PlaceResult) => {
         if (!place.address_components) return;
 
+        const { address, city, state, zip } = parsePlaceComponents(place);
+
+        const lat = place.geometry?.location?.lat()?.toString() || "";
+        const lng = place.geometry?.location?.lng()?.toString() || "";
+
+        setFormData(prev => ({
+            ...prev,
+            address: address || place.formatted_address || "",
+            city,
+            state,
+            zip,
+            latitude: lat,
+            longitude: lng
+        }));
+    };
+
+    const handleShopSelect = (place: google.maps.places.PlaceResult) => {
+        if (!place.name) return;
+
+        const { address, city, state, zip } = parsePlaceComponents(place);
+        const lat = place.geometry?.location?.lat()?.toString() || "";
+        const lng = place.geometry?.location?.lng()?.toString() || "";
+
+        setFormData(prev => ({
+            ...prev,
+            shop_name: place.name || prev.shop_name,
+            address: address || place.formatted_address || prev.address,
+            city: city || prev.city,
+            state: state || prev.state,
+            zip: zip || prev.zip,
+            phone: place.formatted_phone_number || prev.phone,
+            website: place.website || prev.website,
+            latitude: lat || prev.latitude,
+            longitude: lng || prev.longitude
+        }));
+
+        toast({
+            title: "Shop Found",
+            description: "Auto-filled shop details from Google Maps.",
+            duration: 3000
+        });
+    };
+
+    const parsePlaceComponents = (place: google.maps.places.PlaceResult) => {
+        if (!place.address_components) return { address: "", city: "", state: "", zip: "" };
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const components = place.address_components as any[];
 
@@ -266,18 +327,9 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
         const state = getShortComponent('administrative_area_level_1');
         const zip = getComponent('postal_code');
 
-        const lat = place.geometry?.location?.lat()?.toString() || "";
-        const lng = place.geometry?.location?.lng()?.toString() || "";
+        const address = `${streetNumber} ${route}`.trim();
 
-        setFormData(prev => ({
-            ...prev,
-            address: `${streetNumber} ${route}`.trim() || place.formatted_address || "",
-            city,
-            state,
-            zip,
-            latitude: lat,
-            longitude: lng
-        }));
+        return { address, city, state, zip };
     };
 
     const handleSubmit = async () => {
@@ -339,10 +391,11 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
                         {initialData?.shop_name && <Badge className="h-5 px-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0 text-[9px]"><CheckCircle2 className="w-3 h-3 mr-1" /> Auto-filled</Badge>}
                     </Label>
                     <Input
+                        ref={shopNameInputRef}
                         value={formData.shop_name}
                         onChange={e => setFormData(p => ({ ...p, shop_name: e.target.value }))}
                         className={cn("font-bold", errors.shop_name && touched.shop_name && "border-red-300")}
-                        placeholder="Shop Name"
+                        placeholder="Shop Name (Start typing to search...)"
                     />
                 </div>
 
