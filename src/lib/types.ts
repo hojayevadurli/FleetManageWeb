@@ -321,6 +321,7 @@ export interface WorkOrderDto {
   vendorId?: string;
   workOrderNumber?: string;
   odometerAtService?: number;
+  hoursAtService?: number;
   openedAt: string;
   closedAt?: string;
   title: string;

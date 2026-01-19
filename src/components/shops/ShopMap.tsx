@@ -211,16 +211,35 @@ const ShopMap = () => {
       : null;
 
     const content = `
-      <div style="max-width: 250px; padding: 8px;">
-        <h3 style="margin: 0 0 8px 0; font-weight: bold;">${shop.shop_name}</h3>
-        <p style="margin: 0 0 4px 0; font-size: 12px; color: #666;">${shop.shop_id}</p>
-        <p style="margin: 0 0 8px 0; font-size: 14px;">${shop.address}</p>
-        ${distance ? `<p style="margin: 0 0 4px 0; font-size: 12px; color: #666;">${distance.toFixed(1)} miles away</p>` : ''}
-        <div style="display: flex; align-items: center; gap: 8px; margin: 8px 0;">
-          <span style="font-weight: bold;">$${shop.labor_rate}/hr</span>
-          <span style="padding: 2px 8px; border-radius: 12px; font-size: 11px; background: ${shop.rate_category === 'green' ? '#dcfce7; color: #166534' : shop.rate_category === 'orange' ? '#fed7aa; color: #9a3412' : '#fecaca; color: #991b1b'};">${shop.rate_category}</span>
+      <div style="width: 280px; font-family: 'Inter', sans-serif;">
+        <div style="display: flex; align-items: start; gap: 12px; margin-bottom: 12px;">
+           <div style="width: 40px; height: 40px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; color: #cbd5e1; font-size: 14px;">
+              ${shop.shop_name.substring(0, 2).toUpperCase()}
+           </div>
+           <div>
+              <h3 style="margin: 0 0 4px 0; font-weight: 800; font-size: 16px; color: #0f172a; line-height: 1.2;">${shop.shop_name}</h3>
+              <p style="margin: 0; font-size: 12px; color: #64748b;">${shop.address}</p>
+           </div>
         </div>
-        ${shop.phone ? `<p style="margin: 4px 0; font-size: 12px;"><strong>Phone:</strong> ${shop.phone}</p>` : ''}
+
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+          <span style="font-weight: 700; font-size: 14px; color: #0f172a;">$${shop.labor_rate}/hr</span>
+          <span style="padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: ${shop.rate_category === 'green' ? '#dcfce7; color: #166534' : shop.rate_category === 'orange' ? '#ffedd5; color: #9a3412' : '#fee2e2; color: #991b1b'};">
+            ${shop.rate_category === 'green' ? 'Partner' : shop.rate_category === 'orange' ? 'Preferred' : 'Standard'}
+          </span>
+          ${distance ? `<span style="font-size: 11px; color: #94a3b8; margin-left: auto;">${distance.toFixed(1)} mi</span>` : ''}
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+           <a href="/app/shops/${shop.id}" style="display: flex; align-items: center; justify-content: center; height: 36px; background: #0f172a; color: white; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+              View Detail
+           </a>
+           ${shop.phone ? `
+             <a href="tel:${shop.phone}" style="display: flex; align-items: center; justify-content: center; height: 36px; background: #f1f5f9; color: #0f172a; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid #e2e8f0;">
+                Call Shop
+             </a>
+           ` : ''}
+        </div>
       </div>
     `;
 
