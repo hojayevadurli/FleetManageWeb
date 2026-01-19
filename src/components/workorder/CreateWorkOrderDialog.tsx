@@ -9,11 +9,20 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { useRef } from "react";
-import { Loader2, Sparkles, Upload, Trash2, Check, ChevronsUpDown } from "lucide-react";
+import { Loader2, Sparkles, Upload, Trash2, Check, ChevronsUpDown, Plus, CheckCircle2 } from "lucide-react";
 import { parseReceipt } from "@/lib/gemini";
-import { ReceiptParsedData, Vendor } from "@/lib/types";
+import { ReceiptParsedData, Vendor, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
+import { ShopFormData } from "@/components/shops/types/ShopTypes";
+import AddShopDialog from "../shops/AddShopDialog";
+import InlineAddShopForm from "../shops/InlineAddShopForm";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import ShopRatingInputs, { ShopRatingData } from "../shops/ShopRatingInputs";
 import { shopsApi } from "@/lib/shopsApi";
 import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, Calendar, Truck, User, X } from "lucide-react";
 import {
   Command,
   CommandEmpty,
@@ -33,7 +42,7 @@ import WorkOrderItems, { WorkOrderItemData } from "./WorkOrderItems";
 import FileUpload from "./FileUpload";
 
 
-import { WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
+
 import { workOrdersApi, WorkOrderUpsertDto } from "@/lib/workOrdersApi";
 
 type Priority = "low" | "normal" | "high" | "critical";
@@ -89,6 +98,19 @@ export default function CreateWorkOrderDialog({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<'image' | 'pdf'>('image');
 
+  const [workOrderType, setWorkOrderType] = useState<"upcoming" | "completed">("upcoming");
+
+  const [ratingData, setRatingData] = useState<ShopRatingData>({
+    mainRating: 0,
+    qualityRating: 0,
+    timelinessRating: 0,
+    communicationRating: 0,
+    valueRating: 0,
+    wouldRecommend: null,
+    comment: ""
+  });
+  const [status, setStatus] = useState<WorkOrderStatus>(WorkOrderStatus.Open);
+
   const [newWorkOrder, setNewWorkOrder] = useState<NewWorkOrderState>({
     vehicle_id: initialVehicleId || "",
     vehicle_type: initialVehicleType || "truck",
@@ -104,16 +126,48 @@ export default function CreateWorkOrderDialog({
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorOpen, setVendorOpen] = useState(false);
 
-  // Load vendors on mount
-  useEffect(() => {
-    shopsApi.list().then(data => {
+  // New Linkage State
+  const [isAddShopOpen, setIsAddShopOpen] = useState(false);
+  const [showAddShopInline, setShowAddShopInline] = useState(false);
+  const [shopInitialData, setShopInitialData] = useState<Partial<ShopFormData>>({});
+  const [parsedVendorDetails, setParsedVendorDetails] = useState<{
+    name: string;
+    address: string;
+    phone?: string;
+    website?: string;
+  } | null>(null);
+
+  const refreshVendors = async () => {
+    try {
+      const data = await shopsApi.list();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mapped = data.map((s: any) => ({
         id: s.id,
-        name: s.name || s.shopName,
+        name: s.shop_name || s.name || "Unknown Shop",
       })) as Vendor[];
       setVendors(mapped);
-    }).catch(console.error);
+      return mapped;
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  };
+
+  // Load vendors on mount
+  useEffect(() => {
+    refreshVendors();
   }, []);
+
+  const handleShopAdded = async () => {
+    const updatedVendors = await refreshVendors();
+    // Auto-select the most recent one if we have a name match or just created one
+    if (shopInitialData.shop_name) {
+      const match = updatedVendors.find(v => v.name.toLowerCase() === shopInitialData.shop_name?.toLowerCase());
+      if (match) {
+        setNewWorkOrder(prev => ({ ...prev, vendor_id: match.id, vendor_name: match.name }));
+      }
+    }
+  };
 
   // Effect to reset/init form when props change or modal opens
   useEffect(() => {
@@ -124,11 +178,32 @@ export default function CreateWorkOrderDialog({
         vehicle_type: initialVehicleType || "truck",
         company_name: initialCompanyName
       }));
-      if (initialVehicleId && initialUnitNumber) {
-        generateNextWorkOrderNumber(initialVehicleId, initialUnitNumber);
-      }
+      setWorkOrderType("upcoming");
+      setRatingData({
+        mainRating: 0,
+        qualityRating: 0,
+        timelinessRating: 0,
+        communicationRating: 0,
+        valueRating: 0,
+        wouldRecommend: null,
+        comment: ""
+      });
+      setStatus(WorkOrderStatus.Draft);
     }
   }, [open, initialVehicleId, initialVehicleType, initialUnitNumber, initialCompanyName]);
+
+  // Smart default for status based on type
+  useEffect(() => {
+    if (workOrderType === 'completed') {
+      if (status === WorkOrderStatus.Draft || status === WorkOrderStatus.Open) {
+        setStatus(WorkOrderStatus.Completed);
+      }
+    } else {
+      if (status === WorkOrderStatus.Completed || status === WorkOrderStatus.Closed) {
+        setStatus(WorkOrderStatus.Draft);
+      }
+    }
+  }, [workOrderType, status]);
 
   const computedLines = useMemo(() => {
     const items = (workOrderItems ?? []).filter(x => x.description.trim());
@@ -212,6 +287,7 @@ export default function CreateWorkOrderDialog({
       documentIds: []
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const id = (created as any)?.id || (created as any)?.Id; // ✅ handle both
     if (!id) {
       throw new Error("Draft creation failed: backend did not return work order id.");
@@ -219,6 +295,39 @@ export default function CreateWorkOrderDialog({
 
     setDraftWorkOrderId(id);
     return id;
+  };
+
+  const resetForm = () => {
+    setNewWorkOrder({
+      vehicle_id: initialVehicleId || "",
+      vehicle_type: initialVehicleType || "truck",
+      priority: "normal",
+      eta_date: "",
+      eta_hours: "",
+      company_name: initialCompanyName,
+      description: "",
+      vendor_id: null,
+      vendor_name: ""
+    });
+    setWorkOrderType("upcoming");
+    setRatingData({
+      mainRating: 0,
+      qualityRating: 0,
+      timelinessRating: 0,
+      communicationRating: 0,
+      valueRating: 0,
+      wouldRecommend: null,
+      comment: ""
+    });
+    setWorkOrderItems([]);
+    setSelectedFiles([]);
+    setDraftWorkOrderId(null);
+    setIsUploading(false);
+    setShowOptionalFields({ eta: false, attachments: false });
+    setCustomWorkOrderNumber(null);
+    if (initialVehicleId && initialUnitNumber) {
+      generateNextWorkOrderNumber(initialVehicleId, initialUnitNumber);
+    }
   };
 
   const handleCreate = async () => {
@@ -249,15 +358,19 @@ export default function CreateWorkOrderDialog({
       // ✅ If not, we still create draft now then update it to "open".
       const id = await ensureDraftExists();
 
+      // Use the selected status directly
+      const finalStatus = status;
+
       const dto: WorkOrderUpsertDto = {
         equipmentId: newWorkOrder.vehicle_id,
         vendorId: newWorkOrder.vendor_id,
         workOrderNumber: customWorkOrderNumber,
         odometerAtService: null,
         openedAt: new Date().toISOString(),
+        closedAt: workOrderType === "completed" ? new Date().toISOString() : null,
         title: mergedDescription?.trim() ? mergedDescription.split("\n")[0].slice(0, 100) : "New Work Order",
         complaint: mergedDescription?.trim() || "Manual Entry",
-        status: WorkOrderStatus.Open,
+        status: finalStatus,
         priority: newWorkOrder.priority === "low" ? WorkOrderPriority.Low :
           newWorkOrder.priority === "normal" ? WorkOrderPriority.Normal :
             newWorkOrder.priority === "high" ? WorkOrderPriority.High : WorkOrderPriority.Critical,
@@ -270,16 +383,77 @@ export default function CreateWorkOrderDialog({
 
       await workOrdersApi.update(id, dto);
 
+      // Handle Rating Submission
+      if (workOrderType === "completed" && newWorkOrder.vendor_id && ratingData.mainRating > 0) {
+        try {
+          await shopsApi.createRating(newWorkOrder.vendor_id, {
+            rating: ratingData.mainRating,
+            reviewText: ratingData.comment,
+            serviceDate: new Date().toISOString(),
+            workOrderId: id,
+            qualityRating: ratingData.qualityRating,
+            timelinessRating: ratingData.timelinessRating,
+            communicationRating: ratingData.communicationRating,
+            valueRating: ratingData.valueRating,
+            wouldRecommend: ratingData.wouldRecommend === true
+          });
+          toast.success("Review submitted successfully");
+        } catch (ratingErr) {
+          console.error("Failed to submit rating", ratingErr);
+          toast.error("Work order created, but failed to save rating.");
+        }
+      }
+
       toast.success("Work order created.");
       await onAfterCreated?.();
       resetForm();
       onOpenChange(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Failed to create work order.");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Helper for fuzzy matching
+  const levenshteinDistance = (a: string, b: string): number => {
+    const matrix = [];
+    let i, j;
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    for (i = 0; i <= b.length; i++) {
+      matrix[i] = [i];
+    }
+    for (j = 0; j <= a.length; j++) {
+      matrix[0][j] = j;
+    }
+    for (i = 1; i <= b.length; i++) {
+      for (j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1, // substitution
+            Math.min(
+              matrix[i][j - 1] + 1, // insertion
+              matrix[i - 1][j] + 1 // deletion
+            )
+          );
+        }
+      }
+    }
+    return matrix[b.length][a.length];
+  };
+
+  const fuzzyMatch = (str1: string, str2: string, threshold = 0.85): boolean => {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    if (longer.length === 0) return true;
+    const distance = levenshteinDistance(longer.toLowerCase(), shorter.toLowerCase());
+    const similarity = (longer.length - distance) / longer.length;
+    return similarity >= threshold;
   };
 
   const processAIParsing = async (file: File, base64: string) => {
@@ -325,15 +499,34 @@ export default function CreateWorkOrderDialog({
           toast.success(`AI Scan: List populated with ${newItems.length} items from receipt.`);
         }
 
-        // Auto-fill Vendor Name
+        // Auto-fill Vendor Name & Shop Matching Logic
         if (result.businessName) {
-          const match = vendors.find(v => v.name.toLowerCase().includes(result.businessName.toLowerCase()) || result.businessName.toLowerCase().includes(v.name.toLowerCase()));
+          const match = vendors.find(v => {
+            // 1. Direct includes match (fallback)
+            const includesMatch = v.name.toLowerCase().includes(result.businessName.toLowerCase()) ||
+              result.businessName.toLowerCase().includes(v.name.toLowerCase());
+
+            // 2. Fuzzy match
+            const isFuzzy = fuzzyMatch(result.businessName, v.name, 0.75); // 75% threshold
+
+            return includesMatch || isFuzzy;
+          });
+
           if (match) {
             setNewWorkOrder(prev => ({ ...prev, vendor_id: match.id, vendor_name: match.name }));
-            toast.success(`AI Match: Vendor found "${match.name}"`);
+            setParsedVendorDetails(null); // Clear manual option if matched
+            toast.success(`✓ Matched existing shop: "${match.name}"`);
           } else {
-            toast.info(`AI: Extracted vendor "${result.businessName}" (No direct match)`);
+            // 2. New Vendor Detected
+            // toast.info(`🆕 New Vendor Detected: "${result.businessName}"`);
             setNewWorkOrder(prev => ({ ...prev, vendor_name: result.businessName || "", vendor_id: null }));
+
+            setParsedVendorDetails({
+              name: result.businessName,
+              address: `${result.businessAddress.street} ${result.businessAddress.city} ${result.businessAddress.state}`.trim(),
+              phone: result.businessContact?.phone,
+              website: result.businessContact?.website
+            });
           }
         }
 
@@ -392,199 +585,473 @@ export default function CreateWorkOrderDialog({
           {/* LEFT: Form */}
           <div className={`flex-1 overflow-y-auto p-10 space-y-6 ${previewUrl ? 'md:w-1/2 border-r border-slate-100' : 'max-w-4xl mx-auto w-full'}`}>
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="company_name">Company Name</Label>
-                  <Input
-                    id="company_name"
-                    value={newWorkOrder.company_name}
-                    onChange={(e) => setNewWorkOrder((p) => ({ ...p, company_name: e.target.value }))}
-                    placeholder="Your Company Name"
-                  />
+
+              {/* 1. QUICK ACTIONS (Upload or Success) */}
+              {previewUrl ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 relative overflow-hidden animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-start justify-between relative z-10">
+                    <div className="flex gap-4">
+                      <div className="bg-emerald-100 text-emerald-600 p-3 rounded-full h-12 w-12 flex items-center justify-center shrink-0">
+                        <Check className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-black text-slate-900 text-lg">Receipt Uploaded</h4>
+                          <Badge className="bg-emerald-200 text-emerald-800 hover:bg-emerald-300 border-0">AI Complete</Badge>
+                        </div>
+                        <p className="text-sm text-slate-600 font-medium mb-3">{selectedFiles[0]?.name || "Document Scanned"}</p>
+
+                        <div className="flex gap-4 text-xs font-bold uppercase tracking-wide text-slate-500 bg-white/60 p-3 rounded-lg border border-emerald-100/50">
+                          <div>
+                            <span className="block text-[10px] text-emerald-600/70 mb-0.5">Total Extracted</span>
+                            ${computedLines.reduce((acc, i) => acc + ((i.unitPrice || 0) * (i.qty || 1)), 0).toFixed(2)}
+                          </div>
+                          <div className="w-px bg-slate-200 h-full mx-1"></div>
+                          <div>
+                            <span className="block text-[10px] text-emerald-600/70 mb-0.5">Services</span>
+                            {computedLines.length} Items
+                          </div>
+                          <div className="w-px bg-slate-200 h-full mx-1"></div>
+                          <div>
+                            <span className="block text-[10px] text-emerald-600/70 mb-0.5">Shop</span>
+                            {newWorkOrder.vendor_name || "Detecting..."}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                        onClick={() => {
+                          // Focus preview logic handled by keeping it visible
+                        }}
+                      >
+                        👁️ View
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-slate-400 hover:text-red-500 h-8"
+                        onClick={() => {
+                          setPreviewUrl(null);
+                          setSelectedFiles([]);
+                          // Maybe clear extracted data too?
+                        }}
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <Label>Date</Label>
-                  <Input value={new Date().toLocaleDateString()} disabled className="bg-gray-50" />
-                </div>
-              </div>
-
-              <VehicleSelector
-                selectedVehicleId={newWorkOrder.vehicle_id}
-                selectedVehicleType={newWorkOrder.vehicle_type}
-                onVehicleSelect={(vehicleId: string, vehicleType: string, unitNumber: string) => {
-                  setNewWorkOrder((p) => ({
-                    ...p,
-                    vehicle_id: vehicleId,
-                    vehicle_type: vehicleType
-                  }));
-
-                  setDraftWorkOrderId(null);
-                  setSelectedFiles([]);
-                  setIsUploading(false);
-
-                  generateNextWorkOrderNumber(vehicleId, unitNumber);
-                }}
-              />
-
-              <div>
-                <Label htmlFor="priority">Priority</Label>
-                <Select
-                  value={newWorkOrder.priority}
-                  onValueChange={(value) => setNewWorkOrder((p) => ({ ...p, priority: value as Priority }))}
-                >
-                  <SelectTrigger id="priority" className="w-full">
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="normal">Normal</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <WorkOrderItems items={workOrderItems} onItemsChange={setWorkOrderItems} />
-
-              {/* AI Scan Section */}
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-600" /> AI SCAN
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Instant extraction of costs and tasks</p>
-                </div>
-
+              ) : (
                 <div
                   onClick={() => receiptInputRef.current?.click()}
-                  className={`border-4 border-dashed rounded-xl p-8 transition-all group flex flex-col items-center justify-center text-center cursor-pointer relative ${isParsingReceipt ? 'border-blue-400 bg-blue-50/50' : 'border-slate-200 bg-slate-50/30 hover:bg-blue-50/30 hover:border-blue-300'}`}
+                  className={`border-2 border-dashed rounded-xl p-4 transition-all group flex items-center justify-between cursor-pointer relative ${isParsingReceipt ? 'border-blue-400 bg-blue-50/50' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50'}`}
                 >
-                  {isParsingReceipt ? (
-                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-                  ) : (
-                    <>
-                      <Upload className="w-8 h-8 text-slate-400 group-hover:text-blue-500 mb-2" />
-                      <p className="text-sm font-bold text-slate-700">Audit Invoice/Receipt</p>
-                    </>
-                  )}
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isParsingReceipt ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600'}`}>
+                      {isParsingReceipt ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6" />}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors">Upload & AI Scan</h4>
+                      <p className="text-xs text-slate-500 group-hover:text-blue-600/80">Auto-fill details from invoice or picture</p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary" className="group-hover:bg-blue-200 group-hover:text-blue-800">Recommended</Badge>
+
                   <input type="file" ref={receiptInputRef} className="hidden" accept="image/*,application/pdf" onChange={e => {
                     const file = e.target.files?.[0];
                     if (file) handleFileUploadAi(file);
                     e.target.value = '';
                   }} />
                 </div>
-              </div>
+              )}
 
-              {/* Vendor Selection */}
-              <div className="flex flex-col gap-2">
-                <Label className="flex items-center gap-2">
-                  Professional Service Partner <Sparkles className="h-3 w-3 text-blue-600" />
-                </Label>
-                <Popover open={vendorOpen} onOpenChange={setVendorOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={vendorOpen}
-                      className="w-full justify-between"
-                    >
-                      {newWorkOrder.vendor_id
-                        ? vendors.find((v) => v.id === newWorkOrder.vendor_id)?.name || "Select Vendor"
-                        : (newWorkOrder.vendor_name ? newWorkOrder.vendor_name : "In-House / Select Vendor")}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[400px] p-0">
-                    <Command>
-                      <CommandInput placeholder="Search vendor..." />
-                      <CommandList>
-                        <CommandEmpty>No vendor found.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            key="none"
-                            value="none"
-                            onSelect={() => {
-                              setNewWorkOrder((p) => ({ ...p, vendor_id: null, vendor_name: "" }));
-                              setVendorOpen(false);
-                            }}
-                          >
-                            In_House / No Vendor
-                            {newWorkOrder.vendor_id === null && <Check className="ml-auto h-4 w-4" />}
-                          </CommandItem>
-                          {vendors.map((vendor) => (
-                            <CommandItem
-                              key={vendor.id}
-                              value={vendor.name}
-                              onSelect={() => {
-                                setNewWorkOrder((p) => ({ ...p, vendor_id: vendor.id, vendor_name: vendor.name }));
-                                setVendorOpen(false);
-                              }}
-                            >
-                              {vendor.name}
-                              {newWorkOrder.vendor_id === vendor.id && (
-                                <Check className="ml-auto h-4 w-4" />
-                              )}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div>
-                <Label htmlFor="description">Additional Notes (Optional)</Label>
-                <Textarea
-                  id="description"
-                  value={newWorkOrder.description}
-                  onChange={(e) => setNewWorkOrder((p) => ({ ...p, description: e.target.value }))}
-                  placeholder="Any additional notes or special instructions..."
-                  className="min-h-20"
-                />
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={showOptionalFields.attachments ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setShowOptionalFields((prev) => ({ ...prev, attachments: !prev.attachments }))}
-                  >
-                    {showOptionalFields.attachments ? "Hide" : "Add"} Attachments
-                  </Button>
-                </div>
-
-                {showOptionalFields.attachments && (
-                  <div className="p-4 border rounded-lg bg-gray-50 space-y-2">
-                    <FileUpload
-                      files={selectedFiles}
-                      onFilesChange={setSelectedFiles}
-                      ensureWorkOrderId={ensureDraftExists}
-                      onUploadingChange={setIsUploading}
-                      onUploaded={(id) => setDraftWorkOrderId(id)}
-                    />
-                    <p className="text-xs text-gray-600">
-                      {selectedFiles.length === 0
-                        ? "Attachments are optional."
-                        : draftWorkOrderId
-                          ? "Draft exists — Upload Files will attach to it."
-                          : "Click Upload Files — we’ll create a draft work order automatically and attach files."}
-                    </p>
+              {/* 2. work Order Type */}
+              <div className="bg-slate-50 p-1 rounded-xl border border-slate-100">
+                <RadioGroup
+                  value={workOrderType}
+                  onValueChange={(v: "upcoming" | "completed") => setWorkOrderType(v)}
+                  className="grid grid-cols-2"
+                >
+                  <div className={`relative flex items-center space-x-2 p-3 rounded-[0.6rem] cursor-pointer transition-all ${workOrderType === 'upcoming' ? 'bg-white shadow-sm ring-1 ring-black/5' : 'hover:bg-slate-100/50 text-slate-500'}`}>
+                    <RadioGroupItem value="upcoming" id="type-upcoming" className="sr-only" />
+                    <div className="flex items-center gap-3 w-full" onClick={() => setWorkOrderType('upcoming')}>
+                      <Calendar className={`w-5 h-5 ${workOrderType === 'upcoming' ? 'text-blue-600' : 'text-slate-400'}`} />
+                      <div>
+                        <Label htmlFor="type-upcoming" className={`font-bold cursor-pointer ${workOrderType === 'upcoming' ? 'text-slate-900' : 'text-slate-500'}`}>Upcoming Work</Label>
+                        <p className="text-[10px] uppercase font-bold tracking-wider opacity-60">Plan Future</p>
+                      </div>
+                    </div>
                   </div>
-                )}
+                  <div className={`relative flex items-center space-x-2 p-3 rounded-[0.6rem] cursor-pointer transition-all ${workOrderType === 'completed' ? 'bg-white shadow-sm ring-1 ring-black/5' : 'hover:bg-slate-100/50 text-slate-500'}`}>
+                    <RadioGroupItem value="completed" id="type-completed" className="sr-only" />
+                    <div className="flex items-center gap-3 w-full" onClick={() => setWorkOrderType('completed')}>
+                      <CheckCircle2 className={`w-5 h-5 ${workOrderType === 'completed' ? 'text-green-600' : 'text-slate-400'}`} />
+                      <div>
+                        <Label htmlFor="type-completed" className={`font-bold cursor-pointer ${workOrderType === 'completed' ? 'text-slate-900' : 'text-slate-500'}`}>Completed Work</Label>
+                        <p className="text-[10px] uppercase font-bold tracking-wider opacity-60">Log Past</p>
+                      </div>
+                    </div>
+                  </div>
+                </RadioGroup>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-                <Button disabled={createDisabled} onClick={handleCreate}>
+              {/* 3. BASIC INFO CARD */}
+              <Card className="border-slate-200 shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50/50 py-3 px-4 border-b border-slate-100">
+                  <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                    <Truck className="w-4 h-4" /> Asset & Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="company_name" className="text-xs font-bold text-slate-500 mb-1 block">Company / Branch</Label>
+                      <Input
+                        id="company_name"
+                        value={newWorkOrder.company_name}
+                        onChange={(e) => setNewWorkOrder((p) => ({ ...p, company_name: e.target.value }))}
+                        className="h-9"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-bold text-slate-500 mb-1 block">Service Date</Label>
+                      <Input value={new Date().toLocaleDateString()} disabled className="h-9 bg-slate-50 font-medium text-slate-500" />
+                    </div>
+                  </div>
+
+                  <VehicleSelector
+                    selectedVehicleId={newWorkOrder.vehicle_id}
+                    selectedVehicleType={newWorkOrder.vehicle_type}
+                    onVehicleSelect={(vehicleId: string, vehicleType: string, unitNumber: string) => {
+                      setNewWorkOrder((p) => ({
+                        ...p,
+                        vehicle_id: vehicleId,
+                        vehicle_type: vehicleType
+                      }));
+
+                      setDraftWorkOrderId(null);
+                      setSelectedFiles([]);
+                      setIsUploading(false);
+
+                      generateNextWorkOrderNumber(vehicleId, unitNumber);
+                    }}
+                  />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="priority" className="text-xs font-bold text-slate-500 mb-1 block">Priority</Label>
+                      <Select
+                        value={newWorkOrder.priority}
+                        onValueChange={(value) => setNewWorkOrder((p) => ({ ...p, priority: value as Priority }))}
+                      >
+                        <SelectTrigger id="priority" className="h-9">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="critical">Critical</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="status" className="text-xs font-bold text-slate-500 mb-1 block">Status</Label>
+                      <Select
+                        value={status.toString()}
+                        onValueChange={(val) => setStatus(parseInt(val) as WorkOrderStatus)}
+                      >
+                        <SelectTrigger id="status" className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={WorkOrderStatus.Draft.toString()}>📝 Draft</SelectItem>
+                          <SelectItem value={WorkOrderStatus.Open.toString()}>🔵 Open</SelectItem>
+                          <SelectItem value={WorkOrderStatus.InProcess.toString()}>🟡 In Progress</SelectItem>
+                          <SelectItem value={WorkOrderStatus.Completed.toString()}>✅ Completed</SelectItem>
+                          <SelectItem value={WorkOrderStatus.Closed.toString()}>🔒 Closed</SelectItem>
+                          <SelectItem value={WorkOrderStatus.Paid.toString()}>💰 Paid</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                  </div>
+
+                  <div>
+                    <Label htmlFor="description" className="text-xs font-bold text-slate-500 mb-1 block">Notes / Description (Optional)</Label>
+                    <Textarea
+                      id="description"
+                      value={newWorkOrder.description}
+                      onChange={(e) => setNewWorkOrder((p) => ({ ...p, description: e.target.value }))}
+                      placeholder="Routine maintenance, oil change, etc."
+                      className="min-h-[60px] text-sm resize-none"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 4. SHOP SELECTION (Reveal if basic info started or upload done) */}
+              <Card className="border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-bottom-2 fade-in duration-500">
+                <CardHeader className="bg-slate-50/50 py-3 px-4 border-b border-slate-100 flex flex-row items-center justify-between">
+                  <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                    <User className="w-4 h-4" /> Service Provider
+                  </CardTitle>
+                  {newWorkOrder.vendor_id && <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200">Selected</Badge>}
+                </CardHeader>
+                <CardContent className="p-4">
+                  {/* Custom UI for New Vendor Detected state OR Inline Add Form */}
+                  {(parsedVendorDetails && !newWorkOrder.vendor_id) || showAddShopInline ? (
+                    showAddShopInline ? (
+                      <InlineAddShopForm
+                        initialData={shopInitialData}
+                        onCancel={() => {
+                          setShowAddShopInline(false);
+                          if (!parsedVendorDetails) {
+                            // If we manually opened it, maybe reset selection?
+                            // For now just close.
+                          }
+                        }}
+                        onSuccess={(newShop) => {
+                          handleShopAdded(); // triggers refresh
+                          // Auto-select
+                          setNewWorkOrder(prev => ({ ...prev, vendor_id: newShop.id, vendor_name: newShop.shop_name }));
+                          setParsedVendorDetails(null); // Clear prompt
+                          setShowAddShopInline(false);
+                          toast.success("Vendor added and selected!");
+                        }}
+                      />
+                    ) : (
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">New Vendor Found</span>
+                            </div>
+                            <h4 className="font-bold text-slate-900">{parsedVendorDetails?.name}</h4>
+                            <p className="text-xs text-slate-600 line-clamp-1">{parsedVendorDetails?.address}</p>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              size="sm"
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setShopInitialData({
+                                  shop_name: parsedVendorDetails?.name,
+                                  address: parsedVendorDetails?.address,
+                                  phone: parsedVendorDetails?.phone,
+                                  website: parsedVendorDetails?.website,
+                                  vendor_preference: "STANDARD"
+                                });
+                                setShowAddShopInline(true); // Expand inline
+                              }}
+                              className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs h-8 shrink-0"
+                            >
+                              <Plus className="w-3 h-3 mr-1" /> Add Now
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setParsedVendorDetails(null); // Dismiss detection
+                                setNewWorkOrder(p => ({ ...p, vendor_name: "" })); // Reset
+                              }}
+                              className="h-8 text-[10px] text-amber-700 hover:bg-amber-100"
+                            >
+                              Change
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  ) : (
+                    <Popover open={vendorOpen} onOpenChange={setVendorOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={vendorOpen}
+                          className={cn(
+                            "w-full justify-between h-11 rounded-lg border-slate-200 bg-white text-left font-medium",
+                            newWorkOrder.vendor_id && "border-blue-200 bg-blue-50/50 text-blue-900"
+                          )}
+                        >
+                          {newWorkOrder.vendor_id ? (
+                            <span className="flex items-center gap-2 truncate">
+                              <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                              {vendors.find((v) => v.id === newWorkOrder.vendor_id)?.name || "Unknown Vendor"}
+                              {vendors.find((v) => v.id === newWorkOrder.vendor_id) &&
+                                <Badge variant="secondary" className="ml-2 h-5 text-[10px] px-1.5 bg-blue-100 text-blue-700">Matched</Badge>
+                              }
+                            </span>
+                          ) : (
+                            newWorkOrder.vendor_name ? newWorkOrder.vendor_name : <span className="text-slate-400 font-normal">Select vendor...</span>
+                          )}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0 rounded-xl overflow-hidden shadow-xl" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search vendor..." className="text-sm" />
+                          <CommandList>
+                            <CommandEmpty>No vendor found.</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                key="none"
+                                value="none"
+                                onSelect={() => {
+                                  setNewWorkOrder((p) => ({ ...p, vendor_id: null, vendor_name: "" }));
+                                  setVendorOpen(false);
+                                }}
+                                className="text-sm"
+                              >
+                                In-House / No Vendor
+                                {newWorkOrder.vendor_id === null && <Check className="ml-auto h-3 w-3 text-blue-600" />}
+                              </CommandItem>
+
+                              {vendors.map((vendor) => (
+                                <CommandItem
+                                  key={vendor.id}
+                                  value={vendor.name}
+                                  onSelect={() => {
+                                    setNewWorkOrder((p) => ({ ...p, vendor_id: vendor.id, vendor_name: vendor.name }));
+                                    setVendorOpen(false);
+                                  }}
+                                  className="text-sm"
+                                >
+                                  {vendor.name}
+                                  {newWorkOrder.vendor_id === vendor.id && (
+                                    <Check className="ml-auto h-3 w-3 text-blue-600" />
+                                  )}
+                                </CommandItem>
+                              ))}
+                              <div className="p-1 border-t border-slate-100">
+                                <CommandItem
+                                  key="add-new-manual"
+                                  value="add-new"
+                                  onSelect={() => {
+                                    setShopInitialData({});
+                                    setShopInitialData({});
+                                    setShowAddShopInline(true);
+                                    // setIsAddShopOpen(true); // Don't open modal anymore
+                                    setVendorOpen(false);
+                                  }}
+                                  className="text-blue-600 text-xs font-bold bg-blue-50 rounded-lg justify-center py-2"
+                                >
+                                  <Plus className="w-3 h-3 mr-1" /> Add New Shop
+                                </CommandItem>
+                              </div>
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 5. SERVICES (Progressive) */}
+              <Card className="border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-bottom-2 fade-in duration-500 delay-100">
+                <CardHeader className="bg-slate-50/50 py-3 px-4 border-b border-slate-100 flex flex-row items-center justify-between">
+                  <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" /> Line Items
+                  </CardTitle>
+                  {computedLines.length > 0 &&
+                    <div className="font-mono font-bold text-sm bg-white px-2 py-1 rounded border border-slate-200 text-slate-700">
+                      ${computedLines.reduce((acc, item) => acc + item.amount, 0).toFixed(2)}
+                    </div>
+                  }
+                </CardHeader>
+                <CardContent className="p-4">
+                  <WorkOrderItems items={workOrderItems} onItemsChange={setWorkOrderItems} />
+
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs font-bold text-slate-500"
+                        onClick={() => setShowOptionalFields((prev) => ({ ...prev, attachments: !prev.attachments }))}
+                      >
+                        {showOptionalFields.attachments ? "Hide" : "Manage"} Attachments ({selectedFiles.length})
+                      </Button>
+                    </div>
+
+                    {showOptionalFields.attachments && (
+                      <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                        <FileUpload
+                          files={selectedFiles}
+                          onFilesChange={setSelectedFiles}
+                          ensureWorkOrderId={ensureDraftExists}
+                          onUploadingChange={setIsUploading}
+                          onUploaded={(id) => setDraftWorkOrderId(id)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 6. RATING (Collapsible & Progressive) */}
+              {workOrderType === 'completed' && newWorkOrder.vendor_id && (
+                <Collapsible defaultOpen={true}>
+                  <Card className="border-amber-200 shadow-sm overflow-hidden animate-in slide-in-from-bottom-4 bg-amber-50/30">
+                    <CardHeader className="py-0 px-0">
+                      <CollapsibleTrigger className="w-full flex items-center justify-between p-4 hover:bg-amber-50/50 transition-colors text-left group">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-amber-100 p-2 rounded-full text-amber-600 transition-transform group-hover:scale-110">
+                            <Sparkles className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <CardTitle className="font-bold text-slate-900 text-sm">Rate This Service</CardTitle>
+                            <CardDescription className="text-xs text-slate-500">Optional: Share your experience with {newWorkOrder.vendor_name}</CardDescription>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {ratingData.mainRating > 0 && <Badge className="bg-amber-500 hover:bg-amber-600">Rated {ratingData.mainRating}⭐</Badge>}
+                          <ChevronDown className="w-4 h-4 text-slate-400 group-data-[state=open]:rotate-180 transition-transform" />
+                        </div>
+                      </CollapsibleTrigger>
+                    </CardHeader>
+                    <CollapsibleContent>
+                      <CardContent className="p-4 pt-0 border-t border-amber-100/50">
+                        <div className="pt-4">
+                          <ShopRatingInputs
+                            data={ratingData}
+                            onChange={setRatingData}
+                            variant="compact"
+                          />
+                        </div>
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
+
+              {/* ACTION BUTTONS */}
+              <div className="flex items-center justify-end gap-3 pt-6 pb-2">
+                <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold text-slate-500">Cancel</Button>
+                <Button
+                  disabled={createDisabled}
+                  onClick={handleCreate}
+                  className={`h-12 px-6 rounded-xl font-black uppercase tracking-wider shadow-lg transition-all ${workOrderType === 'completed' && ratingData.mainRating > 0 ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-200 text-white' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 text-white'}`}
+                >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {workOrderType === 'completed' ? 'Logging...' : 'Creating...'}
                     </>
                   ) : (
-                    "Create Work Order"
+                    workOrderType === 'completed' && ratingData.mainRating > 0 ? (
+                      <span className="flex items-center">Log Work & Submit Review <Check className="ml-2 w-4 h-4" /></span>
+                    ) : (
+                      "Create Work Order"
+                    )
                   )}
                 </Button>
               </div>
@@ -593,8 +1060,21 @@ export default function CreateWorkOrderDialog({
 
           {/* RIGHT: Preview */}
           {previewUrl && (
-            <div className="hidden md:flex w-1/2 bg-slate-50 border-l border-slate-100 items-center justify-center p-8 overflow-hidden relative">
-              <div className="w-full h-full bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden relative">
+            <div className="hidden md:flex w-1/2 bg-slate-100/50 border-l border-slate-200 flex-col items-center justify-center p-6 relative">
+              <div className="absolute top-4 right-4 z-10 flex gap-2">
+                <a href={previewUrl} target="_blank" rel="noreferrer" className="bg-white/80 backdrop-blur p-2 rounded-lg shadow-sm text-slate-500 hover:text-blue-600 border border-slate-200 transition-all" title="Open in new tab">
+                  <Upload className="w-4 h-4" />
+                </a>
+                <button
+                  onClick={() => setPreviewUrl(null)}
+                  className="bg-white/80 backdrop-blur p-2 rounded-lg shadow-sm text-slate-500 hover:text-rose-500 border border-slate-200 transition-all"
+                  title="Close Preview"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="w-full h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative group">
                 {previewType === 'image' ? (
                   <img
                     src={previewUrl}
@@ -608,25 +1088,25 @@ export default function CreateWorkOrderDialog({
                     title="PDF Preview"
                   />
                 )}
-                <div className="absolute top-6 right-6 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPreviewUrl(null);
-                      setPreviewType('image'); // reset
-                      // optionally clear selectedFiles if desired, but user might want to keep attachment but close preview
-                    }}
-                    className="bg-white/90 backdrop-blur p-3 rounded-xl shadow-lg text-slate-400 hover:text-rose-500 transition-all border border-slate-100"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                  <p className="text-white text-xs font-medium truncate">Previewing Uploaded Document</p>
                 </div>
               </div>
+              <p className="mt-3 text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> AI Analysis Active
+              </p>
             </div>
           )}
         </div>
       </DialogContent>
-    </Dialog>
+
+      <AddShopDialog
+        open={isAddShopOpen}
+        onOpenChange={setIsAddShopOpen}
+        onShopAdded={handleShopAdded}
+        initialData={shopInitialData}
+      />
+    </Dialog >
   );
 }
 

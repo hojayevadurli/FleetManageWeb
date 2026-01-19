@@ -54,8 +54,11 @@ interface EditWorkOrderDialogProps {
   onWorkOrderUpdated: () => void; // refresh list in parent
 }
 
+import WriteReviewDialog from "@/components/shops/WriteReviewDialog";
+
 const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated }: EditWorkOrderDialogProps) => {
   const [loading, setLoading] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   // Keep a local copy so we can refresh documents after upload
   const [currentWo, setCurrentWo] = useState<WorkOrderDto | null>(null);
@@ -337,9 +340,19 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-7xl w-full h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem]">
-        <DialogHeader className="px-10 py-8 border-b border-slate-100 bg-white sticky top-0 z-10">
-          <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight">Edit Work Order - {shortWoNumber(currentWo)}</DialogTitle>
-          <DialogDescription className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Update work order details, status, and attachments</DialogDescription>
+        <DialogHeader className="px-10 py-8 border-b border-slate-100 bg-white sticky top-0 z-10 flex flex-row items-center justify-between">
+          <div>
+            <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight">Edit Work Order - {shortWoNumber(currentWo)}</DialogTitle>
+            <DialogDescription className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Update work order details, status, and attachments</DialogDescription>
+          </div>
+          {(currentWo.status === 'Closed' || currentWo.status === 'Paid') && currentWo.vendorId && (
+            <Button
+              onClick={() => setIsReviewOpen(true)}
+              className="bg-amber-400 hover:bg-amber-500 text-slate-900 font-black text-xs uppercase tracking-widest rounded-xl shadow-lg active:scale-95 transition-all"
+            >
+              <Sparkles className="w-4 h-4 mr-2" /> Rate This Service
+            </Button>
+          )}
         </DialogHeader>
 
         <div className="flex-1 flex overflow-hidden">
@@ -644,6 +657,26 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
           )}
         </div>
       </DialogContent>
+
+      {currentWo.vendorId && (
+        <WriteReviewDialog
+          open={isReviewOpen}
+          onOpenChange={setIsReviewOpen}
+          shopId={currentWo.vendorId}
+          shopName={editData.vendor_name || "Unknown Shop"}
+          onReviewSubmitted={() => {
+            toast.success("Review submitted successfully");
+            setIsReviewOpen(false);
+          }}
+          context={{
+            workOrderId: currentWo.id,
+            workOrderNumber: shortWoNumber(currentWo),
+            serviceDate: new Date(currentWo.openedAt).toLocaleDateString(),
+            totalCost: currentWo.manualActualTotal || currentWo.estimatedTotal || 0,
+            assetName: editData.vehicle_id // We might need to fetch name, but ID is okay for now or use editData derived logic if complex
+          }}
+        />
+      )}
     </Dialog>
   );
 };

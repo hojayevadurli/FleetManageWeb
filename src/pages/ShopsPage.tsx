@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Search,
   Map as MapIcon,
@@ -6,10 +6,13 @@ import {
   Plus,
   Filter,
   Sparkles,
+  X,
+  Star,
+  RotateCcw,
 } from "lucide-react";
-import { Shop } from "@/components/shops/types/ShopTypes";
+import { Shop, VENDOR_PREFERENCE_CONFIG, SERVICE_SPECIALTIES } from "@/components/shops/types/ShopTypes";
 import ShopCard from "@/components/shops/ShopCard";
-import ShopMap from "@/pages/ShopMap"; // Updating import path to local file if it was moved or just using the one we edited
+import ShopMap from "@/pages/ShopMap";
 import AddShopDialog from "@/components/shops/AddShopDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -17,6 +20,18 @@ import { shopsApi } from "@/lib/shopsApi";
 import { Loader } from "@googlemaps/js-api-loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
 
@@ -25,21 +40,67 @@ const ShopsPage = () => {
   const [shops, setShops] = useState<Shop[]>([]);
   const [filteredShops, setFilteredShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
   const [isAddShopOpen, setIsAddShopOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   // Map & Search States
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   // Filter States
-  const [tierFilter, setTierFilter] = useState('ALL');
-  const [auditFilter, setAuditFilter] = useState('ALL');
-  const [priceFilter, setPriceFilter] = useState('ALL');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [tierFilter, setTierFilter] = useState<string[]>([]);
+  const [specialtyFilter, setSpecialtyFilter] = useState<string[]>([]);
+  const [ratingFilter, setRatingFilter] = useState<string>("ALL");
   const [sortBy, setSortBy] = useState('name');
+
+  // Computed stats for filter badges and summary
+  const shopStats = useMemo(() => {
+    const tierCounts = {
+      preferred: shops.filter(s => s.vendor_preference === 'PREFERRED').length,
+      standard: shops.filter(s => s.vendor_preference === 'STANDARD').length,
+      warning: shops.filter(s => s.vendor_preference === 'RESTRICTED').length,
+      new: shops.filter(s => s.vendor_preference === 'NEW').length,
+      partner: shops.filter(s => s.vendor_preference === 'PARTNER').length,
+    };
+
+    // Calculate counts for each specialty
+    const specialtyCounts: Record<string, number> = {};
+    SERVICE_SPECIALTIES.forEach(spec => {
+      // Check if shop has this specialty (case insensitive partial match or direct match)
+      specialtyCounts[spec] = shops.filter(s =>
+        s.specialties && s.specialties.some(shopSpec => shopSpec.toLowerCase() === spec.toLowerCase())
+      ).length;
+    });
+
+    const avgRating = shops.length > 0
+      ? shops.reduce((acc, s) => acc + (s.average_rating || 0), 0) / shops.length
+      : 0;
+    const shopsWithCoords = shops.filter(s => s.latitude && s.longitude).length;
+    return { tierCounts, specialtyCounts, avgRating, shopsWithCoords };
+  }, [shops]);
+
+  // Check if any filters are active
+  const activeFiltersCount = tierFilter.length + specialtyFilter.length + (ratingFilter !== 'ALL' ? 1 : 0);
+  const hasActiveFilters = activeFiltersCount > 0 || searchTerm !== '';
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setTierFilter([]);
+    setSpecialtyFilter([]);
+    setRatingFilter('ALL');
+    setSearchTerm('');
+  };
+
+  const removeSpecialtyFilter = (spec: string) => {
+    setSpecialtyFilter(prev => prev.filter(s => s !== spec));
+  };
+
+  const removeTierFilter = (tier: string) => {
+    setTierFilter(prev => prev.filter(t => t !== tier));
+  };
 
   useEffect(() => {
     loadShops();
@@ -47,15 +108,13 @@ const ShopsPage = () => {
   }, []);
 
   useEffect(() => {
-    console.log("ShopsPage: filtering shops...", { shopsCount: shops.length, filters: { searchTerm, tierFilter, auditFilter, priceFilter, sortBy } });
     filterShops();
-  }, [shops, searchTerm, tierFilter, auditFilter, priceFilter, sortBy]);
+  }, [shops, searchTerm, tierFilter, specialtyFilter, ratingFilter, sortBy]);
 
   const loadShops = async () => {
     setLoading(true);
     try {
       const data = await shopsApi.list();
-      console.log('Fetched shops:', data);
       setShops(data);
     } catch (error) {
       console.error('Error loading shops:', error);
@@ -94,8 +153,7 @@ const ShopsPage = () => {
             setSearchTerm(place.name || place.formatted_address || "");
             setMapCenter({ lat, lng });
 
-            // If we are in list view, switching to map view might be nice, or just filtering
-            // For now, let's auto-switch to map view if they search for a location
+            // Auto switch to map view
             setView('map');
           }
         });
@@ -112,34 +170,27 @@ const ShopsPage = () => {
     if (searchTerm) {
       filtered = filtered.filter(shop =>
         shop.shop_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        shop.address.toLowerCase().includes(searchTerm.toLowerCase())
+        shop.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (shop.specialties && shop.specialties.some(s => s.toLowerCase().includes(searchTerm.toLowerCase())))
       );
     }
 
-    // Tier filter
-    if (tierFilter !== 'ALL') {
-      const mapping: Record<string, string> = {
-        'PREFERRED': 'green',
-        'STANDARD': 'orange',
-        'WARNING': 'red'
-      };
-      filtered = filtered.filter(shop => shop.rate_category === mapping[tierFilter]);
+    // Tier filter (Multi-select OR logic)
+    if (tierFilter.length > 0) {
+      filtered = filtered.filter(shop => tierFilter.includes(shop.vendor_preference));
     }
 
-    // Audit filter (Rating)
-    if (auditFilter !== 'ALL') {
-      const minStars = parseFloat(auditFilter.split('+')[0]);
+    // Specialty filter (Multi-select OR logic)
+    if (specialtyFilter.length > 0) {
+      filtered = filtered.filter(shop =>
+        shop.specialties && shop.specialties.some(s => specialtyFilter.some(filter => filter.toLowerCase() === s.toLowerCase()))
+      );
+    }
+
+    // Rating Filter
+    if (ratingFilter !== 'ALL') {
+      const minStars = parseFloat(ratingFilter);
       filtered = filtered.filter(shop => (shop.average_rating || 0) >= minStars);
-    }
-
-    // Price filter (Labor Rate)
-    if (priceFilter !== 'ALL') {
-      const levels = priceFilter.length; // '$' = 1, '$$' = 2, '$$$' = 3
-      filtered = filtered.filter(shop => {
-        if (levels === 3) return shop.labor_rate > 150;
-        if (levels === 2) return shop.labor_rate > 100 && shop.labor_rate <= 150;
-        return shop.labor_rate <= 100;
-      });
     }
 
     // Sorting
@@ -153,13 +204,28 @@ const ShopsPage = () => {
       filtered.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
     }
 
-    console.log("ShopsPage: filteredShops count:", filtered.length);
     setFilteredShops(filtered);
+  };
+
+  const toggleTier = (tier: string) => {
+    setTierFilter(prev =>
+      prev.includes(tier)
+        ? prev.filter(t => t !== tier)
+        : [...prev, tier]
+    );
+  };
+
+  const toggleSpecialty = (spec: string) => {
+    setSpecialtyFilter(prev =>
+      prev.includes(spec)
+        ? prev.filter(s => s !== spec)
+        : [...prev, spec]
+    );
   };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-20">
-      <div className="max-w-7xl mx-auto px-8 py-10 space-y-12">
+      <div className="max-w-7xl mx-auto px-8 py-10 space-y-8">
 
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
@@ -202,144 +268,278 @@ const ShopsPage = () => {
           </div>
         </div>
 
-        {/* Search & Global Filter Bar */}
-        <div className="flex flex-col lg:flex-row items-center gap-6">
-          <div className="relative flex-1 group w-full">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+        {/* Search & Filter Bar */}
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 group">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
             <Input
               ref={searchInputRef}
               type="text"
-              placeholder="Search or find location..."
-              className="w-full pl-16 pr-8 py-6 bg-white border border-slate-100 rounded-[2.5rem] text-sm font-black text-slate-900 outline-none shadow-sm focus-visible:ring-4 focus-visible:ring-blue-500/5 focus-visible:border-blue-500 transition-all h-auto"
+              placeholder="Search shops, locations, or services..."
+              className="w-full pl-14 pr-8 py-6 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 shadow-sm focus-visible:ring-4 focus-visible:ring-blue-500/10 transition-all h-auto"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" className="flex items-center gap-3 px-8 py-6 bg-white border border-slate-100 rounded-[2.5rem] text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 hover:border-blue-100 transition-all shadow-sm h-auto">
-            <Filter className="w-4 h-4" /> Apply Filters
-          </Button>
-        </div>
 
-        {/* Dark Filter Console */}
-        <div className="bg-[#0F172A] rounded-[3rem] p-10 shadow-2xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-8 opacity-20 group-hover:opacity-40 transition-opacity">
-            <Sparkles className="w-20 h-20 text-blue-400" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative z-10">
-            {/* Network Tier */}
-            <div className="space-y-5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Network Tier</label>
-              <div className="flex bg-slate-800/50 p-1.5 rounded-2xl border border-slate-700">
-                {['ALL', 'PREFERRED', 'STANDARD', 'WARNING'].map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setTierFilter(t)}
-                    className={`flex-1 py-2.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${tierFilter === t ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Minimum Audit */}
-            <div className="space-y-5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Minimum Performance Audit</label>
-              <div className="flex bg-slate-800/50 p-1.5 rounded-2xl border border-slate-700">
-                {['ALL', '3+ STARS', '4+ STARS', '4.5+ STARS'].map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setAuditFilter(s)}
-                    className={`flex-1 py-2.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${auditFilter === s ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Pricing Strategy */}
-            <div className="space-y-5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Pricing Strategy</label>
-              <div className="flex bg-slate-800/50 p-1.5 rounded-2xl border border-slate-700">
-                {['ALL', '$', '$$', '$$$'].map(p => (
-                  <button
-                    key={p}
-                    onClick={() => setPriceFilter(p)}
-                    className={`flex-1 py-2.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${priceFilter === p ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Area */}
-        <div className="pt-4">
-          {/* Shop Count & Sorting */}
-          {!loading && (
-            <div className="flex items-center justify-between mb-6">
-              <p className="text-sm font-bold text-slate-500">
-                Showing <span className="text-slate-900 font-black">{filteredShops.length}</span> of <span className="text-slate-900 font-black">{shops.length}</span> vendors
-              </p>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sort by:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                >
-                  <option value="name">Name</option>
-                  <option value="rating">Rating</option>
-                  <option value="rate">Labor Rate</option>
-                  <option value="recent">Recently Added</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[3rem] border border-slate-100 italic font-black text-slate-300 uppercase tracking-[0.3em]">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-              Orchestrating Network Data...
-            </div>
-          ) : view === 'list' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredShops.map(shop => (
-                <ShopCard
-                  key={shop.id}
-                  shop={shop}
-                  onClick={() => navigate(`/app/shops/${shop.id}`)}
-                />
-              ))}
-              {filteredShops.length === 0 && (
-                <div className="col-span-full py-16 text-center bg-white rounded-[3rem] border border-slate-100">
-                  <div className="space-y-4">
-                    <p className="text-lg font-black text-slate-400">No vendors found</p>
-                    <p className="text-sm text-slate-400">Try adjusting your filters or add a new vendor</p>
-                    <button
-                      onClick={() => setIsAddShopOpen(true)}
-                      className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all"
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button
+                variant="outline"
+                className={`flex items-center gap-3 px-6 py-6 border rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm h-auto transition-all ${activeFiltersCount > 0 ? 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200'}`}
+              >
+                <Filter className="w-4 h-4" />
+                Filters
+                {activeFiltersCount > 0 && (
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-white/20 text-white text-[9px]">
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="w-[400px] sm:w-[450px] overflow-y-auto bg-white">
+              <SheetHeader className="mb-8">
+                <SheetTitle className="text-2xl font-black text-slate-900 flex items-center justify-between">
+                  <span>Filters</span>
+                  {activeFiltersCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearAllFilters}
+                      className="text-xs font-bold text-slate-400 hover:text-red-500 uppercase tracking-wider"
                     >
-                      + Add Vendor
-                    </button>
+                      Reset All
+                    </Button>
+                  )}
+                </SheetTitle>
+                <SheetDescription>
+                  Refine your search by network tier, rating, and services.
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="space-y-8">
+                {/* Network Tier Section */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Network Tier</h3>
+                  <div className="space-y-3">
+                    {[
+                      { key: 'NEW', label: VENDOR_PREFERENCE_CONFIG.NEW.label, count: shopStats.tierCounts.new, color: 'bg-blue-500' },
+                      { key: 'PARTNER', label: VENDOR_PREFERENCE_CONFIG.PARTNER.label, count: shopStats.tierCounts.partner, color: 'bg-indigo-500' },
+                      { key: 'PREFERRED', label: VENDOR_PREFERENCE_CONFIG.PREFERRED.label, count: shopStats.tierCounts.preferred, color: 'bg-emerald-500' },
+                      { key: 'STANDARD', label: VENDOR_PREFERENCE_CONFIG.STANDARD.label, count: shopStats.tierCounts.standard, color: 'bg-orange-500' },
+                      { key: 'RESTRICTED', label: VENDOR_PREFERENCE_CONFIG.RESTRICTED.label, count: shopStats.tierCounts.warning, color: 'bg-rose-500' },
+                    ].map((tier) => (
+                      <div key={tier.key} className="flex items-center space-x-3">
+                        <Checkbox
+                          id={`tier-${tier.key}`}
+                          checked={tierFilter.includes(tier.key)}
+                          onCheckedChange={() => toggleTier(tier.key)}
+                        />
+                        <label
+                          htmlFor={`tier-${tier.key}`}
+                          className="text-sm font-bold text-slate-700 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 flex justify-between items-center cursor-pointer select-none py-1"
+                        >
+                          <span className="flex items-center gap-2">
+                            {tier.label}
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tier.count > 0 ? 'bg-slate-100 text-slate-600' : 'bg-slate-50 text-slate-300'}`}>
+                            {tier.count}
+                          </span>
+                        </label>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-sm overflow-hidden min-h-[600px] relative">
-              <ShopMap shops={filteredShops} center={mapCenter} />
-            </div>
-          )}
+
+                <div className="h-px bg-slate-100" />
+
+                {/* Rating Section */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Min Rating</h3>
+                  <RadioGroup value={ratingFilter} onValueChange={setRatingFilter}>
+                    <div className="flex items-center space-x-3">
+                      <RadioGroupItem value="ALL" id="r-all" />
+                      <Label htmlFor="r-all" className="text-sm font-medium text-slate-700 cursor-pointer">All Ratings</Label>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <RadioGroupItem value="3" id="r-3" />
+                      <Label htmlFor="r-3" className="text-sm font-medium text-slate-700 cursor-pointer flex items-center gap-1">
+                        3+ <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <RadioGroupItem value="4" id="r-4" />
+                      <Label htmlFor="r-4" className="text-sm font-medium text-slate-700 cursor-pointer flex items-center gap-1">
+                        4+ <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <RadioGroupItem value="4.5" id="r-4.5" />
+                      <Label htmlFor="r-4.5" className="text-sm font-medium text-slate-700 cursor-pointer flex items-center gap-1">
+                        4.5+ <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="h-px bg-slate-100" />
+
+                {/* Specialties Section */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Specialties</h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    {SERVICE_SPECIALTIES.map((spec) => (
+                      <div key={spec} className="flex items-center space-x-3">
+                        <Checkbox
+                          id={`spec-${spec}`}
+                          checked={specialtyFilter.includes(spec)}
+                          onCheckedChange={() => toggleSpecialty(spec)}
+                        />
+                        <label
+                          htmlFor={`spec-${spec}`}
+                          className="text-sm font-medium text-slate-700 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 flex justify-between items-center cursor-pointer select-none py-1"
+                        >
+                          <span>{spec}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${shopStats.specialtyCounts[spec] > 0 ? 'bg-slate-100 text-slate-600' : 'bg-slate-50 text-slate-300'}`}>
+                            {shopStats.specialtyCounts[spec] || 0}
+                          </span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+              <SheetFooter className="mt-12">
+                {/* Footer content if needed */}
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
         </div>
 
+        {/* Active Filter Chips */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap gap-2 items-center animate-in fade-in slide-in-from-top-2 duration-300">
+            <span className="text-xs font-bold text-slate-400 uppercase mr-2">Using Filters:</span>
+
+            {tierFilter.map(tier => (
+              <div key={tier} className="flex items-center gap-1 pl-3 pr-2 py-1.5 bg-slate-900 text-white rounded-full text-xs font-bold shadow-sm">
+                <span>{VENDOR_PREFERENCE_CONFIG[tier as keyof typeof VENDOR_PREFERENCE_CONFIG]?.label || tier}</span>
+                <button onClick={() => removeTierFilter(tier)} className="p-0.5 hover:bg-white/20 rounded-full ml-1">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+
+            {ratingFilter !== 'ALL' && (
+              <div className="flex items-center gap-1 pl-3 pr-2 py-1.5 bg-slate-900 text-white rounded-full text-xs font-bold shadow-sm">
+                <span className="flex items-center gap-1">{ratingFilter}+ <Star className="w-3 h-3 fill-white text-white" /></span>
+                <button onClick={() => setRatingFilter('ALL')} className="p-0.5 hover:bg-white/20 rounded-full ml-1">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            {specialtyFilter.map(spec => (
+              <div key={spec} className="flex items-center gap-1 pl-3 pr-2 py-1.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-full text-xs font-bold shadow-sm">
+                <span>{spec}</span>
+                <button onClick={() => removeSpecialtyFilter(spec)} className="p-0.5 hover:bg-slate-200 rounded-full ml-1 text-slate-500">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+
+            <button
+              onClick={clearAllFilters}
+              className="text-xs font-bold text-red-500 hover:text-red-600 hover:underline px-3"
+            >
+              Clear All
+            </button>
+          </div>
+        )}
+
+        {/* Shop Count & Sorting */}
+        {!loading && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            {/* Stats Summary */}
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm font-bold text-slate-600">
+                Showing <span className="text-slate-900 font-black">{filteredShops.length}</span> of <span className="text-slate-900 font-black">{shops.length}</span> vendors
+              </p>
+              <span className="text-slate-300">•</span>
+              <div className="flex items-center gap-1.5 text-sm font-bold text-emerald-600">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                {shopStats.tierCounts.preferred} preferred
+              </div>
+              <span className="text-slate-300">•</span>
+              <div className="flex items-center gap-1 text-sm font-bold text-amber-600">
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                {shopStats.avgRating.toFixed(1)} avg
+              </div>
+              {view === 'map' && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <div className="flex items-center gap-1.5 text-sm font-bold text-blue-600">
+                    <MapIcon className="w-3.5 h-3.5" />
+                    {shopStats.shopsWithCoords} on map
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sort by:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
+              >
+                <option value="name">Name (A-Z)</option>
+                <option value="rating">Highest Rated</option>
+                <option value="rate">Lowest Rate</option>
+                <option value="recent">Recently Added</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Content Area */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[3rem] border border-slate-100 italic font-black text-slate-300 uppercase tracking-[0.3em]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            Orchestrating Network Data...
+          </div>
+        ) : view === 'list' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredShops.map(shop => (
+              <ShopCard
+                key={shop.id}
+                shop={shop}
+                onClick={() => navigate(`/app/shops/${shop.id}`)}
+              />
+            ))}
+            {filteredShops.length === 0 && (
+              <div className="col-span-full py-16 text-center bg-white rounded-[3rem] border border-slate-100">
+                <div className="space-y-4">
+                  <p className="text-lg font-black text-slate-400">No vendors found</p>
+                  <p className="text-sm text-slate-400">Try adjusting your filters or add a new vendor</p>
+                  <button
+                    onClick={() => setIsAddShopOpen(true)}
+                    className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition-all"
+                  >
+                    + Add Vendor
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-sm overflow-hidden min-h-[600px] relative">
+            <ShopMap shops={filteredShops} center={mapCenter} />
+          </div>
+        )
+        }
       </div>
 
       <AddShopDialog
