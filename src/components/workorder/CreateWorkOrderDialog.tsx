@@ -132,7 +132,11 @@ export default function CreateWorkOrderDialog({
   const [shopInitialData, setShopInitialData] = useState<Partial<ShopFormData>>({});
   const [parsedVendorDetails, setParsedVendorDetails] = useState<{
     name: string;
-    address: string;
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+    address: string; // Keep full formatted address for display
     phone?: string;
     website?: string;
   } | null>(null);
@@ -523,7 +527,11 @@ export default function CreateWorkOrderDialog({
 
             setParsedVendorDetails({
               name: result.businessName,
-              address: `${result.businessAddress.street} ${result.businessAddress.city} ${result.businessAddress.state}`.trim(),
+              street: result.businessAddress?.street || "",
+              city: result.businessAddress?.city || "",
+              state: result.businessAddress?.state || "",
+              zip: result.businessAddress?.zip || "",
+              address: `${result.businessAddress?.street || ""} ${result.businessAddress?.city || ""} ${result.businessAddress?.state || ""}`.trim(),
               phone: result.businessContact?.phone,
               website: result.businessContact?.website
             });
@@ -843,7 +851,10 @@ export default function CreateWorkOrderDialog({
                                 e.stopPropagation();
                                 setShopInitialData({
                                   shop_name: parsedVendorDetails?.name,
-                                  address: parsedVendorDetails?.address,
+                                  address: parsedVendorDetails?.street || parsedVendorDetails?.address, // Prefer street for the input
+                                  city: parsedVendorDetails?.city,
+                                  state: parsedVendorDetails?.state,
+                                  zip: parsedVendorDetails?.zip,
                                   phone: parsedVendorDetails?.phone,
                                   website: parsedVendorDetails?.website,
                                   vendor_preference: "STANDARD"
