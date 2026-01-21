@@ -143,7 +143,12 @@ const ShopReviewsList = ({ shopId }: { shopId: string }) => {
             try {
                 const data = await shopsApi.getRatings(shopId);
                 // Sort by date desc
-                const sorted = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const sorted = data.sort((a, b) => {
+                    const dateA = new Date(a.created_at || (a as any).createdAt);
+                    const dateB = new Date(b.created_at || (b as any).createdAt);
+                    return dateB.getTime() - dateA.getTime();
+                });
                 setReviews(sorted);
             } catch (error) {
                 console.error("Failed to fetch reviews:", error);
@@ -167,41 +172,48 @@ const ShopReviewsList = ({ shopId }: { shopId: string }) => {
 
     return (
         <div className="space-y-4 animate-in fade-in duration-300">
-            {reviews.map((review) => (
-                <div key={review.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
-                                <User className="w-4 h-4" />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <div className="text-sm font-bold text-slate-900">Verified User</div>
-                                    {review.work_order_id && (
-                                        <div className="bg-green-100 text-green-700 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                                            <ShieldCheck className="w-2.5 h-2.5" /> Verified Order
-                                        </div>
-                                    )}
+            {reviews.map((review) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const createdDate = new Date(review.created_at || (review as any).createdAt);
+
+                return (
+                    <div key={review.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
+                                    <User className="w-4 h-4" />
                                 </div>
-                                <div className="text-[10px] text-slate-400">{new Date(review.created_at).toLocaleDateString()}</div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-sm font-bold text-slate-900">Verified User</div>
+                                        {review.work_order_id && (
+                                            <div className="bg-green-100 text-green-700 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                                                <ShieldCheck className="w-2.5 h-2.5" /> Verified Order
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="text-[10px] text-slate-400">
+                                        {!isNaN(createdDate.getTime()) ? createdDate.toLocaleDateString() : 'Date unavailable'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex gap-1">
+                                {[...Array(5)].map((_, i) => (
+                                    <Star key={i} className={`w-3.5 h-3.5 ${i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+                                ))}
                             </div>
                         </div>
-                        <div className="flex gap-1">
-                            {[...Array(5)].map((_, i) => (
-                                <Star key={i} className={`w-3.5 h-3.5 ${i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
-                            ))}
-                        </div>
+                        {review.service_date && (
+                            <div className="text-xs text-slate-400 mb-2 font-medium bg-slate-50 inline-block px-2 py-1 rounded-lg">
+                                Service Date: {new Date(review.service_date).toLocaleDateString()}
+                            </div>
+                        )}
+                        <p className="text-slate-600 text-sm leading-relaxed">
+                            {review.review_text || <span className="italic text-slate-400">No written review.</span>}
+                        </p>
                     </div>
-                    {review.service_date && (
-                        <div className="text-xs text-slate-400 mb-2 font-medium bg-slate-50 inline-block px-2 py-1 rounded-lg">
-                            Service Date: {new Date(review.service_date).toLocaleDateString()}
-                        </div>
-                    )}
-                    <p className="text-slate-600 text-sm leading-relaxed">
-                        {review.review_text || <span className="italic text-slate-400">No written review.</span>}
-                    </p>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 };
