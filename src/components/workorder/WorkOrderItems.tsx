@@ -83,9 +83,12 @@ const WorkOrderItems = ({ items, onItemsChange }: WorkOrderItemsProps) => {
         ) : (
           <ul className="divide-y divide-slate-100">
             {items.map((item, index) => (
-              <li key={index} className="group flex items-center p-3 hover:bg-slate-50 transition-colors">
-                <span className="text-slate-300 mr-3 text-lg">•</span>
+              <li key={index} className="group flex items-start p-3 hover:bg-slate-50 transition-colors gap-3">
+                <span className="text-slate-300 mr-1 text-lg pt-1">•</span>
+
+                {/* Description */}
                 <div className="flex-1">
+                  <Label className="text-[10px] uppercase text-slate-400 font-bold mb-1 block">Description</Label>
                   <Input
                     value={item.description}
                     onChange={(e) => handleUpdateDescription(index, e.target.value)}
@@ -93,15 +96,64 @@ const WorkOrderItems = ({ items, onItemsChange }: WorkOrderItemsProps) => {
                     placeholder="Describe service performed..."
                   />
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
-                  onClick={() => handleDeleteItem(index)}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
+
+                {/* Quantity */}
+                <div className="w-20">
+                  <Label className="text-[10px] uppercase text-slate-400 font-bold mb-1 block">Qty</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={item.quantity}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      const newItems = [...items];
+                      newItems[index].quantity = isNaN(val) ? 0 : val;
+                      onItemsChange(newItems);
+                    }}
+                    className="h-8 text-right font-mono text-xs"
+                  />
+                </div>
+
+                {/* Unit Price */}
+                <div className="w-28 relative">
+                  <Label className="text-[10px] uppercase text-slate-400 font-bold mb-1 block">Unit Price</Label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.price}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        const newItems = [...items];
+                        newItems[index].price = isNaN(val) ? 0 : val;
+                        onItemsChange(newItems);
+                      }}
+                      className="h-8 pl-5 text-right font-mono text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Amount Display (Read Only) */}
+                <div className="w-24 text-right pt-6">
+                  <div className="text-xs font-bold text-slate-700">
+                    ${((item.price || 0) * (item.quantity || 0)).toFixed(2)}
+                  </div>
+                </div>
+
+                <div className="pt-5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                    onClick={() => handleDeleteItem(index)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               </li>
             ))}
             {/* Footer Add Button */}

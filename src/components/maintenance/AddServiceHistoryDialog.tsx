@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import AddShopDialog from "./AddShopDialog";
+import AddShopDialog from "@/components/shops/AddShopDialog";
 import InvoiceUpload from "./InvoiceUpload";
 import ServiceHistoryFormFields from "./ServiceHistoryFormFields";
 import { useServiceHistoryForm } from "./hooks/useServiceHistoryForm";
@@ -25,11 +25,14 @@ const AddServiceHistoryDialog = ({ open, onOpenChange, onAddRecord }: AddService
     handleSubmit
   } = useServiceHistoryForm(onAddRecord, () => onOpenChange(false));
 
-  const handleShopAdded = (shop: any) => {
-    handleChange("shop_id", shop.id);
-    // Refresh shops in combobox
-    if ((window as any).refreshShops) {
-      (window as any).refreshShops();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleShopAdded = (shop?: any) => {
+    if (shop?.id) {
+      handleChange("shop_id", shop.id);
+      // Refresh shops in combobox
+      if ((window as any).refreshShops) {
+        (window as any).refreshShops();
+      }
     }
   };
 

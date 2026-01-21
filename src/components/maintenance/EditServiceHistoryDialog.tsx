@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import AddShopDialog from "./AddShopDialog";
+import AddShopDialog from "@/components/shops/AddShopDialog";
 import EditServiceForm from "./EditServiceForm";
 import { useServiceRecordForm } from "./hooks/useServiceRecordForm";
 import { ServiceRecord } from "./types/ServiceHistoryTypes";
@@ -13,14 +13,14 @@ interface EditServiceHistoryDialogProps {
   record: ServiceRecord | null;
 }
 
-const EditServiceHistoryDialog = ({ 
-  open, 
-  onOpenChange, 
-  onUpdateRecord, 
-  record 
+const EditServiceHistoryDialog = ({
+  open,
+  onOpenChange,
+  onUpdateRecord,
+  record
 }: EditServiceHistoryDialogProps) => {
   const [isAddShopOpen, setIsAddShopOpen] = useState(false);
-  
+
   const {
     formData,
     isLoading,
@@ -34,10 +34,13 @@ const EditServiceHistoryDialog = ({
     onClose: () => onOpenChange(false)
   });
 
-  const handleShopAdded = (shop: any) => {
-    handleChange("shop_id", shop.id);
-    if ((window as any).refreshShops) {
-      (window as any).refreshShops();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleShopAdded = (shop?: any) => {
+    if (shop?.id) {
+      handleChange("shop_id", shop.id);
+      if ((window as any).refreshShops) {
+        (window as any).refreshShops();
+      }
     }
   };
 
@@ -48,7 +51,7 @@ const EditServiceHistoryDialog = ({
           <DialogHeader>
             <DialogTitle>Edit Service Record</DialogTitle>
           </DialogHeader>
-          
+
           <EditServiceForm
             formData={formData}
             onFieldChange={handleChange}
