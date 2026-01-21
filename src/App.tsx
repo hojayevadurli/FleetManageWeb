@@ -12,6 +12,7 @@ import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
+import ConfirmEmail from "./pages/ConfirmEmail";
 import NotFound from "./pages/NotFound";
 import Equipment from "./pages/Equipment";
 import WorkOrders from "./pages/WorkOrders";
@@ -153,6 +154,8 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             {/* Backend sends /reset link */}
             <Route path="/reset" element={<ResetPassword />} />
+            {/* Backend sends /confirm-email link */}
+            <Route path="/confirm-email" element={<ConfirmEmail />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/app/*" element={
               <ProtectedRoute>
