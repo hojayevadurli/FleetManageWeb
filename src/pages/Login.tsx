@@ -70,7 +70,7 @@ export default function Login() {
           setError(res.error);
         } else {
           // ✅ no auto-login: tell user to sign in
-          setSuccess("Company created. Please sign in.");
+          setSuccess("Company created! Please check your email to verify your account before logging in.");
           setMode("login");
           setPassword("");
           setConfirmPassword("");

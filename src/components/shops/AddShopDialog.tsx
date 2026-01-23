@@ -4,10 +4,12 @@ import {
   Globe, Search, ChevronRight, X, Tag, CheckCircle2, Loader2, ShieldCheck,
   MapPin, Phone, Star, Building2, User, Sparkles
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { Shop, ShopFormData, VENDOR_PREFERENCE_CONFIG, PREFERENCE_TO_RATE_CATEGORY, SERVICE_SPECIALTIES } from "./types/ShopTypes";
 import { searchVendorSuggestions, fetchDetailedVendorInfo } from "@/lib/gemini";
 import { useToast } from "@/hooks/use-toast";
 import { shopsApi } from "@/lib/shopsApi";
+import ShopRatingInputs, { ShopRatingData } from "./ShopRatingInputs";
 
 interface AddShopDialogProps {
   open: boolean;
@@ -51,6 +53,16 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [autoFilledName, setAutoFilledName] = useState(false); // New state for visual indicator
+
+  const [ratingData, setRatingData] = useState<ShopRatingData>({
+    mainRating: 0,
+    qualityRating: 0,
+    timelinessRating: 0,
+    communicationRating: 0,
+    valueRating: 0,
+    wouldRecommend: null,
+    comment: ""
+  });
 
   const validate = (data: ShopFormData) => {
     const newErrors: Record<string, string> = {};
@@ -159,6 +171,16 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
             city: "",
             state: "",
             zip: ""
+          });
+          // Reset rating data
+          setRatingData({
+            mainRating: 0,
+            qualityRating: 0,
+            timelinessRating: 0,
+            communicationRating: 0,
+            valueRating: 0,
+            wouldRecommend: null,
+            comment: ""
           });
         }
       }
@@ -345,6 +367,31 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
         onOpenChange(false);
       } else {
         const newShop = await shopsApi.create(shopData);
+
+        // Handle Rating Submission if provided
+        if (ratingData.mainRating > 0) {
+          try {
+            await shopsApi.createRating(newShop.id, {
+              rating: ratingData.mainRating,
+              reviewText: ratingData.comment,
+              serviceDate: new Date().toISOString(),
+              qualityRating: ratingData.qualityRating,
+              timelinessRating: ratingData.timelinessRating,
+              communicationRating: ratingData.communicationRating,
+              valueRating: ratingData.valueRating,
+              wouldRecommend: ratingData.wouldRecommend === true
+            });
+            console.log("AddShopDialog: Rating submitted successfully");
+          } catch (ratingErr) {
+            console.error("AddShopDialog: Failed to submit rating", ratingErr);
+            toast({
+              title: "Shop created, but rating failed",
+              description: "The shop was saved but the rating could not be added.",
+              variant: "destructive"
+            });
+          }
+        }
+
         setShowSuccess(true);
         // Delay closing to show success animation
         setTimeout(() => {
@@ -576,7 +623,6 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
         shopNameAutocompleteRef.current.addListener("place_changed", () =>
           handlePlaceSelect(shopNameAutocompleteRef.current!, true));
       } else {
-        console.error("AddShopDialog: shopNameInputRef.current is NULL!");
       }
 
     } catch (e) {
@@ -597,7 +643,9 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMethod, step]);
 
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -956,45 +1004,75 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                       </button>
                     ))}
                   </div>
-                </div>
 
-                <div className="space-y-3 col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Specialties</label>
-                  <div className="flex flex-wrap gap-3">
-                    {SERVICE_SPECIALTIES.map(specialty => (
-                      <button
-                        key={specialty}
-                        type="button"
-                        onClick={() => toggleSpecialty(specialty)}
-                        className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all ${formData.specialties.includes(specialty)
-                          ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20"
-                          : "bg-slate-50 text-slate-500 hover:bg-slate-100"
-                          }`}
-                      >
-                        {specialty}
-                      </button>
-                    ))}
+                  {/* Rating Inputs */}
+                  <div className="space-y-3 col-span-2">
+                    <Label className="text-[10px] font-black uppercase text-slate-500 mb-2 block">Initial Rating (Optional)</Label>
+                    <ShopRatingInputs
+                      data={ratingData}
+                      onChange={setRatingData}
+                      variant="default"
+                    />
+                  </div>
+
+                  <div className="space-y-3 col-span-2">
+                    <Label className="text-[10px] font-black uppercase text-slate-500 mb-2 block">Specialties</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {SERVICE_SPECIALTIES.map(spec => (
+                        <button
+                          key={spec}
+                          type="button"
+                          onClick={() => toggleSpecialty(spec)}
+                          className={`px-4 py-2 rounded-full text-xs font-bold border transition-all ${formData.specialties.includes(spec)
+                            ? "bg-slate-800 text-white border-slate-800 shadow-md transform scale-105"
+                            : "bg-white text-slate-500 border-slate-200 hover:border-blue-300 hover:text-blue-600"
+                            }`}
+                        >
+                          {spec}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Comments */}
+                  <div className="space-y-3 col-span-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Internal Notes</label>
+                    <textarea
+                      className="w-full p-6 bg-slate-50 border-2 border-transparent rounded-[2rem] font-medium text-slate-700 focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-200 outline-none transition-all resize-none min-h-[120px]"
+                      placeholder="Add any internal notes about this shop..."
+                      value={formData.comment}
+                      onChange={e => setFormData(prev => ({ ...prev, comment: e.target.value }))}
+                    />
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-6 pt-6 border-t border-slate-100">
-                {!shopToEdit && (
+                <div className="pt-6 border-t border-slate-100 flex gap-4">
                   <button
                     type="button"
-                    onClick={() => setStep("search")}
-                    className="px-8 py-4 rounded-2xl font-black text-slate-400 uppercase tracking-widest text-xs hover:bg-slate-50 transition-colors"
+                    onClick={() => {
+                      if (step === "details" && selectedMethod === "search") {
+                        setStep("search");
+                      } else {
+                        onOpenChange(false);
+                      }
+                    }}
+                    className="flex-1 py-4 rounded-[1.5rem] font-black text-slate-500 hover:bg-slate-100 transition-colors"
                   >
-                    Back
+                    Cancel
                   </button>
-                )}
-                <button
-                  type="submit"
-                  disabled={isSubmitting || Object.keys(errors).length > 0}
-                  className="flex-1 bg-slate-900 text-white px-8 py-5 rounded-[2rem] font-black uppercase tracking-widest text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:active:scale-100"
-                >
-                  {shopToEdit ? "Save Changes" : "Confirm & Add Shop"} <ChevronRight className="w-5 h-5" />
-                </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="flex-[2] py-4 bg-slate-900 text-white rounded-[1.5rem] font-black hover:bg-slate-800 transition-all transform active:scale-95 shadow-xl shadow-slate-200 disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                      <>
+                        <CheckCircle2 className="w-5 h-5" />
+                        {shopToEdit ? "Update Shop" : "Save Shop"}
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           )}

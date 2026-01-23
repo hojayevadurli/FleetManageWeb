@@ -66,6 +66,10 @@ export async function changePassword(currentPassword: string, newPassword: strin
   await api.post("/Auth/change-password", { currentPassword, newPassword });
 }
 
+export async function confirmEmail(userId: string, token: string): Promise<void> {
+  await api.post("/Auth/confirm-email", { userId, token });
+}
+
 export function isAuthenticated() {
   return !!getToken();
 }
