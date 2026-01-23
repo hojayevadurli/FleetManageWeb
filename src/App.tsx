@@ -24,6 +24,8 @@ import InspectionsPage from "./pages/InspectionsPage";
 import ShopsPage from "./pages/ShopsPage";
 import ShopMap from "./pages/ShopMap";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Terms from "./pages/Terms";
+import Contact from "./pages/Contact";
 import AIChatPage from "./pages/AIChatPage";
 import FleetMap from "./pages/FleetMap";
 import ServiceRecordDetailPage from "./pages/ServiceRecordDetailPage";
@@ -140,6 +142,8 @@ const DashboardHeader = () => {
     </header>
   );
 };
+
+import { HelmetProvider } from "react-helmet-async";
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

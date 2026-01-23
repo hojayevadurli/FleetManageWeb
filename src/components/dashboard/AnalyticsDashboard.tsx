@@ -32,11 +32,11 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
 
     return (
         <div className="space-y-6 pb-12">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-2 pb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
                 <div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Fleet Performance Center</h1>
-                    <p className="text-slate-500 font-medium text-lg mt-3 leading-relaxed">
-                        Track work, control costs, and answer any question about a unit’s history in seconds.
+                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">Fleet Performance Center</h1>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                        Track work, control costs, and answer questions about your fleet
                     </p>
                 </div>
             </div>
