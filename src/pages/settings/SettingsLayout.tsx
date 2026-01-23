@@ -16,10 +16,10 @@ const SettingsLayout = () => {
     return (
         <div className="max-w-5xl mx-auto pb-20 pt-8 px-4 md:px-8 w-full">
             {/* Header */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm mb-8">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Settings</h1>
-                    <p className="text-slate-500 font-medium mt-2">Manage your company profile and preferences</p>
+                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">Settings</h1>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Manage your company profile and preferences</p>
                 </div>
 
                 {/* We might move the global save button here later, but for now specific tabs handle it */}

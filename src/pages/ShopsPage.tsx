@@ -228,22 +228,22 @@ const ShopsPage = () => {
       <div className="max-w-7xl mx-auto px-8 py-10 space-y-8">
 
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-          <div className="space-y-4">
-            <h1 className="text-5xl font-black text-slate-900 tracking-tight">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
               Service Network
             </h1>
-            <p className="text-lg text-slate-500 font-medium max-w-xl">
-              Manage trusted partners, audit performance, and discover new shops across your maintenance cloud.
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+              Manage trusted partners and discover new shops
             </p>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="bg-white p-1.5 rounded-2xl border border-slate-200 flex shadow-sm">
+            <div className="bg-slate-50 p-1.5 rounded-2xl border border-slate-200 flex shadow-sm">
               <Button
                 variant={view === 'list' ? 'default' : 'ghost'}
                 onClick={() => setView('list')}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'list' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 hover:bg-transparent'
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'list' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 hover:bg-transparent'
                   }`}
               >
                 <List className="w-4 h-4" /> List
@@ -251,7 +251,7 @@ const ShopsPage = () => {
               <Button
                 variant={view === 'map' ? 'default' : 'ghost'}
                 onClick={() => setView('map')}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'map' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 hover:bg-transparent'
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'map' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 hover:bg-transparent'
                   }`}
               >
                 <MapIcon className="w-4 h-4" /> Map
@@ -259,11 +259,12 @@ const ShopsPage = () => {
             </div>
 
             <Button
-              variant="outline"
+              size="lg"
               onClick={() => setIsAddShopOpen(true)}
-              className="px-6 py-3 rounded-[1rem] border-2 border-blue-600 text-blue-600 font-bold text-xs uppercase tracking-widest hover:bg-blue-50 transition-all active:scale-95 flex items-center gap-2 h-auto"
+              className="rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-lg active:scale-95 transition-all"
             >
-              <Plus className="w-4 h-4" /> Add Shop
+              <Plus className="h-4 w-4" />
+              Add Shop
             </Button>
           </div>
         </div>

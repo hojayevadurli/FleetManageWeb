@@ -226,8 +226,8 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
                     <div className="flex-1">
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Fleet Control Center</h1>
-                        <p className="text-slate-500 font-medium">Manage assets and service history.</p>
+                        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Fleet Control Center</h1>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Manage assets and service history</p>
                     </div>
                     <div className="flex gap-3">
 

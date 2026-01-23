@@ -101,7 +101,7 @@ const UpcomingMaintenance = () => {
     if (dateRangeFilter !== "all") {
       const today = new Date();
       let endDate = new Date();
-      
+
       switch (dateRangeFilter) {
         case "7days":
           endDate.setDate(today.getDate() + 7);
@@ -136,7 +136,7 @@ const UpcomingMaintenance = () => {
     const today = new Date();
     const weekFromNow = new Date();
     weekFromNow.setDate(today.getDate() + 7);
-    
+
     return maintenanceItems.filter(item => {
       if (!item.due_date) return false;
       const dueDate = new Date(item.due_date);
@@ -158,17 +158,17 @@ const UpcomingMaintenance = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Upcoming Maintenance</h1>
-          <p className="text-gray-600">Schedule and track preventive maintenance</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Upcoming Maintenance</h1>
+          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Schedule and track preventive maintenance</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchUpcomingMaintenance} className="flex items-center gap-2">
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={fetchUpcomingMaintenance} className="flex items-center gap-2 rounded-xl">
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
-          <Button className="flex items-center gap-2">
+          <Button size="lg" className="rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-lg active:scale-95 transition-all">
             <Plus className="h-4 w-4" />
             Schedule Maintenance
           </Button>
