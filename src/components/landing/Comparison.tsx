@@ -49,7 +49,7 @@ const Comparison = () => {
                                     feature: "Cost",
                                     trad: "$$$ (Contracts)",
                                     paper: "Free (Time cost)",
-                                    us: "$5/mo per truck"
+                                    us: "$6/mo per truck"
                                 },
                                 {
                                     feature: "Warranty Tracking",

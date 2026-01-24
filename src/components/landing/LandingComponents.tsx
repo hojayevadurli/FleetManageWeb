@@ -40,7 +40,7 @@ export const Pricing = () => (
                     </div>
 
                     <div className="flex items-baseline justify-center gap-1 mb-2">
-                        <span className="text-5xl font-bold text-white">$5</span>
+                        <span className="text-5xl font-bold text-white">$6</span>
                         <span className="text-slate-400">/month per truck</span>
                     </div>
 
@@ -65,9 +65,9 @@ export const Pricing = () => (
                     <div className="bg-[#0B1121]/50 p-4 rounded-xl mb-8 text-left space-y-2 border border-white/5">
                         <p className="text-slate-300 font-medium text-sm mb-2">Pricing Examples:</p>
                         <ul className="space-y-1 text-sm text-slate-400">
-                            <li className="flex justify-between"><span>1 truck</span> <span>= $5/month</span></li>
-                            <li className="flex justify-between"><span>10 trucks</span> <span>= $50/month</span></li>
-                            <li className="flex justify-between"><span>50 trucks</span> <span>= $250/month</span></li>
+                            <li className="flex justify-between"><span>1 truck</span> <span>= $6/month</span></li>
+                            <li className="flex justify-between"><span>10 trucks</span> <span>= $60/month</span></li>
+                            <li className="flex justify-between"><span>50 trucks</span> <span>= $300/month</span></li>
                         </ul>
                         <p className="text-xs text-slate-500 mt-3 pt-2 border-t border-white/5">
                             Unlimited users & drivers at no extra cost. No per-seat fees.

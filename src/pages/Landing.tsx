@@ -12,7 +12,7 @@ const Landing = () => {
         <div className="min-h-screen bg-[#0F172A] selection:bg-[#4F7CFF] selection:text-white font-sans text-slate-900 antialiased">
             <Helmet>
                 <title>AI Fleet Management Software | FleetManage.ai</title>
-                <meta name="description" content="AI fleet management software for small trucking companies. Track maintenance, scan receipts automatically, and manage repair shops. $5/month, unlimited trucks. Start free." />
+                <meta name="description" content="AI fleet management software for small trucking companies. Track maintenance, scan receipts automatically, and manage repair shops. $6/month, unlimited trucks. Start free." />
                 <meta name="keywords" content="fleet management software, truck maintenance tracking, ai fleet manager, receipt scanner for truckers" />
                 <meta property="og:title" content="AI Fleet Management for Small Trucking Companies" />
                 <meta property="og:description" content="Stop wrestling with paperwork. Talk to your fleet with AI. Track maintenance, warranties, and costs instantly." />
