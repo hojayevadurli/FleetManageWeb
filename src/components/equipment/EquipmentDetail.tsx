@@ -16,11 +16,20 @@ import {
     Sparkles,
     FileText,
     FileCheck,
-    Pencil
+    Pencil,
+    Trash2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import AddWarrantyDialog from './AddWarrantyDialog';
+import EquipmentFormModal from './EquipmentFormModal';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Equipment, EquipmentStatus, WorkOrder, ChatMessage, Warranty } from '@/lib/types';
 import { getEquipmentChatResponse } from '@/lib/gemini';
 
@@ -34,13 +43,28 @@ interface EquipmentDetailProps {
     onBack: () => void;
     onUpdateStatus?: (status: EquipmentStatus) => Promise<void>;
     onUpdate?: (data: any) => Promise<void>;
+    onDelete?: () => Promise<void>;
     initialAiOpen?: boolean;
 }
 
-const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders, onBack, onUpdateStatus, onUpdate, initialAiOpen }) => {
+const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders, onBack, onUpdateStatus, onUpdate, onDelete, initialAiOpen }) => {
     const navigate = useNavigate();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAddWarrantyOpen, setIsAddWarrantyOpen] = useState(false);
+
+    const handleEditSave = async (data: any) => {
+        if (onUpdate) {
+            await onUpdate(data);
+            setIsEditModalOpen(false);
+        }
+    };
+
+    const handleDeleteClick = async () => {
+        if (onDelete && window.confirm(`Are you sure you want to delete ${equipment.unitNumber}? This action cannot be undone.`)) {
+            await onDelete();
+        }
+    };
+
     const [isAiPanelOpen, setIsAiPanelOpen] = useState(initialAiOpen || false);
     const [messages, setMessages] = useState<ExtendedChatMessage[]>([]);
     const [input, setInput] = useState('');
@@ -119,13 +143,24 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Verified asset diagnostics & service timeline</p>
                     </div>
                     {onUpdate && (
-                        <Button
-                            variant="secondary"
-                            onClick={() => setIsEditModalOpen(true)}
-                            className="h-10 px-4 rounded-xl gap-2 font-bold text-xs uppercase tracking-wider text-slate-600 bg-slate-100 hover:bg-slate-200"
-                        >
-                            <Pencil className="w-4 h-4" /> Edit
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="secondary"
+                                onClick={() => setIsEditModalOpen(true)}
+                                className="h-10 px-4 rounded-xl gap-2 font-bold text-xs uppercase tracking-wider text-slate-600 bg-slate-100 hover:bg-slate-200"
+                            >
+                                <Pencil className="w-4 h-4" /> Edit
+                            </Button>
+                            {onDelete && (
+                                <Button
+                                    variant="ghost"
+                                    onClick={handleDeleteClick}
+                                    className="h-10 px-3 rounded-xl hover:bg-rose-50 hover:text-rose-600 text-slate-400 transition-colors"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            )}
+                        </div>
                     )}
                 </div>
 
@@ -160,12 +195,26 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
 
                             {/* LEFT: Main Spec Card */}
                             <div className="flex-[3] bg-white rounded-[3rem] p-10 border border-slate-200 shadow-sm relative overflow-hidden">
-                                <span className={`inline-block px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border mb-6 ${equipment.status === EquipmentStatus.ACTIVE ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                                    equipment.status === EquipmentStatus.IN_SHOP ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                                        'bg-rose-100 text-rose-700 border-rose-200'
-                                    }`}>
-                                    Status: {equipment.status}
-                                </span>
+                                <div className="mb-6">
+                                    <Select
+                                        value={equipment.status}
+                                        onValueChange={(val) => onUpdateStatus && onUpdateStatus(val as EquipmentStatus)}
+                                    >
+                                        <SelectTrigger className={`w-auto min-w-[140px] px-4 py-1.5 h-auto rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${equipment.status === EquipmentStatus.ACTIVE ? 'bg-emerald-100/50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300' :
+                                            equipment.status === EquipmentStatus.IN_SHOP ? 'bg-amber-100/50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300' :
+                                                'bg-rose-100/50 text-rose-700 border-rose-200 hover:bg-rose-100 hover:border-rose-300'
+                                            }`}>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Object.values(EquipmentStatus).map((status) => (
+                                                <SelectItem key={status} value={status} className="text-xs font-bold uppercase tracking-wide">
+                                                    {status}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
                                 <div className="flex flex-col md:flex-row gap-12 items-start relative z-10">
                                     <div className="space-y-2 max-w-sm">
@@ -251,8 +300,8 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                         <div key={wo.id} className="p-10 flex items-start justify-between hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/app/maintenance/service-history/${wo.id}`)}>
                                             <div className="space-y-3 flex-1 pr-12">
                                                 <div className="flex items-center gap-4">
-                                                    <div className="text-base font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">{wo.workOrderNumber || 'Draft'}</div>
-                                                    {wo.documentIds && wo.documentIds.length > 0 && (
+                                                    <div className="text-base font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">{wo.woNumber || 'Draft'}</div>
+                                                    {wo.media && wo.media.length > 0 && (
                                                         <span className="flex items-center gap-1.5 text-[9px] bg-blue-50 px-2 py-0.5 rounded-lg text-blue-600 uppercase font-black tracking-widest border border-blue-100 shadow-sm">
                                                             <FileText className="w-3 h-3" /> Invoice Attached
                                                         </span>
@@ -264,7 +313,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                             </div>
                                             <div className="text-right shrink-0">
                                                 <div className="text-xl font-mono font-black text-slate-900 tracking-tighter">${wo.totalCost?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? '0.00'}</div>
-                                                <div className="text-[10px] text-slate-400 font-black mt-1 uppercase tracking-widest">{new Date(wo.openedAt).toLocaleDateString()}</div>
+                                                <div className="text-[10px] text-slate-400 font-black mt-1 uppercase tracking-widest">{new Date(wo.date).toLocaleDateString()}</div>
                                             </div>
                                         </div>
                                     ))
