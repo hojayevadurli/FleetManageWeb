@@ -39,7 +39,7 @@ const Terms = () => {
                         <strong>Free Trial:</strong> We offer a 1-month free trial for new users. No credit card is required to start the trial.
                     </p>
                     <p className="leading-relaxed">
-                        <strong>Pricing:</strong> After the trial period, the Service costs $5.00 per month per fleet account. You may cancel your subscription at any time.
+                        <strong>Pricing:</strong> After the trial period, the Service costs $6.00 per month per fleet account. You may cancel your subscription at any time.
                         Cancellation will take effect at the end of the current billing cycle.
                     </p>
                 </section>

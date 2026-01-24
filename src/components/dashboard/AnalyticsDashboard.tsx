@@ -22,7 +22,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
     const breakdowns = workOrders.filter(wo => (wo as any).isRoadside && wo.status !== WorkOrderStatus.Completed);
 
     // Maintenance Spend from Service Records
-    const totalSpend = serviceRecords.reduce((acc, sr) => acc + (sr.estimatedTotal || 0), 0);
+    const totalSpend = serviceRecords.reduce((acc, sr) => acc + (sr.totalCost || 0), 0);
 
     const statusData = [
         { name: 'Active', value: activeUnits, color: '#10b981' }, // emerald-500
@@ -193,7 +193,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                                             <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate mt-0.5">{vendorDisplay}</div>
                                         </div>
                                         <div className="text-right shrink-0">
-                                            <div className="text-sm font-black text-slate-900 tracking-tight">${(sr.estimatedTotal || 0).toLocaleString()}</div>
+                                            <div className="text-sm font-black text-slate-900 tracking-tight">${(sr.totalCost || 0).toLocaleString()}</div>
                                             <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md mt-1 inline-block ${statusColor}`}>
                                                 {statusLabel}
                                             </div>

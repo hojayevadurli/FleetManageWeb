@@ -290,40 +290,41 @@ const VehicleManager = () => {
         vin: data.vin,
         serialNumber: data.serialNumber,
         plateNumber: data.licensePlate, // Map licensePlate to plateNumber
-        state: data.licenseState,
+        // state: data.licenseState, // Backend doesn't support State directly yet, might be inside JSON specs if implemented
         make: data.make,
         model: data.model,
         year: data.year,
-        status: data.status,
-        type: data.type,
 
-        // Operational Status mapping
+        // Operational Status mapping - ensure integer values
         operationalStatus: (() => {
-          switch (data.status) {
-            case EquipmentStatus.ACTIVE: return EquipmentOperationalStatus.Available;
-            case EquipmentStatus.IN_SHOP: return EquipmentOperationalStatus.InShop;
-            case EquipmentStatus.OUT_OF_SERVICE: return EquipmentOperationalStatus.OutOfService;
-            default: return EquipmentOperationalStatus.Available;
-          }
+          const s = (data.status || '').toLowerCase();
+          if (s === EquipmentStatus.IN_SHOP) return 2; // InShop
+          if (s === EquipmentStatus.OUT_OF_SERVICE) return 3; // OutOfService
+          return 1; // Available
         })(),
-        lifecycleStatus: data.status === EquipmentStatus.SOLD ? EquipmentLifecycleStatus.Sold :
-          data.status === EquipmentStatus.ARCHIVED ? EquipmentLifecycleStatus.Retired :
-            EquipmentLifecycleStatus.Active,
+
+        lifecycleStatus: (() => {
+          const s = (data.status || '').toLowerCase();
+          if (s === EquipmentStatus.SOLD) return 3; // Sold
+          if (s === EquipmentStatus.ARCHIVED) return 2; // Retired
+          return 1; // Active
+        })(),
 
         // Specs
-        length: data.length,
+        length: Number(data.length) || 0,
         width: 0,
         height: 0,
-        color: 'White', // Default
-        grossVehicleWeightRating: data.weightCapacity,
+        color: 'White',
+        grossVehicleWeightRating: Number(data.weightCapacity) || 0,
 
         // Meters
-        currentOdometer: data.mileage,
-        currentHobbs: data.hours,
+        odometerCurrent: Number(data.mileage) || 0,
+        hoursCurrent: Number(data.hours) || 0,
 
         notes: selectedEquipment.notes
       };
 
+      console.log("Sending Update Payload:", payload);
       await equipmentApi.update(selectedEquipment.id, payload);
 
       // Update local state
@@ -334,7 +335,21 @@ const VehicleManager = () => {
       toast({ title: "Equipment Updated", description: "Changes saved successfully." });
     } catch (err: any) {
       console.error("Update failed:", err);
-      toast({ title: "Update Failed", description: err.message || "Failed to save changes", variant: "destructive" });
+      // Re-throw so the modal knows it failed
+      throw new Error(err.message || "Failed to save changes");
+    }
+  };
+
+  const handleDeleteEquipment = async () => {
+    if (!selectedEquipment) return;
+    try {
+      await equipmentApi.delete(selectedEquipment.id);
+      setEquipmentList(prev => prev.filter(e => e.id !== selectedEquipment.id));
+      setSelectedEquipment(null);
+      toast({ title: "Asset Deleted", description: "Equipment removed successfully." });
+    } catch (err: any) {
+      console.error("Delete failed", err);
+      toast({ title: "Delete Failed", description: err.message, variant: "destructive" });
     }
   };
 
@@ -346,6 +361,7 @@ const VehicleManager = () => {
         onBack={() => setSelectedEquipment(null)}
         onUpdate={handleUpdateEquipment}
         onUpdateStatus={handleUpdateStatus}
+        onDelete={handleDeleteEquipment}
         initialAiOpen={false}
       />
     );

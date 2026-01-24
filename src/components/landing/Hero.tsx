@@ -56,7 +56,7 @@ const Hero = () => {
                     </div>
 
                     <p className="mt-6 text-sm text-slate-500 font-medium">
-                        1 Month Free • $5/truck/month after
+                        1 Month Free • $6/truck/month after
                     </p>
                 </div>
 

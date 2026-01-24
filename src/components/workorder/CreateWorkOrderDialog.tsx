@@ -379,8 +379,8 @@ export default function CreateWorkOrderDialog({
           newWorkOrder.priority === "normal" ? WorkOrderPriority.Normal :
             newWorkOrder.priority === "high" ? WorkOrderPriority.High : WorkOrderPriority.Critical,
         costSource: WorkOrderCostSource.Estimated,
-        estimatedTotal: 0,
-        manualActualTotal: 0,
+        estimatedTotal: computedLines.reduce((acc, l) => acc + l.amount, 0),
+        manualActualTotal: workOrderType === "completed" ? computedLines.reduce((acc, l) => acc + l.amount, 0) : 0,
         lines: computedLines,
         documentIds: []
       };

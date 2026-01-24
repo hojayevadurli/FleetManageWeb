@@ -43,7 +43,7 @@ const Dashboard = () => {
         priority: (WorkOrderPriority as any)[wo.priority] ?? WorkOrderPriority.Normal,
         date: wo.openedAt,
         technician: 'Unknown',
-        totalCost: wo.manualActualTotal || wo.estimatedTotal,
+        totalCost: wo.manualActualTotal || wo.estimatedTotal || (wo.lines || []).reduce((sum: number, l: any) => sum + (l.amount || 0), 0),
         partsCost: 0,
         laborCost: 0,
         title: wo.title,
@@ -51,7 +51,7 @@ const Dashboard = () => {
         diagnosis: wo.diagnosis || '',
         resolution: wo.resolution || '',
         costSource: (WorkOrderCostSource as any)[wo.costSource] ?? WorkOrderCostSource.Estimated,
-        estimatedTotal: wo.estimatedTotal,
+        estimatedTotal: wo.estimatedTotal || (wo.lines || []).reduce((sum: number, l: any) => sum + (l.amount || 0), 0),
         manualActualTotal: wo.manualActualTotal,
         description: wo.notes || '',
         vendor: '',
@@ -61,10 +61,8 @@ const Dashboard = () => {
 
       setEquipment(mappedEquipment);
       setWorkOrders(mappedWorkOrders);
-      // Use mappedWorkOrders for service records, allowing all active work (Open, InProcess, Completed)
-      // This ensures Maintenance Spend calculates correctly for all known costs.
+      // Use mappedWorkOrders for service records, allowing all active work including Drafts (to match Service Page)
       setServiceRecords(mappedWorkOrders.filter(wo =>
-        wo.status !== WorkOrderStatus.Draft &&
         wo.status !== WorkOrderStatus.Cancelled
       ));
     } catch (error) {
