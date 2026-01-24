@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
+import { Logo } from "@/components/ui/Logo";
 
 const Navbar = () => {
     const navigate = useNavigate();
@@ -20,15 +21,8 @@ const Navbar = () => {
     return (
         <nav className="sticky top-0 z-50 w-full border-b border-white/10 bg-[#1A1F2E]/80 backdrop-blur-md">
             <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
-                <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/")}>
-                    <img
-                        src="/logo-head.jpg"
-                        alt="FleetManage Logo"
-                        className="h-14 w-auto rounded-lg object-contain bg-white p-1"
-                    />
-                    <span className="text-2xl font-bold text-white">
-                        fleetmanage.ai
-                    </span>
+                <div className="cursor-pointer" onClick={() => navigate("/")}>
+                    <Logo textClassName="text-white" />
                 </div>
 
                 {/* Desktop Navigation */}
@@ -41,6 +35,13 @@ const Navbar = () => {
 
                 {/* Desktop Auth Buttons */}
                 <div className="hidden md:flex items-center gap-4">
+                    <Button
+                        variant="ghost"
+                        onClick={() => (window as any).Calendly?.initPopupWidget({ url: 'https://calendly.com/suleyman-durdiyev/30min' })}
+                        className="text-slate-300 hover:text-white hover:bg-white/10"
+                    >
+                        Book Demo
+                    </Button>
                     <Button
                         variant="ghost"
                         onClick={() => navigate("/login")}
@@ -67,12 +68,7 @@ const Navbar = () => {
                         <SheetContent className="bg-[#1A1F2E] border-l border-white/10 text-white w-[300px]">
                             <SheetHeader>
                                 <SheetTitle className="text-left text-white flex items-center gap-2">
-                                    <img
-                                        src="/logo-head.jpg"
-                                        alt="FleetManage Logo"
-                                        className="h-8 w-auto rounded object-contain bg-white p-0.5"
-                                    />
-                                    fleetmanage.ai
+                                    <Logo textClassName="text-white text-lg" />
                                 </SheetTitle>
                             </SheetHeader>
                             <div className="flex flex-col gap-6 mt-8">
@@ -83,6 +79,16 @@ const Navbar = () => {
                                     <button onClick={() => handleNav("#faq")} className="text-left hover:text-white transition-colors">FAQ</button>
                                 </div>
                                 <div className="border-t border-white/10 pt-6 flex flex-col gap-4">
+                                    <Button
+                                        variant="ghost"
+                                        onClick={() => {
+                                            setIsOpen(false);
+                                            (window as any).Calendly?.initPopupWidget({ url: 'https://calendly.com/suleyman-durdiyev/30min' });
+                                        }}
+                                        className="justify-start text-slate-300 hover:text-white hover:bg-white/10 px-0"
+                                    >
+                                        Book Demo
+                                    </Button>
                                     <Button
                                         variant="ghost"
                                         onClick={() => handleNav("/login")}

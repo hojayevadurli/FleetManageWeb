@@ -2,12 +2,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, Building2, Phone, Briefcase } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Industry } from "@/lib/industriesApi";
+import { cn } from "@/lib/utils";
 
 interface LoginFormProps {
-  // existing
   email: string;
   setEmail: (email: string) => void;
   password: string;
@@ -23,19 +23,12 @@ interface LoginFormProps {
   isForgotPassword: boolean;
   onSubmit: (e: React.FormEvent) => void;
   onForgotPasswordClick: () => void;
-
-  // NEW for company sign-up
   companyName?: string;
   setCompanyName?: (name: string) => void;
-
   phoneNumber?: string;
   setPhoneNumber?: (phone: string) => void;
-
-  // Optional (nice UX): confirm password on sign-up
   confirmPassword?: string;
   setConfirmPassword?: (pwd: string) => void;
-
-  // Industry
   industryId?: string;
   setIndustryId?: (id: string) => void;
   industries?: Industry[];
@@ -69,121 +62,144 @@ export const LoginForm = ({
   industries = [],
   industriesLoading = false
 }: LoginFormProps) => {
+
+  const inputApi = "bg-[#0B1121] border-white/10 text-white placeholder:text-slate-600 focus:ring-blue-500/50 focus:border-blue-500 transition-all h-11 pl-10";
+  const iconStyle = "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500";
+
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {/* Company Name (sign-up only) */}
+
+      {/* Company Name & Industry (Sign Up) */}
       {isSignUp && !isForgotPassword && setCompanyName && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="companyName">Company Name</Label>
-            <Input
-              id="companyName"
-              type="text"
-              placeholder="Acme Logistics"
-              value={companyName ?? ""}
-              onChange={(e) => setCompanyName(e.target.value)}
-              required={isSignUp}
-              className="h-11"
-              autoComplete="organization"
-            />
+            <Label htmlFor="companyName" className="text-slate-300">Company Name</Label>
+            <div className="relative">
+              <Building2 className={iconStyle} />
+              <Input
+                id="companyName"
+                type="text"
+                placeholder="Acme Logistics"
+                value={companyName ?? ""}
+                onChange={(e) => setCompanyName(e.target.value)}
+                required={isSignUp}
+                className={inputApi}
+                autoComplete="organization"
+              />
+            </div>
           </div>
 
-          {/* Industry Selection */}
           {setIndustryId && (
             <div className="space-y-2">
-              <Label htmlFor="industry">Industry</Label>
-              <Select value={industryId} onValueChange={setIndustryId} disabled={industriesLoading}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder={industriesLoading ? "Loading industry options..." : "Select industry type"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {industries.length > 0 ? (
-                    industries.map((ind) => (
-                      <SelectItem key={ind.id} value={ind.id}>
-                        {ind.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <>
-                      <SelectItem value="trucking">Trucking & Logistics</SelectItem>
-                      <SelectItem value="construction">Construction</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="industry" className="text-slate-300">Industry</Label>
+              <div className="relative">
+                <Briefcase className={cn(iconStyle, "z-10")} />
+                <Select value={industryId} onValueChange={setIndustryId} disabled={industriesLoading}>
+                  <SelectTrigger className={cn(inputApi, "w-full text-left pl-10 flex items-center")}>
+                    <SelectValue placeholder={industriesLoading ? "Loading..." : "Select industry type"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1E2536] border-white/10 text-white">
+                    {industries.length > 0 ? (
+                      industries.map((ind) => (
+                        <SelectItem key={ind.id} value={ind.id} className="focus:bg-blue-600 focus:text-white">
+                          {ind.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <>
+                        <SelectItem value="trucking">Trucking & Logistics</SelectItem>
+                        <SelectItem value="construction">Construction</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
         </>
       )}
 
-      {/* Full Name (sign-up only) */}
+      {/* Full Name (Sign Up) */}
       {isSignUp && !isForgotPassword && (
         <div className="space-y-2">
-          <Label htmlFor="fullName">Full Name</Label>
-          <Input
-            id="fullName"
-            type="text"
-            placeholder="Enter your full name"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            required={isSignUp}
-            className="h-11"
-            autoComplete="name"
-          />
+          <Label htmlFor="fullName" className="text-slate-300">Full Name</Label>
+          <div className="relative">
+            <User className={iconStyle} />
+            <Input
+              id="fullName"
+              type="text"
+              placeholder="John Doe"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required={isSignUp}
+              className={inputApi}
+              autoComplete="name"
+            />
+          </div>
         </div>
       )}
 
-      {/* Email (always shown) */}
+      {/* Email */}
       <div className="space-y-2">
-        <Label htmlFor="email">Email Address</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="Enter your email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="h-11"
-          autoComplete={isForgotPassword ? "email" : "username"}
-        />
+        <Label htmlFor="email" className="text-slate-300">Email Address</Label>
+        <div className="relative">
+          <Mail className={iconStyle} />
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className={inputApi}
+            autoComplete={isForgotPassword ? "email" : "username"}
+          />
+        </div>
       </div>
 
-      {/* Phone Number (sign-up only) */}
+      {/* Phone (Sign Up) */}
       {isSignUp && !isForgotPassword && setPhoneNumber && (
         <div className="space-y-2">
-          <Label htmlFor="phoneNumber">Phone Number</Label>
-          <Input
-            id="phoneNumber"
-            type="tel"
-            placeholder="(555) 123-4567"
-            value={phoneNumber ?? ""}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            required={isSignUp}
-            className="h-11"
-            autoComplete="tel"
-          />
+          <Label htmlFor="phoneNumber" className="text-slate-300">Phone Number</Label>
+          <div className="relative">
+            <Phone className={iconStyle} />
+            <Input
+              id="phoneNumber"
+              type="tel"
+              placeholder="(555) 123-4567"
+              value={phoneNumber ?? ""}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              required={isSignUp}
+              className={inputApi}
+              autoComplete="tel"
+            />
+          </div>
         </div>
       )}
 
-      {/* Password (hidden for forgot) */}
+      {/* Password */}
       {!isForgotPassword && (
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <div className="flex justify-between items-center">
+            <Label htmlFor="password" className="text-slate-300">Password</Label>
+            {/* Forgot Password Link - moved here for cleaner layout if not signing up */}
+          </div>
           <div className="relative">
+            <Lock className={iconStyle} />
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              placeholder="Enter your password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="h-11 pr-10"
+              className={`${inputApi} pr-10`}
               autoComplete={isSignUp ? "new-password" : "current-password"}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -192,63 +208,64 @@ export const LoginForm = ({
         </div>
       )}
 
-      {/* Confirm Password (sign-up only, optional prop-gated) */}
+      {/* Confirm Password */}
       {isSignUp && !isForgotPassword && setConfirmPassword && (
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm Password</Label>
-          <Input
-            id="confirmPassword"
-            type="password"
-            placeholder="Re-enter your password"
-            value={confirmPassword ?? ""}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required={isSignUp}
-            className="h-11"
-            autoComplete="new-password"
-          />
+          <Label htmlFor="confirmPassword" className="text-slate-300">Confirm Password</Label>
+          <div className="relative">
+            <Lock className={iconStyle} />
+            <Input
+              id="confirmPassword"
+              type="password"
+              placeholder="••••••••"
+              value={confirmPassword ?? ""}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required={isSignUp}
+              className={inputApi}
+              autoComplete="new-password"
+            />
+          </div>
         </div>
       )}
 
-      {/* Remember me + Forgot link (sign-in only) */}
+      {/* Remember Me / Forgot Password Row */}
       {!isSignUp && !isForgotPassword && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-1">
           <div className="flex items-center space-x-2">
             <Checkbox
               id="remember"
               checked={rememberMe}
               onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+              className="border-slate-600 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
             />
-            <Label htmlFor="remember" className="text-sm text-gray-600">
+            <Label htmlFor="remember" className="text-sm text-slate-400 font-normal cursor-pointer">
               Remember me
             </Label>
           </div>
           <button
             type="button"
             onClick={onForgotPasswordClick}
-            className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            className="text-sm text-blue-400 hover:text-blue-300 hover:underline transition-colors"
           >
             Forgot password?
           </button>
         </div>
       )}
 
-      {/* Submit */}
+      {/* Submit Button */}
       <Button
         type="submit"
-        className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white"
+        className="w-full h-11 bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-lg shadow-blue-900/20 transition-all mt-4"
         disabled={isLoading}
       >
-        {isLoading
-          ? (isForgotPassword
-            ? "Sending reset email..."
-            : isSignUp
-              ? "Creating account..."
-              : "Signing in...")
-          : (isForgotPassword
-            ? "Send Reset Email"
-            : isSignUp
-              ? "Create Account"
-              : "Sign In")}
+        {isLoading ? (
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <span>Processing...</span>
+          </div>
+        ) : (
+          isForgotPassword ? "Send Reset Email" : isSignUp ? "Create Account" : "Sign In"
+        )}
       </Button>
     </form>
   );

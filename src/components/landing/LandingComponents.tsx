@@ -1,5 +1,6 @@
 import { Truck, MessageSquare, MapPin, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/ui/Logo";
 
 // --- HOW IT WORKS ---
 export const HowItWorks = () => (
@@ -203,14 +204,8 @@ export const CTASection = () => (
 export const Footer = () => (
     <footer className="bg-[#0B1121] py-12 border-t border-white/5">
         <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-3">
-                <img
-                    src="/logo-head.jpg"
-                    alt="FleetManage Logo"
-                    className="h-10 w-auto rounded-lg object-contain bg-white p-1"
-                />
-                <span className="text-xl font-bold text-white">fleetmanage.ai</span>
-            </div>
+            <Logo textClassName="text-white text-xl" />
+
             <div className="text-slate-500 text-sm">
                 © 2026 FleetManage.ai. All rights reserved.
             </div>

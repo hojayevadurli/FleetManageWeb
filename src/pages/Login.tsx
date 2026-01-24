@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { api } from "@/lib/Api";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { LoginActivityFeed } from "@/components/auth/LoginActivityFeed";
 import { industriesApi, Industry } from "@/lib/industriesApi";
-import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/ui/Logo";
+import { Shield, CheckCircle2 } from "lucide-react";
 
 export default function Login() {
   const { signIn, signUp } = useAuth();
@@ -53,11 +55,9 @@ export default function Login() {
 
     try {
       if (isForgotPassword) {
-        // forgot-password flow
         await api.post("/Auth/forgot-password", { email });
         setSuccess("Password reset link sent to your email.");
       } else if (isSignUp) {
-        // basic client-side check
         if (password !== confirmPassword) {
           setError("Passwords do not match.");
           return;
@@ -66,7 +66,6 @@ export default function Login() {
         const res = await signUp(companyName, fullName, email, phoneNumber, password, industryId);
 
         if (res.error) {
-          // 🔥 show exact backend message from signUp
           setError(res.error);
         } else {
           // ✅ no auto-login: tell user to sign in
@@ -76,19 +75,15 @@ export default function Login() {
           setConfirmPassword("");
         }
       } else {
-        // login flow
         const res = await signIn(email, password);
 
         if (res.error) {
-          // 🔥 show exact backend message from signIn
           setError(res.error);
         } else {
           window.location.href = "/app";
         }
       }
     } catch (err: any) {
-      // Only catches unexpected/network errors.
-      // Still try to surface backend message if present.
       const data = err?.response?.data;
       let msg = "Something went wrong.";
 
@@ -120,108 +115,141 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-md space-y-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold">
-            {isForgotPassword
-              ? "Reset your password"
-              : isSignUp
-                ? "Create your company account"
-                : "Sign in to FleetManage"}
-          </h1>
-          <p className="text-sm text-gray-600">
-            {isForgotPassword
-              ? "Enter your email and we’ll send you a reset link."
-              : isSignUp
-                ? "Create a company and your first admin user."
-                : "Use your work email to log in."}
-          </p>
-        </div>
+    <div className="flex min-h-screen w-full bg-[#0F172A] font-sans antialiased text-slate-200 selection:bg-blue-500/30 selection:text-blue-200 lg:grid lg:grid-cols-[55%_45%]">
 
-        <LoginForm
-          email={email}
-          setEmail={setEmail}
-          phoneNumber={phoneNumber}
-          setPhoneNumber={setPhoneNumber}
-          password={password}
-          setPassword={setPassword}
-          fullName={fullName}
-          setFullName={setFullName}
-          showPassword={showPassword}
-          setShowPassword={setShowPassword}
-          rememberMe={rememberMe}
-          setRememberMe={setRememberMe}
-          isLoading={isLoading}
-          isSignUp={isSignUp}
-          isForgotPassword={isForgotPassword}
-          onSubmit={handleSubmit}
-          onForgotPasswordClick={handleForgotPasswordClick}
-          companyName={companyName}
-          setCompanyName={setCompanyName}
-          confirmPassword={confirmPassword}
-          setConfirmPassword={setConfirmPassword}
-          industryId={industryId}
-          setIndustryId={setIndustryId}
-          industries={industries}
-          industriesLoading={industriesLoading}
-        />
-
-        {error && (
-          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-            {error}
-          </p>
-        )}
-        {success && (
-          <p className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-md px-3 py-2">
-            {success}
-          </p>
-        )}
-
-        <div className="text-sm text-center text-gray-600 space-y-1">
-          {!isForgotPassword && !isSignUp && (
-            <p>
-              Don&apos;t have an account?{" "}
-              <Button
-                variant="link"
-                type="button"
-                onClick={switchToSignUp}
-                className="text-blue-600 hover:underline p-0 h-auto font-normal"
-              >
-                Create company
-              </Button>
-            </p>
-          )}
-
-          {isSignUp && (
-            <p>
-              Already have an account?{" "}
-              <Button
-                variant="link"
-                type="button"
-                onClick={switchToLogin}
-                className="text-blue-600 hover:underline p-0 h-auto font-normal"
-              >
-                Sign in
-              </Button>
-            </p>
-          )}
-
-          {isForgotPassword && (
-            <p>
-              Remember your password?{" "}
-              <Button
-                variant="link"
-                type="button"
-                onClick={switchToLogin}
-                className="text-blue-600 hover:underline p-0 h-auto font-normal"
-              >
-                Back to sign in
-              </Button>
-            </p>
-          )}
+      {/* Left Panel - Animation (Hidden on Mobile) */}
+      <div className="hidden lg:flex relative flex-col items-center justify-center overflow-hidden bg-[#0B1121] border-r border-white/5">
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+        <div className="z-10 w-full max-w-2xl px-12">
+          <LoginActivityFeed />
+          <div className="mt-8 text-center space-y-2">
+            <h2 className="text-3xl font-bold text-white">Your Fleet, In Real-Time</h2>
+            <p className="text-slate-400">Track maintenance, scan receipts, and find shops instantly.</p>
+          </div>
         </div>
       </div>
+
+      {/* Right Panel - Login Form */}
+      <div className="flex flex-col items-center justify-center p-6 sm:p-12 relative">
+        <div className="w-full max-w-md space-y-8">
+
+          {/* Header */}
+          <div className="text-center space-y-6">
+            <div className="flex justify-center">
+              <Logo textClassName="text-2xl" />
+            </div>
+
+            <div className="space-y-2">
+              <h1 className="text-2xl font-bold text-white tracking-tight">
+                {isForgotPassword
+                  ? "Reset Password"
+                  : isSignUp
+                    ? "Start Your Free Trial"
+                    : "Welcome Back"}
+              </h1>
+              <p className="text-sm text-slate-400">
+                {isForgotPassword
+                  ? "We'll send a recovery link to your email"
+                  : isSignUp
+                    ? "Join 500+ fleets saving time with AI"
+                    : "Sign in to manage your fleet"}
+              </p>
+            </div>
+          </div>
+
+          {/* Form */}
+          <div className="bg-[#1E2536] p-8 rounded-2xl border border-white/10 shadow-xl">
+            <LoginForm
+              email={email}
+              setEmail={setEmail}
+              phoneNumber={phoneNumber}
+              setPhoneNumber={setPhoneNumber}
+              password={password}
+              setPassword={setPassword}
+              fullName={fullName}
+              setFullName={setFullName}
+              showPassword={showPassword}
+              setShowPassword={setShowPassword}
+              rememberMe={rememberMe}
+              setRememberMe={setRememberMe}
+              isLoading={isLoading}
+              isSignUp={isSignUp}
+              isForgotPassword={isForgotPassword}
+              onSubmit={handleSubmit}
+              onForgotPasswordClick={handleForgotPasswordClick}
+              companyName={companyName}
+              setCompanyName={setCompanyName}
+              confirmPassword={confirmPassword}
+              setConfirmPassword={setConfirmPassword}
+              industryId={industryId}
+              setIndustryId={setIndustryId}
+              industries={industries}
+              industriesLoading={industriesLoading}
+            />
+
+            {error && (
+              <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-start gap-2">
+                <Shield className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {success && (
+              <div className="mt-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{success}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Footer Links */}
+          <div className="text-center text-sm text-slate-400">
+            {!isForgotPassword && !isSignUp && (
+              <p>
+                New to FleetManage?{" "}
+                <button
+                  type="button"
+                  onClick={switchToSignUp}
+                  className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  Start free trial
+                </button>
+              </p>
+            )}
+
+            {isSignUp && (
+              <p>
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={switchToLogin}
+                  className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  Sign in
+                </button>
+              </p>
+            )}
+
+            {isForgotPassword && (
+              <button
+                type="button"
+                onClick={switchToLogin}
+                className="font-medium text-blue-400 hover:text-blue-300 transition-colors flex items-center justify-center gap-1 w-full"
+              >
+                Back to sign in
+              </button>
+            )}
+          </div>
+
+          <div className="text-center">
+            <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold flex items-center justify-center gap-2">
+              <Shield className="h-3 w-3" />
+              Secured with 256-bit SSL Encryption
+            </p>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }

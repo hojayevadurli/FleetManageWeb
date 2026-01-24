@@ -40,8 +40,8 @@ const Hero = () => {
                     <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
                         <Button
                             size="lg"
-                            onClick={() => navigate("/login")}
                             className="w-full sm:w-auto h-12 px-8 bg-[#4F7CFF] hover:bg-[#4F7CFF]/90 text-white font-bold text-base shadow-[0_0_25px_rgba(79,124,255,0.4)] transition-all hover:scale-105"
+                            onClick={() => navigate("/login")}
                         >
                             Start Free Month
                             <ArrowRight className="ml-2 w-5 h-5" />
@@ -50,8 +50,9 @@ const Hero = () => {
                             size="lg"
                             variant="outline"
                             className="w-full sm:w-auto h-12 px-8 border-white/20 text-white hover:bg-white/10 hover:text-white bg-transparent"
+                            onClick={() => (window as any).Calendly?.initPopupWidget({ url: 'https://calendly.com/suleyman-durdiyev/30min' })}
                         >
-                            See AI in Action
+                            Book a Demo
                         </Button>
                     </div>
 
