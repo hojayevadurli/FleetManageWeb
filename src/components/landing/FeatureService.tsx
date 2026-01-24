@@ -1,4 +1,5 @@
-import { Camera, ArrowRight, CheckCircle2, FileText, Smartphone, Truck } from "lucide-react";
+import { Camera, ArrowRight, CheckCircle2, FileText, Smartphone, Truck, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 
 const FeatureService = () => {
     return (
@@ -56,18 +57,43 @@ const FeatureService = () => {
                         </div>
                     </div>
 
-                    {/* Visual Side */}
-                    <div className="relative" aria-label="AI scanning handwritten truck repair receipt and converting to digital work order">
-                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-40 bg-purple-500/20 blur-[100px] rounded-full" />
+                    {/* Visual Side - Animation */}
+                    <div className="relative h-[400px] flex items-center justify-center" aria-label="AI scanning handwritten truck repair receipt and converting to digital work order">
+                        <div className="absolute inset-0 bg-purple-500/10 blur-[100px] rounded-full" />
 
-                        <div className="relative grid grid-cols-2 gap-4">
-                            {/* Left: Messy Receipt */}
-                            <div className="bg-white p-4 rounded-xl shadow-lg transform rotate-[-3deg] mt-8 self-end opacity-90">
+                        <div className="relative w-full max-w-[600px] flex items-center justify-between">
+
+                            {/* 1. Receipt Card */}
+                            <motion.div
+                                animate={{
+                                    x: [-50, 0, 0, 0, -50],
+                                    rotate: [-5, 0, 0, 0, -5],
+                                    opacity: [0, 1, 1, 1, 0]
+                                }}
+                                transition={{
+                                    duration: 8,
+                                    times: [0, 0.1, 0.8, 0.9, 1],
+                                    repeat: Infinity,
+                                    repeatDelay: 1
+                                }}
+                                className="bg-white p-4 rounded-xl shadow-xl w-48 relative overflow-hidden shrink-0 z-20 origin-bottom-left"
+                            >
                                 <div className="text-[10px] text-slate-400 mb-2 uppercase tracking-widest text-center">Original Receipt</div>
-                                <div className="space-y-2 font-mono text-[8px] text-slate-600 leading-tight blur-[0.5px]">
-                                    <div className="font-bold text-center text-slate-900 text-xs mb-2">JOE'S TRUCK SHOP</div>
+                                <div className="space-y-2 font-mono text-[8px] text-slate-600 leading-tight">
+                                    <motion.div
+                                        animate={{ color: ["#475569", "#9333ea", "#475569"] }}
+                                        transition={{ duration: 0.5, delay: 1.5, repeat: Infinity, repeatDelay: 7.5 }}
+                                        className="font-bold text-center text-slate-900 text-xs mb-2"
+                                    >
+                                        JOE'S TRUCK SHOP
+                                    </motion.div>
                                     <div>Inv: #999321</div>
-                                    <div>Date: Jan 21, 2026</div>
+                                    <motion.div
+                                        animate={{ color: ["#475569", "#9333ea", "#475569"] }}
+                                        transition={{ duration: 0.5, delay: 1.8, repeat: Infinity, repeatDelay: 7.5 }}
+                                    >
+                                        Date: Jan 21, 2026
+                                    </motion.div>
                                     <div className="border-b border-slate-300 my-1"></div>
                                     <div className="flex justify-between">
                                         <span>Air Dryer Assy</span>
@@ -77,23 +103,74 @@ const FeatureService = () => {
                                         <span>Labor 1h</span>
                                         <span>$85.00</span>
                                     </div>
-                                    <div className="flex justify-between text-slate-900 font-bold pt-1 border-t border-slate-300 mt-1">
+                                    <motion.div
+                                        animate={{ color: ["#475569", "#9333ea", "#475569"], scale: [1, 1.05, 1] }}
+                                        transition={{ duration: 0.5, delay: 2.1, repeat: Infinity, repeatDelay: 7.5 }}
+                                        className="flex justify-between text-slate-900 font-bold pt-1 border-t border-slate-300 mt-1"
+                                    >
                                         <span>Total</span>
                                         <span>$210.00</span>
-                                    </div>
+                                    </motion.div>
+                                </div>
+
+                                {/* Scan Line */}
+                                <motion.div
+                                    animate={{ top: ["0%", "150%"], opacity: [0, 1, 1, 0] }}
+                                    transition={{ duration: 1.5, delay: 0.5, repeat: Infinity, repeatDelay: 7.5, ease: "linear" }}
+                                    className="absolute left-0 w-full h-8 bg-gradient-to-b from-purple-500/20 to-transparent border-t border-purple-500/50 pointer-events-none"
+                                />
+                            </motion.div>
+
+                            {/* 2. Arrow & Particles */}
+                            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-24 h-12 flex items-center justify-center">
+                                <div className="relative w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500/30 to-transparent">
+                                    {/* Particles */}
+                                    {[0, 1, 2].map((i) => (
+                                        <motion.div
+                                            key={i}
+                                            animate={{ x: [-40, 40], opacity: [0, 1, 0] }}
+                                            transition={{ duration: 1, delay: 1 + (i * 0.2), repeat: Infinity, repeatDelay: 7 }}
+                                            className="absolute top-1/2 left-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-purple-400 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.8)]"
+                                        />
+                                    ))}
+                                </div>
+                                <div className="absolute right-0 bg-white shadow-lg rounded-full p-1.5 z-20">
+                                    <ArrowRight className="w-4 h-4 text-purple-600" />
                                 </div>
                             </div>
 
-                            {/* Arrow */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-white shadow-xl rounded-full p-2">
-                                <ArrowRight className="w-5 h-5 text-purple-600" />
-                            </div>
-
-                            {/* Right: Clean UI */}
-                            <div className="bg-[#1E2536] border border-green-500/30 rounded-xl p-4 shadow-2xl transform rotate-[3deg] self-start mb-8">
+                            {/* 3. Work Order Card */}
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{
+                                    scale: [0.9, 1, 1, 1, 0.9],
+                                    opacity: [0, 1, 1, 1, 0]
+                                }}
+                                transition={{
+                                    duration: 8,
+                                    times: [0, 0.3, 0.8, 0.9, 1], // Consolidate timing window
+                                    delay: 2, // Start later
+                                    repeat: Infinity,
+                                    repeatDelay: 1
+                                }}
+                                className="bg-[#1E2536] border border-green-500/30 rounded-xl p-4 shadow-2xl w-56 shrink-0 relative z-20 origin-center"
+                            >
                                 <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
-                                    <div className="text-xs font-bold text-white">Work Order #WO-1</div>
-                                    <div className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">Completed</div>
+                                    <motion.div
+                                        animate={{ opacity: [0, 1] }}
+                                        transition={{ duration: 0.5, delay: 2.5, repeat: Infinity, repeatDelay: 8.5 }}
+                                        className="text-xs font-bold text-white"
+                                    >
+                                        Work Order #WO-1
+                                    </motion.div>
+                                    <motion.div
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: [0, 1.2, 1] }}
+                                        transition={{ duration: 0.4, delay: 3.5, repeat: Infinity, repeatDelay: 8.6 }}
+                                        className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full"
+                                    >
+                                        Completed
+                                    </motion.div>
                                 </div>
                                 <div className="space-y-3">
                                     <div className="flex gap-2">
@@ -102,26 +179,50 @@ const FeatureService = () => {
                                         </div>
                                         <div>
                                             <div className="text-[10px] text-slate-400 uppercase">Asset</div>
-                                            <div className="text-xs font-bold text-white">Truck #5192</div>
+                                            <motion.div
+                                                animate={{ opacity: [0, 1] }}
+                                                transition={{ duration: 0.5, delay: 2.6, repeat: Infinity, repeatDelay: 8.5 }}
+                                                className="text-xs font-bold text-white"
+                                            >
+                                                Truck #5192
+                                            </motion.div>
                                         </div>
                                     </div>
 
                                     <div className="bg-[#0F172A] rounded-lg p-3 border border-white/5">
                                         <div className="flex justify-between text-xs text-slate-400 mb-1">
                                             <span>Shop</span>
-                                            <span className="text-white">Joe's Truck Shop</span>
+                                            <motion.span
+                                                animate={{ opacity: [0, 1] }}
+                                                transition={{ duration: 0.5, delay: 2.7, repeat: Infinity, repeatDelay: 8.5 }}
+                                                className="text-white"
+                                            >
+                                                Joe's Truck Shop
+                                            </motion.span>
                                         </div>
                                         <div className="flex justify-between text-xs text-slate-400 mb-1">
                                             <span>Date</span>
-                                            <span className="text-white">Jan 21, 2026</span>
+                                            <motion.span
+                                                animate={{ opacity: [0, 1] }}
+                                                transition={{ duration: 0.5, delay: 2.8, repeat: Infinity, repeatDelay: 8.5 }}
+                                                className="text-white"
+                                            >
+                                                Jan 21, 2026
+                                            </motion.span>
                                         </div>
                                         <div className="flex justify-between text-sm font-bold text-white border-t border-white/10 pt-2 mt-2">
                                             <span>Total</span>
-                                            <span>$210.00</span>
+                                            <motion.span
+                                                animate={{ opacity: [0, 1] }}
+                                                transition={{ duration: 0.5, delay: 3.0, repeat: Infinity, repeatDelay: 8.5 }}
+                                            >
+                                                $210.00
+                                            </motion.span>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                            </motion.div>
+
                         </div>
                     </div>
 
