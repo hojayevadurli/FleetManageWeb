@@ -8,6 +8,7 @@ import billingApi, { STRIPE_PRICE_ID } from "@/lib/billingApi";
 import equipmentApi from "@/lib/equipmentApi";
 import { differenceInDays, format, parseISO } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EquipmentOperationalStatus } from "@/lib/types";
 
 const BillingSection = () => {
   const [tenant, setTenant] = useState<Tenant | null>(null);
@@ -25,8 +26,12 @@ const BillingSection = () => {
           tenantsApi.getCurrent(),
           equipmentApi.list()
         ]);
+        const billableAssets = equipmentData.filter(e =>
+          e.operationalStatus === EquipmentOperationalStatus.Active ||
+          e.operationalStatus === EquipmentOperationalStatus.InShop
+        );
         setTenant(tenantData);
-        setAssetCount(equipmentData.length);
+        setAssetCount(billableAssets.length);
       } catch (error) {
         console.error("Failed to fetch tenant data", error);
         toast.error("Failed to load subscription details");
@@ -122,7 +127,7 @@ const BillingSection = () => {
                 </div>
                 <span className="font-medium text-slate-700">Current Fleet Size</span>
               </div>
-              <span className="font-bold text-slate-900">{assetCount} assets</span>
+              <span className="font-bold text-slate-900">{assetCount} billable assets</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-slate-200">
               <span className="font-medium text-slate-700 ml-11">Price per asset</span>

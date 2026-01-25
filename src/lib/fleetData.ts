@@ -1,57 +1,3 @@
-export type FleetType = 'TRUCK' | 'TRAILER' | 'HEAVY_EQUIPMENT';
-
-export const FLEET_TYPES: Record<FleetType, string> = {
-    TRUCK: 'Trucks',
-    TRAILER: 'Trailers',
-    HEAVY_EQUIPMENT: 'Heavy Equipment'
-};
-
-export const TRUCK_TYPES = [
-    'Day Cab Tractor',
-    'Sleeper Tractor',
-    'Box Truck',
-    'Straight Truck',
-    'Dump Truck',
-    'Flatbed Truck',
-    'Tow Truck',
-    'Delivery Van',
-    'Service/Utility Truck',
-    'Refrigerated Truck'
-] as const;
-
-export const TRAILER_TYPES = [
-    'Auto Hauler',
-    'Box Truck', // Included in request, though unusual for trailer
-    'Conestoga',
-    'Curtain Side',
-    'Double Drop',
-    'Drybox',
-    'Dry Van',
-    'Dump/Tipper',
-    'Flatbed',
-    'Intermodal Chassis',
-    'Livestock',
-    'Lowboy',
-    'Reefer',
-    'Removable Gooseneck',
-    'Stake',
-    'Step Deck',
-    'Tanker'
-] as const;
-
-export const HEAVY_EQUIPMENT_TYPES = [
-    'Backhoe',
-    'Boom Truck',
-    'Bulldozer',
-    'Crane',
-    'Dump Truck', // Also here in request
-    'Excavator',
-    'Forklift',
-    'Front Loader',
-    'Grader',
-    'Trencher'
-] as const;
-
 export const TRUCK_MANUFACTURERS = [
     'Freightliner',
     'Peterbilt',
@@ -84,20 +30,13 @@ export const HEAVY_EQUIPMENT_MANUFACTURERS = [
     'Liebherr'
 ] as const;
 
-export const getSpecificTypes = (fleetType: FleetType) => {
-    switch (fleetType) {
-        case 'TRUCK': return TRUCK_TYPES;
-        case 'TRAILER': return TRAILER_TYPES;
-        case 'HEAVY_EQUIPMENT': return HEAVY_EQUIPMENT_TYPES;
-    }
-};
-
-export const getManufacturers = (fleetType: FleetType) => {
-    switch (fleetType) {
-        case 'TRUCK': return TRUCK_MANUFACTURERS;
-        case 'TRAILER': return TRAILER_MANUFACTURERS;
-        case 'HEAVY_EQUIPMENT': return HEAVY_EQUIPMENT_MANUFACTURERS;
-    }
+export const getManufacturers = (categoryName: string) => {
+    const name = categoryName.toUpperCase();
+    if (name.includes('TRUCK')) return TRUCK_MANUFACTURERS;
+    if (name.includes('TRAILER')) return TRAILER_MANUFACTURERS;
+    if (name.includes('HEAVY') || name.includes('CONSTRUCTION')) return HEAVY_EQUIPMENT_MANUFACTURERS;
+    if (name.includes('BUS')) return [...TRUCK_MANUFACTURERS, 'Blue Bird', 'Thomas Built', 'IC Bus', 'New Flyer', 'Prevost'];
+    return [];
 };
 
 export const US_STATES = [

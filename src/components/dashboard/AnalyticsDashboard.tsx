@@ -1,6 +1,6 @@
 import React from 'react';
 import { Truck, AlertTriangle, DollarSign, ShieldCheck, ClipboardList, Zap, ChevronRight, ArrowRight } from 'lucide-react';
-import { Equipment, EquipmentStatus, WorkOrder, WorkOrderStatus } from '@/lib/types';
+import { Equipment, EquipmentOperationalStatus, WorkOrder, WorkOrderStatus } from '@/lib/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import AIPredictiveForecast from './AIPredictiveForecast';
@@ -14,8 +14,9 @@ interface DashboardProps {
 
 const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, serviceRecords, onTabChange }) => {
     const totalFleet = equipment.length;
-    const inShop = equipment.filter(e => e.status?.toLowerCase() === EquipmentStatus.IN_SHOP.toLowerCase()).length;
-    const activeUnits = equipment.filter(e => e.status?.toLowerCase() === EquipmentStatus.ACTIVE.toLowerCase()).length;
+    const inShop = equipment.filter(e => e.status === EquipmentOperationalStatus.InShop).length;
+    const activeUnits = equipment.filter(e => e.status === EquipmentOperationalStatus.Active).length;
+    const soldUnits = equipment.filter(e => e.status === EquipmentOperationalStatus.Sold).length;
 
     // Work orders logic (active rescues/breakdowns)
     // Note: WorkOrder interface in types.ts HAS isRoadside, but the API DTO might not.
@@ -27,7 +28,8 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
     const statusData = [
         { name: 'Active', value: activeUnits, color: '#10b981' }, // emerald-500
         { name: 'In Shop', value: inShop, color: '#f59e0b' },   // amber-500
-        { name: 'OOS', value: totalFleet - activeUnits - inShop, color: '#f43f5e' }, // rose-500
+        { name: 'OOS', value: totalFleet - activeUnits - inShop - soldUnits, color: '#f43f5e' }, // rose-500
+        { name: 'Sold', value: soldUnits, color: '#64748b' },   // slate-500
     ];
 
     return (
@@ -43,7 +45,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 <div
-                    onClick={() => onTabChange('equipment', EquipmentStatus.ACTIVE)}
+                    onClick={() => onTabChange('equipment', EquipmentOperationalStatus.Active.toString())}
                     className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group cursor-pointer hover:shadow-lg hover:border-blue-100 transition-all duration-300"
                 >
                     <div className="flex items-center gap-6">
@@ -59,7 +61,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                 </div>
 
                 <div
-                    onClick={() => onTabChange('equipment', EquipmentStatus.IN_SHOP)}
+                    onClick={() => onTabChange('equipment', EquipmentOperationalStatus.InShop.toString())}
                     className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group cursor-pointer hover:shadow-lg hover:border-amber-100 transition-all duration-300"
                 >
                     <div className="flex items-center gap-6">
