@@ -10,7 +10,7 @@ import {
     Lock,
     Pencil
 } from 'lucide-react';
-import { Equipment, EquipmentStatus, EquipmentOperationalStatus, FleetType } from '@/lib/types';
+import { Equipment, EquipmentOperationalStatus } from '@/lib/types';
 import { EquipmentCreatePayload } from '@/lib/equipmentApi';
 import {
     Select,
@@ -21,15 +21,18 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { FLEET_TYPES, getManufacturers, getSpecificTypes, US_STATES } from '@/lib/fleetData';
+import { getManufacturers, US_STATES } from '@/lib/fleetData';
 import { decodeVin, validateVin } from '@/lib/nhtsaApi';
+import { fleetCategoriesApi, FleetCategory } from '@/lib/fleetCategoriesApi';
+import { equipmentTypesApi } from '@/lib/equipmentTypesApi';
+import { EquipmentTypeDto } from '@/lib/types';
 
 interface EquipmentFormModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (data: Partial<EquipmentCreatePayload>) => Promise<void>;
     mode: 'create' | 'edit';
-    initialData?: Partial<EquipmentCreatePayload> & { id?: string; fleetType?: FleetType; specificType?: string; licenseState?: string };
+    initialData?: Partial<EquipmentCreatePayload> & { id?: string; specificType?: string; licenseState?: string };
 }
 
 const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
@@ -39,17 +42,16 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
     mode,
     initialData
 }) => {
-    const [formData, setFormData] = useState<Partial<EquipmentCreatePayload> & { fleetType?: FleetType; specificType?: string; licenseState?: string; operationalStatus?: EquipmentOperationalStatus }>(() => {
+    const [formData, setFormData] = useState<Partial<EquipmentCreatePayload> & { specificType?: string; licenseState?: string; operationalStatus?: EquipmentOperationalStatus }>(() => {
         if (initialData) {
             return {
                 unitNumber: initialData.unitNumber || '',
-                type: initialData.type || 'Truck',
-                fleetType: initialData.fleetType || 'TRUCK',
+                type: initialData.type || 'Asset',
                 specificType: initialData.specificType || '',
                 make: initialData.make || '',
                 model: initialData.model || '',
                 year: initialData.year || new Date().getFullYear(),
-                status: initialData.status || EquipmentStatus.ACTIVE,
+                status: initialData.status || EquipmentOperationalStatus.Active,
                 vin: initialData.vin || '',
                 serialNumber: initialData.serialNumber || '',
                 licensePlate: initialData.licensePlate || '',
@@ -59,6 +61,8 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                 length: initialData.length || 53,
                 weightCapacity: initialData.weightCapacity || 45000,
                 fleetCategoryId: initialData.fleetCategoryId || undefined,
+                equipmentTypeId: initialData.equipmentTypeId || '',
+                hours: initialData.hours || 0,
                 initialOdometer: 0,
                 initialHours: 0
             };
@@ -66,13 +70,12 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
 
         return {
             unitNumber: '',
-            type: 'Truck',
-            fleetType: 'TRUCK',
+            type: 'Asset',
             specificType: '',
             make: '',
             model: '',
             year: new Date().getFullYear(),
-            status: EquipmentStatus.ACTIVE,
+            status: EquipmentOperationalStatus.Active,
             operationalStatus: EquipmentOperationalStatus.Active,
             vin: '',
             serialNumber: '',
@@ -101,13 +104,43 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                 unitNumber: initialData.unitNumber || prev.unitNumber // Ensure precedence
             }));
         }
-    }, [initialData]); // Only re-run if DATA changes
+    }, [initialData, isOpen]); // Only re-run if DATA changes or modal opens
 
     const [isDecoding, setIsDecoding] = useState(false);
     const [decodeError, setDecodeError] = useState<string | null>(null);
     const [autoFilledFields, setAutoFilledFields] = useState<string[]>([]);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [categories, setCategories] = useState<FleetCategory[]>([]);
+    const [equipmentTypes, setEquipmentTypes] = useState<EquipmentTypeDto[]>([]);
+
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const data = await fleetCategoriesApi.list();
+                setCategories(data);
+            } catch (err) {
+                console.error("Failed to fetch categories", err);
+            }
+        };
+        fetchCategories();
+    }, []);
+
+    useEffect(() => {
+        const fetchTypes = async () => {
+            if (!formData.fleetCategoryId) {
+                setEquipmentTypes([]);
+                return;
+            }
+            try {
+                const data = await equipmentTypesApi.list(undefined, formData.fleetCategoryId);
+                setEquipmentTypes(data);
+            } catch (err) {
+                console.error("Failed to fetch equipment types", err);
+            }
+        };
+        fetchTypes();
+    }, [formData.fleetCategoryId]);
 
     const handleVinChange = async (val: string) => {
         const vin = val.toUpperCase();
@@ -196,14 +229,13 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                 background: linear-gradient(to right, #F0F4FF 0%, transparent 100%);
                                 border-left: 3px solid #6366F1;
                             }
-                            .auto-filled-badge {
-                                font-size: 9px;
-                                color: #6366F1;
-                                display: flex;
-                                align-items: center;
-                                gap: 3px;
-                                margin-bottom: 2px;
-                            }
+                                .auto-filled-badge {
+                                    font-size: 9px;
+                                    color: #6366F1;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 3px;
+                                }
                         `}</style>
 
                         {submitError && (
@@ -264,61 +296,79 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             {/* 3. Fleet Classification */}
                             <div className="space-y-4 pt-2">
                                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fleet Classification</h3>
-                                <div className="grid grid-cols-3 gap-4">
-                                    {(Object.keys(FLEET_TYPES) as FleetType[]).map(type => (
-                                        <div
-                                            key={type}
-                                            onClick={() => setFormData({ ...formData, fleetType: type, specificType: '', make: '' })}
-                                            className={`cursor-pointer rounded-2xl border-2 p-4 text-center transition-all ${formData.fleetType === type ? 'border-blue-600 bg-blue-50/50' : 'border-slate-100 hover:border-slate-200'}`}
-                                        >
-                                            <div className="text-xs font-black text-slate-800">{FLEET_TYPES[type]}</div>
-                                        </div>
-                                    ))}
+                                <div className="grid grid-cols-4 gap-4">
+                                    {categories.map(cat => {
+                                        const displayName = cat.name === 'School Bus' ? 'Bus' : cat.name;
+
+                                        return (
+                                            <div
+                                                key={cat.id}
+                                                onClick={() => setFormData({ ...formData, fleetCategoryId: cat.id, specificType: '', equipmentTypeId: '', make: '' })}
+                                                className={`cursor-pointer rounded-2xl border-2 p-4 text-center transition-all ${formData.fleetCategoryId === cat.id ? 'border-blue-600 bg-blue-50/50' : 'border-slate-100 hover:border-slate-200'}`}
+                                            >
+                                                <div className="text-xs font-black text-slate-800">{displayName}</div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
                             {/* 4. Specific Type & Make */}
                             <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <Label>Specific Type <span className="text-red-500">*</span></Label>
+                                <div className="space-y-1.5">
+                                    <div className="min-h-[15px] px-1 flex items-center">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Specific Type <span className="text-red-500">*</span></label>
+                                    </div>
                                     <Select
                                         value={formData.specificType}
-                                        onValueChange={(val) => setFormData({ ...formData, specificType: val, type: val })}
+                                        onValueChange={(val) => {
+                                            const selectedType = equipmentTypes.find(t => t.name === val);
+                                            setFormData({
+                                                ...formData,
+                                                specificType: val,
+                                                type: val,
+                                                equipmentTypeId: selectedType?.id.toString() || ''
+                                            });
+                                        }}
                                     >
-                                        <SelectTrigger className="w-full bg-slate-50 border-slate-200 py-4 h-auto text-sm font-bold">
+                                        <SelectTrigger className="w-full bg-slate-50 border-slate-200 px-5 py-4 h-auto text-sm font-bold rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none">
                                             <SelectValue placeholder="Select Type" />
                                         </SelectTrigger>
-                                        <SelectContent className="z-[200] max-h-[300px]">
-                                            {formData.fleetType ? getSpecificTypes(formData.fleetType).map(t => (
-                                                <SelectItem key={t} value={t}>{t}</SelectItem>
+                                        <SelectContent className="z-[200] max-h-[300px] rounded-2xl">
+                                            {equipmentTypes.length > 0 ? equipmentTypes.map(t => (
+                                                <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
                                             )) : (
-                                                <SelectItem value="none" disabled>Select Fleet Type First</SelectItem>
+                                                <SelectItem value="none" disabled>Select Fleet Classification First</SelectItem>
                                             )}
                                         </SelectContent>
                                     </Select>
                                 </div>
 
-                                <div className="space-y-2">
-                                    {autoFilledFields.includes('make') ? (
-                                        <div className="auto-filled-badge"><Zap className="w-3 h-3" /> Auto-filled from VIN</div>
-                                    ) : (
-                                        <Label>Make</Label>
-                                    )}
+                                <div className="space-y-1.5">
+                                    <div className="flex justify-between items-center min-h-[15px] px-1">
+                                        {autoFilledFields.includes('make') ? (
+                                            <div className="auto-filled-badge"><Zap className="w-3 h-3" /> Auto-filled from VIN</div>
+                                        ) : (
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Make</label>
+                                        )}
+                                    </div>
                                     <div className="relative">
-                                        <Input
+                                        <input
                                             list="make-suggestions"
-                                            className={`w-full bg-slate-50 border-slate-200 py-4 h-auto text-sm font-bold transition-all ${autoFilledFields.includes('make') ? 'auto-filled-field' : ''}`}
+                                            className={`w-full bg-slate-50 border border-slate-200 px-5 py-4 h-auto text-sm font-bold rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all ${autoFilledFields.includes('make') ? 'auto-filled-field' : ''}`}
                                             placeholder="Select or Type Make"
                                             value={formData.make}
                                             onChange={(e) => setFormData({ ...formData, make: e.target.value })}
                                         />
                                         {autoFilledFields.includes('make') && <Lock className="w-3 h-3 text-indigo-400 absolute right-3 top-1/2 -translate-y-1/2 opacity-50" />}
                                         <datalist id="make-suggestions">
-                                            {formData.fleetType && getManufacturers(formData.fleetType).map(m => (
-                                                <option key={m} value={m} />
-                                            ))}
+                                            {(() => {
+                                                const catName = categories.find(c => c.id === formData.fleetCategoryId)?.name || '';
+                                                return getManufacturers(catName).map(m => (
+                                                    <option key={m} value={m} />
+                                                ));
+                                            })()}
                                         </datalist>
-
                                     </div>
                                 </div>
                             </div>
@@ -326,16 +376,17 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             {/* 5. Status, Model, Year */}
                             <div className="grid grid-cols-3 gap-6">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Status</label>
+                                    <div className="min-h-[15px] px-1">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Status</label>
+                                    </div>
                                     <select
-                                        className={`w-full px-5 py-4 border rounded-2xl text-sm font-black outline-none appearance-none cursor-pointer transition-all ${getStatusColor(formData.operationalStatus || EquipmentOperationalStatus.Active)}`}
-                                        value={formData.operationalStatus}
-                                        onChange={e => setFormData({ ...formData, operationalStatus: Number(e.target.value) })}
+                                        className={`w-full px-5 py-4 border rounded-2xl text-sm font-black outline-none appearance-none cursor-pointer transition-all bg-slate-50 ${getStatusColor(formData.operationalStatus || EquipmentOperationalStatus.Active)}`}
+                                        value={formData.status}
+                                        onChange={e => setFormData({ ...formData, status: Number(e.target.value) })}
                                     >
-                                        {Object.keys(EquipmentOperationalStatus)
-                                            .filter(k => isNaN(Number(k))) // Filter out numeric keys to get string names
-                                            .map(key => {
-                                                const val = EquipmentOperationalStatus[key as keyof typeof EquipmentOperationalStatus];
+                                        {Object.entries(EquipmentOperationalStatus)
+                                            .filter(([k, v]) => typeof v === 'number')
+                                            .map(([key, val]) => {
                                                 return (
                                                     <option key={val} value={val} className="bg-white text-slate-900">
                                                         {key.replace(/([A-Z])/g, ' $1').trim()}
@@ -346,11 +397,13 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                 </div>
 
                                 <div className="space-y-1.5 relative">
-                                    {autoFilledFields.includes('model') ? (
-                                        <div className="auto-filled-badge"><Zap className="w-3 h-3" /> Auto-filled</div>
-                                    ) : (
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model</label>
-                                    )}
+                                    <div className="flex justify-between items-center min-h-[15px] px-1">
+                                        {autoFilledFields.includes('model') ? (
+                                            <div className="auto-filled-badge"><Zap className="w-3 h-3" /> Auto-filled</div>
+                                        ) : (
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model</label>
+                                        )}
+                                    </div>
                                     <div className="relative">
                                         <input
                                             required
@@ -365,11 +418,13 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                 </div>
 
                                 <div className="space-y-1.5 relative">
-                                    {autoFilledFields.includes('year') ? (
-                                        <div className="auto-filled-badge"><Zap className="w-3 h-3" /> Auto-filled</div>
-                                    ) : (
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model Year</label>
-                                    )}
+                                    <div className="flex justify-between items-center min-h-[15px] px-1">
+                                        {autoFilledFields.includes('year') ? (
+                                            <div className="auto-filled-badge"><Zap className="w-3 h-3" /> Auto-filled</div>
+                                        ) : (
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model Year</label>
+                                        )}
+                                    </div>
                                     <div className="relative">
                                         <input
                                             required
@@ -384,20 +439,52 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                 </div>
                             </div>
 
-                            {/* 6. License Details (Moved to Bottom) */}
+                            {/* 6. Usage Metrics (Added) */}
                             <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-100/50">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">License Number (Optional)</label>
+                                    <div className="min-h-[15px] px-1 flex items-center">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Odometer (Miles)</label>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        placeholder="0"
+                                        value={formData.mileage}
+                                        onChange={e => setFormData({ ...formData, mileage: parseInt(e.target.value) || 0 })}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <div className="min-h-[15px] px-1 flex items-center">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Engine Hours</label>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        placeholder="0"
+                                        value={formData.hours || 0}
+                                        onChange={e => setFormData({ ...formData, hours: parseFloat(e.target.value) || 0 })}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* 7. License Details */}
+                            <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-100/50">
+                                <div className="space-y-1.5">
+                                    <div className="min-h-[15px] px-1 flex items-center">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">License Number (Optional)</label>
+                                    </div>
                                     <input
                                         type="text"
-                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none uppercase placeholder:text-slate-300 transition-all"
+                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none uppercase placeholder:text-slate-300 transition-all font-mono"
                                         placeholder="ABC-1234"
                                         value={formData.licensePlate}
                                         onChange={e => setFormData({ ...formData, licensePlate: e.target.value.toUpperCase() })}
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Issuing State (Optional)</label>
+                                    <div className="min-h-[15px] px-1 flex items-center">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Issuing State (Optional)</label>
+                                    </div>
                                     <Select
                                         value={formData.licenseState}
                                         onValueChange={(val) => setFormData({ ...formData, licenseState: val })}

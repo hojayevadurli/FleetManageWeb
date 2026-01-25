@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
+import { equipmentApi, mapDtoToEquipment, EquipmentCreatePayload } from "@/lib/equipmentApi";
 import { fleetCategoriesApi, FleetCategory } from "@/lib/fleetCategoriesApi";
 import { equipmentTypesApi } from "@/lib/equipmentTypesApi";
 import { tenantsApi } from "@/lib/tenantsApi";
@@ -9,12 +9,12 @@ import { tenantsApi } from "@/lib/tenantsApi";
 import EquipmentDetail from "@/components/equipment/EquipmentDetail";
 import EquipmentList from "@/components/equipment/EquipmentList";
 import { workOrdersApi } from "@/lib/workOrdersApi";
-import { Equipment, WorkOrder, EquipmentStatus, WorkOrderStatus, EquipmentLifecycleStatus, EquipmentOperationalStatus, WorkOrderPriority, WorkOrderCostSource, EquipmentTypeDto, FleetType } from "@/lib/types";
+import { Equipment, WorkOrder, EquipmentOperationalStatus, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource, EquipmentTypeDto } from "@/lib/types";
 
 const VehicleManager = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const initialStatus = queryParams.get('status') as EquipmentStatus | null;
+  const initialStatus = queryParams.get('status') ? parseInt(queryParams.get('status')!) as EquipmentOperationalStatus : null;
 
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,54 +127,17 @@ const VehicleManager = () => {
     fetchWO();
   }, [selectedEquipment]);
 
-  const handleAddEquipment = async (e: Omit<Equipment, 'id'>) => {
+  const handleAddEquipment = async (e: EquipmentCreatePayload) => {
     try {
-      // Logic to find best matching Category and Type IDs based on user selection
-      let mappedCatId = e.fleetCategoryId;
-      let mappedTypeId = e.equipmentTypeId;
-
-      if (!mappedCatId && e.fleetType) {
-        // Try to map from fleetType string (TRUCK, TRAILER, etc.) to a Category Name
-        // Simple heuristic: Category Name contains "Truck", "Trailer", "Heavy"
-        const targetName = e.fleetType === 'TRUCK' ? 'Truck' : e.fleetType === 'TRAILER' ? 'Trailer' : 'Heavy';
-        const match = fleetCategories.find(c => c.name.toLowerCase().includes(targetName.toLowerCase()));
-        if (match) mappedCatId = match.id;
-        else if (fleetCategories.length > 0) mappedCatId = fleetCategories[0].id; // Fallback to first available
-      }
-
-      if (!mappedTypeId && e.specificType) {
-        // Try to find exact name match for specific type
-        const match = equipmentTypes.find(t => t.name.toLowerCase() === e.specificType?.toLowerCase());
-        if (match) mappedTypeId = match.id.toString();
-
-        // If not found, try to find one that matches fleetType to be safe
-        if (!mappedTypeId && mappedCatId) {
-          const fallbackMatch = equipmentTypes.find(t => t.fleetCategoryId === mappedCatId);
-          if (fallbackMatch) mappedTypeId = fallbackMatch.id.toString();
-        }
-      }
-
-      const payload: any = {
-        equipmentTypeId: mappedTypeId,
-        fleetCategoryId: mappedCatId,
-        unitNumber: e.unitNumber,
+      const payload: EquipmentCreatePayload = {
+        ...e,
+        plateNumber: e.licensePlate, // Map for backend
         displayName: e.unitNumber,
-        vin: e.vin,
-        serialNumber: e.serialNumber,
-        plateNumber: e.licensePlate,
-        make: e.make,
-        model: e.model,
-        year: e.year,
-        operationalStatus: (e as any).operationalStatus || EquipmentOperationalStatus.Active,
-        lifecycleStatus: EquipmentLifecycleStatus.Active,
+        operationalStatus: e.operationalStatus || EquipmentOperationalStatus.Active,
         acquiredDate: new Date().toISOString().split('T')[0],
         inServiceDate: new Date().toISOString().split('T')[0],
-        notes: e.notes,
-        initialOdometer: (e as any).initialOdometer || 0,
-        initialHours: (e as any).initialHours || 0,
-        specs: {
-          licenseState: (e as any).licenseState
-        }
+        initialOdometer: e.initialOdometer || 0,
+        initialHours: e.initialHours || 0,
       };
       await equipmentApi.create(payload);
       toast({ title: "Equipment Added", description: `${e.unitNumber} has been successfully onboarded.` });
@@ -224,16 +187,7 @@ const VehicleManager = () => {
     if (!selectedEquipment) return;
     try {
       // Optimistic update
-      // Map back to string status for compatibility with other components if necessary
-      let stringStatus = EquipmentStatus.ACTIVE;
-      switch (status) {
-        case EquipmentOperationalStatus.Active: stringStatus = EquipmentStatus.ACTIVE; break;
-        case EquipmentOperationalStatus.InShop: stringStatus = EquipmentStatus.IN_SHOP; break;
-        case EquipmentOperationalStatus.OutOfService: stringStatus = EquipmentStatus.OUT_OF_SERVICE; break;
-        case EquipmentOperationalStatus.Sold: stringStatus = EquipmentStatus.SOLD; break;
-      }
-
-      const updatedEquipment = { ...selectedEquipment, operationalStatus: status, status: stringStatus };
+      const updatedEquipment = { ...selectedEquipment, status: status };
       setSelectedEquipment(updatedEquipment);
       setEquipmentList(prev => prev.map(v => v.id === selectedEquipment.id ? updatedEquipment : v));
 
@@ -250,8 +204,6 @@ const VehicleManager = () => {
         model: selectedEquipment.model,
         year: selectedEquipment.year,
         operationalStatus: status,
-        lifecycleStatus: status === EquipmentOperationalStatus.Sold ? EquipmentLifecycleStatus.Sold :
-          EquipmentLifecycleStatus.Active, // Simplified lifecycle mapping
         outOfServiceDate: status === EquipmentOperationalStatus.OutOfService ? new Date().toISOString().split('T')[0] : selectedEquipment.outOfServiceDate,
         notes: selectedEquipment.notes
         // Add other fields if needed by backend DTO
@@ -296,20 +248,8 @@ const VehicleManager = () => {
         model: data.model,
         year: data.year,
 
-        // Operational Status mapping - ensure integer values
-        operationalStatus: (() => {
-          const s = (data.status || '').toLowerCase();
-          if (s === EquipmentStatus.IN_SHOP) return 2; // InShop
-          if (s === EquipmentStatus.OUT_OF_SERVICE) return 3; // OutOfService
-          return 1; // Available
-        })(),
-
-        lifecycleStatus: (() => {
-          const s = (data.status || '').toLowerCase();
-          if (s === EquipmentStatus.SOLD) return 3; // Sold
-          if (s === EquipmentStatus.ARCHIVED) return 2; // Retired
-          return 1; // Active
-        })(),
+        // Operational Status mapping
+        operationalStatus: data.status,
 
         // Specs
         length: Number(data.length) || 0,

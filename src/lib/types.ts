@@ -1,17 +1,3 @@
-export enum EquipmentStatus {
-  ACTIVE = 'active',
-  IN_SHOP = 'in shop',
-  OUT_OF_SERVICE = 'out of service',
-  SOLD = 'sold',
-  ARCHIVED = 'archived'
-}
-
-export enum EquipmentLifecycleStatus {
-  Active = 1,
-  Retired = 2,
-  Sold = 3
-}
-
 export enum EquipmentOperationalStatus {
   Active = 1,
   InShop = 2,
@@ -19,8 +5,9 @@ export enum EquipmentOperationalStatus {
   Sold = 4
 }
 
+
+
 // 63+ types supported now
-export type FleetType = 'TRUCK' | 'TRAILER' | 'HEAVY_EQUIPMENT';
 export type EquipmentType = string;
 
 export enum WorkOrderStatus {
@@ -128,8 +115,7 @@ export interface Equipment {
   vin?: string;
   serialNumber?: string;
   licensePlate?: string;
-  status: EquipmentStatus;
-  operationalStatus?: EquipmentOperationalStatus;
+  status: EquipmentOperationalStatus;
   lastServiceDate?: string;
   acquiredDate?: string;
 
@@ -139,10 +125,12 @@ export interface Equipment {
 
   // Common optional specs
   mileage?: number;
+  hours?: number;
   engineType?: string;
   fuelType?: string;
   length?: number;
   weightCapacity?: number;
+  licenseState?: string;
   purchasedAt?: string;
   notes?: string;
 
@@ -150,7 +138,6 @@ export interface Equipment {
   specs?: Record<string, string | number | boolean>;
 
   // Categorization
-  fleetType?: 'TRUCK' | 'TRAILER' | 'HEAVY_EQUIPMENT';
   specificType?: string; // e.g. "Sleeper Tractor", "Dry Van"
 
   // Department/Industry links
@@ -212,7 +199,6 @@ export interface EquipmentDto {
   model: string;
   year: number;
   plateNumber: string;
-  lifecycleStatus: EquipmentLifecycleStatus;
   operationalStatus: EquipmentOperationalStatus;
   odometerCurrent: number;
   hoursCurrent: number;

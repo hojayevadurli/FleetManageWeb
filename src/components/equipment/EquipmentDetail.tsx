@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
     ArrowLeft,
     Container,
@@ -17,7 +17,10 @@ import {
     FileText,
     FileCheck,
     Pencil,
-    Trash2
+    Trash2,
+    Plus,
+    AlertTriangle,
+    Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -30,11 +33,19 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Equipment, EquipmentStatus, EquipmentOperationalStatus, WorkOrder, ChatMessage, Warranty, EquipmentDocRole } from '@/lib/types';
+import { Equipment, EquipmentOperationalStatus, WorkOrder, ChatMessage, Warranty, EquipmentDocRole } from '@/lib/types';
 import { getEquipmentChatResponse } from '@/lib/gemini';
 
 interface ExtendedChatMessage extends ChatMessage {
     sources?: any[];
+}
+
+interface ChatSession {
+    id: string;
+    title: string;
+    timestamp: Date;
+    preview: string;
+    messages: ExtendedChatMessage[];
 }
 
 interface EquipmentDetailProps {
@@ -52,6 +63,8 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAddWarrantyOpen, setIsAddWarrantyOpen] = useState(false);
 
+    const isReadOnly = equipment.status === EquipmentOperationalStatus.OutOfService || equipment.status === EquipmentOperationalStatus.Sold;
+
     const handleEditSave = async (data: any) => {
         if (onUpdate) {
             await onUpdate(data);
@@ -66,11 +79,83 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     };
 
     const [isAiPanelOpen, setIsAiPanelOpen] = useState(initialAiOpen || false);
-    const [messages, setMessages] = useState<ExtendedChatMessage[]>([]);
-    const [input, setInput] = useState('');
-    const [isTyping, setIsTyping] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
     const [warranties, setWarranties] = useState<Warranty[]>([]);
+    const [input, setInput] = useState('');
+    const [isTyping, setIsTyping] = useState(false);
+    const [sessions, setSessions] = useState<ChatSession[]>([]);
+    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+    // Derived messages for the UI
+    const messages = useMemo(() => {
+        if (!currentSessionId) return [];
+        return sessions.find(s => s.id === currentSessionId)?.messages || [];
+    }, [sessions, currentSessionId]);
+
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    // PERSISTENCE: Save/Load Sessions
+    useEffect(() => {
+        setIsLoaded(false);
+        const savedSessions = localStorage.getItem(`fleet_chat_sessions_${equipment.id}`);
+
+        let loadedSessions: ChatSession[] = [];
+
+        // 1. Load Sessions if exist
+        if (savedSessions) {
+            try {
+                const parsed = JSON.parse(savedSessions);
+                loadedSessions = parsed.map((s: any) => ({
+                    ...s,
+                    timestamp: new Date(s.timestamp),
+                    messages: s.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
+                }));
+            } catch (err) {
+                console.warn("Failed to parse sessions", err);
+            }
+        }
+
+        // 2. Migration Check: Do we have legacy messages but NO sessions?
+        // Only run migration if we found NO new sessions to avoid overwriting.
+        if (loadedSessions.length === 0) {
+            const legacy = localStorage.getItem(`fleet_chat_${equipment.id}`);
+            if (legacy) {
+                try {
+                    const parsedLegacy = JSON.parse(legacy);
+                    if (parsedLegacy.length > 0) {
+                        const restoredMsg = parsedLegacy.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+                        const migratedSession: ChatSession = {
+                            id: 'migrated_legacy',
+                            title: 'Previous Consultation',
+                            timestamp: new Date(),
+                            preview: 'Restored history...',
+                            messages: restoredMsg
+                        };
+                        loadedSessions = [migratedSession];
+                        // Clear legacy key to mark migration done
+                        localStorage.removeItem(`fleet_chat_${equipment.id}`);
+                    }
+                } catch (e) {
+                    console.warn("Legacy migration failed", e);
+                }
+            }
+        }
+
+        setSessions(loadedSessions);
+        // Default to opening the most recent session if exists
+        if (loadedSessions.length > 0) {
+            setCurrentSessionId(loadedSessions[0].id);
+        } else {
+            setCurrentSessionId(null);
+        }
+
+        setIsLoaded(true);
+    }, [equipment.id]);
+
+    useEffect(() => {
+        if (!isLoaded) return;
+        localStorage.setItem(`fleet_chat_sessions_${equipment.id}`, JSON.stringify(sessions));
+    }, [sessions, isLoaded, equipment.id]);
 
     // Tab State
     const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'ai' | 'spend' | 'warranty'>('dashboard');
@@ -102,19 +187,37 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
             timestamp: new Date()
         };
 
-        setMessages(prev => [...prev, userMsg]);
+        // If no session active, create one
+        let activeSessionId = currentSessionId;
+        if (!activeSessionId) {
+            const newId = Date.now().toString();
+            activeSessionId = newId;
+            const newSession: ChatSession = {
+                id: newId,
+                title: textToSend.length > 30 ? textToSend.substring(0, 30) + '...' : textToSend,
+                timestamp: new Date(),
+                preview: textToSend,
+                messages: [userMsg]
+            };
+            setSessions(prev => [newSession, ...prev]);
+            setCurrentSessionId(newId);
+        } else {
+            // Append to existing
+            setSessions(prev => prev.map(s => {
+                if (s.id === activeSessionId) {
+                    return {
+                        ...s,
+                        messages: [...s.messages, userMsg],
+                        preview: textToSend, // Update preview to latest
+                        timestamp: new Date()
+                    };
+                }
+                return s;
+            }));
+        }
+
         setInput('');
         setIsTyping(true);
-
-        // Geolocation removed for simplicity in this refactor or handled if needed, assuming okay to skip for now or keep simplistic
-        // Keeping it consistent with previous file logic if possible, but simplified here to reduce boilerplate risk.
-        // Actually, let's keep it to ensure no regression.
-        let latLng;
-        try {
-            // Mock or real, keeping it safe
-        } catch (err) {
-            console.warn("Geolocation skipped", err);
-        }
 
         const { text, sources } = await getEquipmentChatResponse(equipment, equipmentHistory, textToSend, warranties);
 
@@ -126,8 +229,30 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
             timestamp: new Date()
         };
 
-        setMessages(prev => [...prev, aiMsg]);
+        setSessions(prev => prev.map(s => {
+            if (s.id === activeSessionId) {
+                return {
+                    ...s,
+                    messages: [...s.messages, aiMsg]
+                };
+            }
+            return s;
+        }));
         setIsTyping(false);
+    };
+
+    const handleNewChat = () => {
+        setCurrentSessionId(null);
+    };
+
+    const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
+        e.stopPropagation();
+        if (window.confirm("Delete this conversation?")) {
+            setSessions(prev => prev.filter(s => s.id !== sessionId));
+            if (currentSessionId === sessionId) {
+                setCurrentSessionId(null);
+            }
+        }
     };
 
     return (
@@ -164,6 +289,33 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                     )}
                 </div>
 
+
+
+                {/* Read Only Banner */}
+                {isReadOnly && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2 mb-8">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-100 rounded-xl">
+                                <Lock className="w-5 h-5 text-amber-600" />
+                            </div>
+                            <div>
+                                <h4 className="font-black text-amber-800 text-sm">Read-Only Mode Active</h4>
+                                <p className="text-xs font-bold text-amber-600/80 mt-0.5">
+                                    This asset is marked as {equipment.status === EquipmentOperationalStatus.OutOfService ? 'Out of Service' : 'Sold'}. creating new records is disabled.
+                                </p>
+                            </div>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsEditModalOpen(true)}
+                            className="text-amber-700 hover:text-amber-800 hover:bg-amber-100 font-bold text-xs uppercase tracking-wider"
+                        >
+                            Change Status
+                        </Button>
+                    </div>
+                )}
+
                 <div className="flex p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm">
                     {(['dashboard', 'history', 'ai', 'spend', 'warranty'] as const).map(tab => (
                         <Button
@@ -197,12 +349,12 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             <div className="flex-[3] bg-white rounded-[3rem] p-10 border border-slate-200 shadow-sm relative overflow-hidden">
                                 <div className="mb-6">
                                     <Select
-                                        value={equipment.operationalStatus?.toString()}
+                                        value={equipment.status.toString()}
                                         onValueChange={(val) => onUpdateStatus && onUpdateStatus(Number(val) as EquipmentOperationalStatus)}
                                     >
-                                        <SelectTrigger className={`w-auto min-w-[140px] px-4 py-1.5 h-auto rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${equipment.operationalStatus === EquipmentOperationalStatus.Active ? 'bg-emerald-100/50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300' :
-                                                equipment.operationalStatus === EquipmentOperationalStatus.InShop ? 'bg-amber-100/50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300' :
-                                                    'bg-rose-100/50 text-rose-700 border-rose-200 hover:bg-rose-100 hover:border-rose-300'
+                                        <SelectTrigger className={`w-auto min-w-[140px] px-4 py-1.5 h-auto rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${equipment.status === EquipmentOperationalStatus.Active ? 'bg-emerald-100/50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300' :
+                                            equipment.status === EquipmentOperationalStatus.InShop ? 'bg-amber-100/50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300' :
+                                                'bg-rose-100/50 text-rose-700 border-rose-200 hover:bg-rose-100 hover:border-rose-300'
                                             }`}>
                                             <SelectValue />
                                         </SelectTrigger>
@@ -424,19 +576,75 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                 )}
 
                 {/* AI View */}
+                {/* AI View */}
                 {activeTab === 'ai' && (
-                    <div className="bg-white p-20 rounded-[3rem] border border-slate-200 shadow-sm text-center animate-in zoom-in-95 duration-200">
-                        <div className="bg-blue-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                            <Sparkles className="w-12 h-12 text-blue-500" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in zoom-in-95 duration-200">
+                        {/* Session History List */}
+                        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col max-h-[600px]">
+                            <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50">
+                                <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest flex items-center gap-2">
+                                    <History className="w-4 h-4 text-slate-400" /> Recent Consultations
+                                </h3>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                                {sessions.length > 0 ? (
+                                    sessions.map(session => (
+                                        <div
+                                            key={session.id}
+                                            onClick={() => {
+                                                setCurrentSessionId(session.id);
+                                                setIsAiPanelOpen(true);
+                                            }}
+                                            className="group p-5 bg-white border border-slate-100 rounded-2xl hover:bg-blue-50 hover:border-blue-200 cursor-pointer transition-all shadow-sm flex justify-between items-start"
+                                        >
+                                            <div className="space-y-1">
+                                                <div className="font-bold text-slate-800 group-hover:text-blue-700 text-sm line-clamp-1">{session.title}</div>
+                                                <div className="text-xs text-slate-500 line-clamp-2">{session.preview}</div>
+                                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider pt-2">{session.timestamp.toLocaleDateString()}</div>
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={(e) => handleDeleteSession(e, session.id)}
+                                                className="opacity-0 group-hover:opacity-100 hover:bg-rose-100 hover:text-rose-600 h-8 w-8 rounded-xl transition-all"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-10 opacity-50">
+                                        <div className="bg-slate-50 w-16 h-16 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4">
+                                            <Bot className="w-8 h-8 text-slate-300" />
+                                        </div>
+                                        <p className="text-xs font-bold text-slate-400">No past conversations</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        <h3 className="text-2xl font-black text-slate-900 mb-4">Deep Intelligence Active</h3>
-                        <Button
-                            size="lg"
-                            className="h-16 px-8 rounded-2xl font-black text-base shadow-xl shadow-blue-500/30"
-                            onClick={() => setIsAiPanelOpen(true)}
-                        >
-                            Open AI Assistant Panel
-                        </Button>
+
+                        {/* New Chat CTA */}
+                        <div className="bg-blue-600 p-10 rounded-[2.5rem] shadow-xl shadow-blue-500/20 text-center flex flex-col items-center justify-center text-white h-full min-h-[400px]">
+                            <div className="bg-white/10 w-24 h-24 rounded-full flex items-center justify-center mb-8 backdrop-blur-md">
+                                <Sparkles className="w-12 h-12 text-white" />
+                            </div>
+                            <h3 className="text-2xl font-black mb-4">Start New Analysis</h3>
+                            <p className="text-blue-100 text-sm font-medium mb-8 max-w-xs leading-relaxed">
+                                Initialize a fresh diagnostic session with the Unit Intelligence Expert.
+                            </p>
+                            <Button
+                                size="lg"
+                                disabled={isReadOnly}
+                                className={`h-14 px-8 rounded-2xl font-black text-blue-600 bg-white hover:bg-blue-50 shadow-lg border-0 ${isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                onClick={() => {
+                                    if (isReadOnly) return;
+                                    handleNewChat();
+                                    setIsAiPanelOpen(true);
+                                }}
+                            >
+                                {isReadOnly ? <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> Disabled</span> : 'New Consultation'}
+                            </Button>
+                        </div>
                     </div>
                 )}
 
@@ -452,22 +660,26 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                 <p className="text-slate-500 font-medium max-w-md mx-auto mb-8">
                                     Upload written warranties, extended coverage docs, or capture policy details for AI analysis.
                                 </p>
+
                                 <Button
                                     size="lg"
-                                    onClick={() => setIsAddWarrantyOpen(true)}
+                                    disabled={isReadOnly}
+                                    onClick={() => !isReadOnly && setIsAddWarrantyOpen(true)}
                                     className="h-14 px-8 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl"
                                 >
-                                    + Add Warranty Record
+                                    {isReadOnly ? <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> Read Only</span> : '+ Add Warranty Record'}
                                 </Button>
                             </div>
                         ) : (
                             <>
                                 <div className="flex justify-end">
                                     <Button
-                                        onClick={() => setIsAddWarrantyOpen(true)}
+                                        disabled={isReadOnly}
+                                        onClick={() => !isReadOnly && setIsAddWarrantyOpen(true)}
                                         className="h-12 px-6 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg gap-2"
                                     >
-                                        <FileCheck className="w-4 h-4" /> Add Another
+                                        {isReadOnly ? <Lock className="w-4 h-4" /> : <FileCheck className="w-4 h-4" />}
+                                        {isReadOnly ? 'Read Only' : 'Add Another'}
                                     </Button>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -531,11 +743,12 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             </>
                         )}
                     </div>
-                )}
-            </div>
+                )
+                }
+            </div >
 
             {/* Dialogs */}
-            <AddWarrantyDialog
+            < AddWarrantyDialog
                 open={isAddWarrantyOpen}
                 onOpenChange={setIsAddWarrantyOpen}
                 onSave={(w) => {
@@ -557,9 +770,21 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                 <p className="text-[10px] text-blue-400 font-black tracking-[0.2em] uppercase">Autonomous Fleet Advisor</p>
                             </div>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={() => setIsAiPanelOpen(false)} className="hover:bg-slate-800 text-white hover:text-white rounded-2xl h-12 w-12">
-                            <X className="w-8 h-8" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleNewChat}
+                                disabled={isReadOnly}
+                                title={isReadOnly ? "New Chat Disabled" : "New Chat"}
+                                className={`hover:bg-slate-800 text-slate-400 hover:text-white rounded-2xl h-12 w-12 ${isReadOnly ? 'opacity-30 cursor-not-allowed' : ''}`}
+                            >
+                                <Plus className="w-6 h-6" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => setIsAiPanelOpen(false)} className="hover:bg-slate-800 text-white hover:text-white rounded-2xl h-12 w-12">
+                                <X className="w-8 h-8" />
+                            </Button>
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-slate-50/50 custom-scrollbar">
@@ -644,7 +869,22 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                     </div>
                 </div>
             </div>
-        </div>
+
+            {
+                isEditModalOpen && (
+                    <EquipmentFormModal
+                        isOpen={isEditModalOpen}
+                        onClose={() => setIsEditModalOpen(false)}
+                        onSave={handleEditSave}
+                        mode="edit"
+                        initialData={{
+                            ...equipment,
+                            specificType: equipment.specificType || equipment.equipmentTypeName
+                        }}
+                    />
+                )
+            }
+        </div >
     );
 };
 

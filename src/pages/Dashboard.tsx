@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AnalyticsDashboard from "@/components/dashboard/AnalyticsDashboard";
 import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
 import { workOrdersApi } from "@/lib/workOrdersApi";
-import { Equipment, WorkOrder, EquipmentStatus, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
+import { Equipment, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
 
 const Dashboard = () => {
   const navigate = useNavigate();
