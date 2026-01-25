@@ -165,7 +165,7 @@ const VehicleManager = () => {
         make: e.make,
         model: e.model,
         year: e.year,
-        operationalStatus: EquipmentOperationalStatus.Available,
+        operationalStatus: (e as any).operationalStatus || EquipmentOperationalStatus.Active,
         lifecycleStatus: EquipmentLifecycleStatus.Active,
         acquiredDate: new Date().toISOString().split('T')[0],
         inServiceDate: new Date().toISOString().split('T')[0],
@@ -220,11 +220,20 @@ const VehicleManager = () => {
     }
   };
 
-  const handleUpdateStatus = async (status: EquipmentStatus) => {
+  const handleUpdateStatus = async (status: EquipmentOperationalStatus) => {
     if (!selectedEquipment) return;
     try {
       // Optimistic update
-      const updatedEquipment = { ...selectedEquipment, status };
+      // Map back to string status for compatibility with other components if necessary
+      let stringStatus = EquipmentStatus.ACTIVE;
+      switch (status) {
+        case EquipmentOperationalStatus.Active: stringStatus = EquipmentStatus.ACTIVE; break;
+        case EquipmentOperationalStatus.InShop: stringStatus = EquipmentStatus.IN_SHOP; break;
+        case EquipmentOperationalStatus.OutOfService: stringStatus = EquipmentStatus.OUT_OF_SERVICE; break;
+        case EquipmentOperationalStatus.Sold: stringStatus = EquipmentStatus.SOLD; break;
+      }
+
+      const updatedEquipment = { ...selectedEquipment, operationalStatus: status, status: stringStatus };
       setSelectedEquipment(updatedEquipment);
       setEquipmentList(prev => prev.map(v => v.id === selectedEquipment.id ? updatedEquipment : v));
 
@@ -240,24 +249,16 @@ const VehicleManager = () => {
         make: selectedEquipment.make,
         model: selectedEquipment.model,
         year: selectedEquipment.year,
-        operationalStatus: (() => {
-          switch (status) {
-            case EquipmentStatus.ACTIVE: return EquipmentOperationalStatus.Available;
-            case EquipmentStatus.IN_SHOP: return EquipmentOperationalStatus.InShop;
-            case EquipmentStatus.OUT_OF_SERVICE: return EquipmentOperationalStatus.OutOfService;
-            default: return EquipmentOperationalStatus.Available;
-          }
-        })(),
-        lifecycleStatus: status === EquipmentStatus.SOLD ? EquipmentLifecycleStatus.Sold :
-          status === EquipmentStatus.ARCHIVED ? EquipmentLifecycleStatus.Retired :
-            EquipmentLifecycleStatus.Active,
-        outOfServiceDate: status === EquipmentStatus.OUT_OF_SERVICE ? new Date().toISOString().split('T')[0] : selectedEquipment.outOfServiceDate,
+        operationalStatus: status,
+        lifecycleStatus: status === EquipmentOperationalStatus.Sold ? EquipmentLifecycleStatus.Sold :
+          EquipmentLifecycleStatus.Active, // Simplified lifecycle mapping
+        outOfServiceDate: status === EquipmentOperationalStatus.OutOfService ? new Date().toISOString().split('T')[0] : selectedEquipment.outOfServiceDate,
         notes: selectedEquipment.notes
         // Add other fields if needed by backend DTO
       };
 
       await equipmentApi.update(selectedEquipment.id, payload);
-      toast({ title: "Status Updated", description: `Unit is now ${status}` });
+      toast({ title: "Status Updated", description: `Unit status updated` });
     } catch (err: any) {
       console.error("Status update error details:", err.response?.data);
       const errorMsg = err.response?.data?.message || err.message;
