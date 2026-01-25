@@ -22,7 +22,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
     const breakdowns = workOrders.filter(wo => (wo as any).isRoadside && wo.status !== WorkOrderStatus.Completed);
 
     // Maintenance Spend from Service Records
-    const totalSpend = serviceRecords.reduce((acc, sr) => acc + (sr.estimatedTotal || 0), 0);
+    const totalSpend = serviceRecords.reduce((acc, sr) => acc + (sr.totalCost || 0), 0);
 
     const statusData = [
         { name: 'Active', value: activeUnits, color: '#10b981' }, // emerald-500
@@ -97,7 +97,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                         </div>
                         <div className="h-80 w-full">
                             <ResponsiveContainer width="100%" height="100%" debounce={100}>
-                                <BarChart data={statusData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                <BarChart data={statusData} margin={{ top: 10, right: 30, left: 0, bottom: 30 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                     <XAxis
                                         dataKey="name"
@@ -193,7 +193,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                                             <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate mt-0.5">{vendorDisplay}</div>
                                         </div>
                                         <div className="text-right shrink-0">
-                                            <div className="text-sm font-black text-slate-900 tracking-tight">${(sr.estimatedTotal || 0).toLocaleString()}</div>
+                                            <div className="text-sm font-black text-slate-900 tracking-tight">${(sr.totalCost || 0).toLocaleString()}</div>
                                             <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md mt-1 inline-block ${statusColor}`}>
                                                 {statusLabel}
                                             </div>

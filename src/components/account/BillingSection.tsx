@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import tenantsApi, { Tenant } from "@/lib/tenantsApi";
 import billingApi, { STRIPE_PRICE_ID } from "@/lib/billingApi";
+import equipmentApi from "@/lib/equipmentApi";
 import { differenceInDays, format, parseISO } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -12,17 +13,20 @@ const BillingSection = () => {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
+  const [assetCount, setAssetCount] = useState(0);
 
-  // Still hardcoded as per instruction to do fleet size later
-  const truckCount = 5;
-  const pricePerTruck = 5;
-  const estimatedMonthlyCost = truckCount * pricePerTruck;
+  const pricePerAsset = 6;
+  const estimatedMonthlyCost = assetCount * pricePerAsset;
 
   useEffect(() => {
     const fetchTenantData = async () => {
       try {
-        const data = await tenantsApi.getCurrent();
-        setTenant(data);
+        const [tenantData, equipmentData] = await Promise.all([
+          tenantsApi.getCurrent(),
+          equipmentApi.list()
+        ]);
+        setTenant(tenantData);
+        setAssetCount(equipmentData.length);
       } catch (error) {
         console.error("Failed to fetch tenant data", error);
         toast.error("Failed to load subscription details");
@@ -118,11 +122,11 @@ const BillingSection = () => {
                 </div>
                 <span className="font-medium text-slate-700">Current Fleet Size</span>
               </div>
-              <span className="font-bold text-slate-900">{truckCount} trucks</span>
+              <span className="font-bold text-slate-900">{assetCount} assets</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-slate-200">
-              <span className="font-medium text-slate-700 ml-11">Price per truck</span>
-              <span className="font-bold text-slate-900">${pricePerTruck}.00 / month</span>
+              <span className="font-medium text-slate-700 ml-11">Price per asset</span>
+              <span className="font-bold text-slate-900">${pricePerAsset}.00 / month</span>
             </div>
             <div className="flex items-start justify-between">
               <div>
@@ -131,7 +135,7 @@ const BillingSection = () => {
                 <p className="text-slate-500 mt-2">Billed monthly • Next billing date: {nextBillingDate}</p>
               </div>
               <div className="text-right">
-                <h3 className="text-3xl font-bold text-slate-900">$49<span className="text-lg text-slate-500 font-medium">/mo</span></h3>
+                <h3 className="text-3xl font-bold text-slate-900">${estimatedMonthlyCost}<span className="text-lg text-slate-500 font-medium">/mo</span></h3>
               </div>
             </div>
           </div>
