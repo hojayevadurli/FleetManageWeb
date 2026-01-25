@@ -92,24 +92,7 @@ const ShopRatingInputs = ({ data, onChange, showComment = true, variant = 'defau
                     rows={2}
                 />
 
-                {/* Inline Recommendation */}
-                <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Recommend?</span>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => update('wouldRecommend', true)}
-                            className={`px-3 py-1 rounded text-xs font-bold border transition-all ${data.wouldRecommend === true ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white text-slate-500 border-slate-200 hover:border-green-300'}`}
-                        >
-                            👍 Yes
-                        </button>
-                        <button
-                            onClick={() => update('wouldRecommend', false)}
-                            className={`px-3 py-1 rounded text-xs font-bold border transition-all ${data.wouldRecommend === false ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-white text-slate-500 border-slate-200 hover:border-rose-300'}`}
-                        >
-                            👎 No
-                        </button>
-                    </div>
-                </div>
+                {/* Inline Recommendation removed */}
             </div>
         );
     }
@@ -156,28 +139,7 @@ const ShopRatingInputs = ({ data, onChange, showComment = true, variant = 'defau
                 </div>
             </div>
 
-            {/* 3. Recommendation Toggle */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-slate-50 border border-slate-100 rounded-xl">
-                <span className="text-sm font-bold text-slate-700">Would you recommend them?</span>
-                <div className="flex gap-2 w-full sm:w-auto">
-                    <button
-                        onClick={() => update('wouldRecommend', true)}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all border ${data.wouldRecommend === true
-                            ? 'bg-green-600 text-white border-green-600 shadow-lg shadow-green-200'
-                            : 'bg-white text-slate-500 border-slate-200 hover:border-green-300 hover:text-green-600'}`}
-                    >
-                        👍 Yes
-                    </button>
-                    <button
-                        onClick={() => update('wouldRecommend', false)}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all border ${data.wouldRecommend === false
-                            ? 'bg-rose-600 text-white border-rose-600 shadow-lg shadow-rose-200'
-                            : 'bg-white text-slate-500 border-slate-200 hover:border-rose-300 hover:text-rose-600'}`}
-                    >
-                        👎 No
-                    </button>
-                </div>
-            </div>
+            {/* 3. Recommendation Toggle removed */}
 
             {/* 4. Written Review */}
             {showComment && (

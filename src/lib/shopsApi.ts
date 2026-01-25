@@ -61,66 +61,67 @@ const injectPreference = (comment: string | undefined, preference?: VendorPrefer
 };
 
 const mapBackendShopToShop = (data: any): Shop => {
-    // 1. Parse comment for metadata
-    const { cleanComment, preference: storedPreference } = parseComment(data.comment || data.notes);
+    // 1. Parse comment for metadata (check notes/description too)
+    const { cleanComment, preference: storedPreference } = parseComment(data.comment || data.notes || data.description);
 
     // 2. Determine vendor preference
     // Priority:
-    // a. Explicit field (if backend supports it)
-    // b. Stored metadata in comment
-    // c. Map from rate category/color
-    // d. Default to STANDARD
+    // a. Stored metadata in comment (Our specific source of truth)
+    // b. Explicit field (vendorPreference, vendor_preference)
+    // c. Network Tier field (networkTier, network_tier)
+    // d. Map from rate category/color
+    // e. Default to STANDARD
 
-    // Determine rate category (color) from backend first, but might override later
-    let rateCategory = (data.rateCategory || data.networkTier || 'orange').toLowerCase() as ShopRateCategory;
+    let rateCategory = (data.rateCategory || data.rate_category || data.networkTier || data.network_tier || 'orange').toLowerCase() as ShopRateCategory;
     let vendorPreference: VendorPreference = 'STANDARD';
 
-    if (data.vendorPreference) {
-        vendorPreference = data.vendorPreference;
-    } else if (storedPreference) {
+    const explicitPref = data.vendorPreference || data.vendor_preference;
+    const tierRaw = (data.networkTier || data.network_tier || '').toUpperCase();
+
+    // Check stored preference in comment FIRST (it acts as our override)
+    if (storedPreference) {
         vendorPreference = storedPreference;
-        // If we recovered preference from comment, FORCE the rate category to match
-        // This fixes the issue where backend returns 'orange' for 'blue' preference
         if (PREFERENCE_TO_RATE_CATEGORY[vendorPreference]) {
             rateCategory = PREFERENCE_TO_RATE_CATEGORY[vendorPreference];
         }
-    } else {
-        // If no explicit preference or stored preference, try to derive from networkTier/rateCategory
-        const tierRaw = (data.networkTier || '').toUpperCase();
+    }
+    else if (explicitPref) {
+        vendorPreference = explicitPref;
+    } else if (tierRaw) {
+        // Map backend tier values to frontend preference
         if (tierRaw === 'NEW') vendorPreference = 'NEW';
         else if (tierRaw === 'PARTNER') vendorPreference = 'PARTNER';
         else if (tierRaw === 'PREFERRED' || tierRaw === 'GREEN') vendorPreference = 'PREFERRED';
         else if (tierRaw === 'STANDARD' || tierRaw === 'ORANGE') vendorPreference = 'STANDARD';
         else if (tierRaw === 'RESTRICTED' || tierRaw === 'WARNING' || tierRaw === 'RED') vendorPreference = 'RESTRICTED';
-        else if (RATE_CATEGORY_TO_PREFERENCE[rateCategory]) { // Fallback to mapping from rateCategory
-            vendorPreference = RATE_CATEGORY_TO_PREFERENCE[rateCategory];
-        }
+    } else if (RATE_CATEGORY_TO_PREFERENCE[rateCategory]) {
+        vendorPreference = RATE_CATEGORY_TO_PREFERENCE[rateCategory];
     }
 
     return {
         id: data.id,
-        shop_id: data.shopId || data.id,
-        shop_name: data.name || data.shopName || "Unknown Shop",
+        shop_id: data.shopId || data.shop_id || data.id,
+        shop_name: data.shopName || data.shop_name || data.name || "Unknown Shop",
         address: data.address1 || data.address || "",
-        contact_name: data.contactName,
-        labor_rate: data.laborRate || 0,
+        contact_name: data.contactName || data.contact_name,
+        labor_rate: data.laborRate || data.labor_rate || 0,
         rate_category: rateCategory,
         vendor_preference: vendorPreference,
-        comment: cleanComment, // Use clean comment without tags
+        comment: cleanComment,
         phone: data.phone,
         email: data.email,
         website: data.website,
-        hours_of_operation: data.hoursOfOperation,
+        hours_of_operation: data.hoursOfOperation || data.hours_of_operation,
         specialties: data.specialties || [],
         latitude: data.latitude,
         longitude: data.longitude,
-        average_rating: data.averageRating || 0,
-        total_reviews: data.reviewCount || 0,
-        created_at: data.createdAt || new Date().toISOString(),
-        updated_at: data.updatedAt || new Date().toISOString(),
+        average_rating: data.averageRating || data.average_rating || 0,
+        total_reviews: data.reviewCount || data.total_reviews || 0,
+        created_at: data.createdAt || data.created_at || new Date().toISOString(),
+        updated_at: data.updatedAt || data.updated_at || new Date().toISOString(),
         city: data.city,
         state: data.state,
-        zip: data.postalCode
+        zip: data.postalCode || data.postal_code || data.zip
     };
 };
 
@@ -140,6 +141,8 @@ export const shopsApi = {
     async get(id: string): Promise<Shop | null> {
         try {
             const response = await api.get<any>(`/service-partners/${id}`);
+            // Log raw response for debugging persistence
+            console.log(`[ShopApi] Fetched shop ${id} raw data:`, response.data);
             return mapBackendShopToShop(response.data);
         } catch (error) {
             console.error(`Error fetching shop ${id}:`, error);
@@ -149,13 +152,26 @@ export const shopsApi = {
 
     // POST /api/service-partners
     async create(payload: ShopCreatePayload): Promise<Shop> {
-        // Inject preference into comment
         const commentWithTag = injectPreference(payload.comment, payload.vendorPreference);
-        // Map vendorPreference to networkTier for backend
+        // Robust payload: send multiple variations to ensure backend picks it up
         const payloadToSend = {
             ...payload,
+            // Core fields mapped to likely backend names
+            shopName: payload.name,
+            name: payload.name, // Keep original
+            address: payload.address1,
+            address1: payload.address1, // Keep original
+            postalCode: payload.postalCode,
+            zip: payload.postalCode,
+
             comment: commentWithTag,
-            networkTier: payload.vendorPreference
+            notes: commentWithTag, // Try 'notes' field
+            description: commentWithTag, // Try 'description' field
+
+            // Send Preference as both
+            networkTier: payload.vendorPreference,
+            vendorPreference: payload.vendorPreference,
+            vendor_preference: payload.vendorPreference
         };
 
         const response = await api.post<any>("/service-partners", payloadToSend);
@@ -164,22 +180,52 @@ export const shopsApi = {
 
     // PUT /api/service-partners/{id}
     async update(id: string, payload: ShopUpdatePayload): Promise<Shop> {
-        // Inject preference into comment
         const commentWithTag = injectPreference(payload.comment, payload.vendorPreference);
         console.log('[ShopApi] Updating shop with preference:', {
             original: payload.vendorPreference,
             injectedComment: commentWithTag
         });
 
-        // Map vendorPreference to networkTier for backend
         const payloadToSend = {
             ...payload,
+            // Core fields mapped to likely backend names
+            shopName: payload.name,
+            name: payload.name,
+            address: payload.address1,
+            address1: payload.address1,
+            postalCode: payload.postalCode,
+            zip: payload.postalCode,
+
             comment: commentWithTag,
-            networkTier: payload.vendorPreference
+            notes: commentWithTag, // Try 'notes' field
+            description: commentWithTag, // Try 'description' field
+
+            // Send Preference as both styles
+            networkTier: payload.vendorPreference,
+            vendorPreference: payload.vendorPreference,
+            vendor_preference: payload.vendorPreference
         };
 
         const response = await api.put<any>(`/service-partners/${id}`, payloadToSend);
-        return mapBackendShopToShop(response.data);
+        const mappedShop = mapBackendShopToShop(response.data);
+
+        // CRITICAL FIX: Backend may not echo back preference, force what we sent
+        if (payload.vendorPreference) {
+            mappedShop.vendor_preference = payload.vendorPreference;
+            // Also update rate_category to match
+            mappedShop.rate_category = PREFERENCE_TO_RATE_CATEGORY[payload.vendorPreference];
+        }
+        // Also force other fields that might not be echoed
+        if (payload.name) mappedShop.shop_name = payload.name;
+        if (payload.laborRate) mappedShop.labor_rate = payload.laborRate;
+        if (payload.address1) mappedShop.address = payload.address1;
+        if (payload.phone) mappedShop.phone = payload.phone;
+        if (payload.city) mappedShop.city = payload.city;
+        if (payload.state) mappedShop.state = payload.state;
+        if (payload.postalCode) mappedShop.zip = payload.postalCode;
+
+        console.log('[ShopApi] Returning shop with forced preference:', mappedShop.vendor_preference);
+        return mappedShop;
     },
 
     // DELETE /api/service-partners/{id}

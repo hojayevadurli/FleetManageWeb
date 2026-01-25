@@ -4,61 +4,61 @@ export type ShopRateCategory = 'purple' | 'green' | 'orange' | 'red' | 'blue' | 
 export type VendorPreference = 'NEW' | 'PARTNER' | 'PREFERRED' | 'STANDARD' | 'RESTRICTED';
 
 export const VENDOR_PREFERENCE_CONFIG: Record<VendorPreference, { label: string; borderHex: string; textColor: string; bgColor: string; mapColor: string; description: string }> = {
-  NEW: {
-    label: 'New',
-    borderHex: '#8b5cf6',
-    textColor: 'text-violet-700',
-    bgColor: 'bg-violet-50',
-    mapColor: '#8b5cf6',
-    description: "Trial stage"
-  },
-  PARTNER: {
-    label: 'Partner',
-    borderHex: '#3b82f6',
-    textColor: 'text-blue-700',
-    bgColor: 'bg-blue-50',
-    mapColor: '#3b82f6',
-    description: "Contracted rates"
-  },
   PREFERRED: {
     label: 'Preferred',
-    borderHex: '#10b981',
+    borderHex: '#10b981', // Green
     textColor: 'text-emerald-700',
     bgColor: 'bg-emerald-50',
     mapColor: '#10B981',
     description: "Top rated"
   },
+  PARTNER: {
+    label: 'Partner',
+    borderHex: '#3b82f6', // Blue
+    textColor: 'text-blue-700',
+    bgColor: 'bg-blue-50',
+    mapColor: '#3b82f6',
+    description: "Contracted rates"
+  },
   STANDARD: {
     label: 'Standard',
-    borderHex: '#f97316',
-    textColor: 'text-orange-700',
-    bgColor: 'bg-orange-50',
-    mapColor: '#F97316',
+    borderHex: '#94a3b8', // Gray (Slate-400 equivalent)
+    textColor: 'text-slate-600',
+    bgColor: 'bg-slate-100',
+    mapColor: '#94a3b8',
     description: "General use"
+  },
+  NEW: {
+    label: 'New',
+    borderHex: '#eab308', // Yellow
+    textColor: 'text-yellow-700',
+    bgColor: 'bg-yellow-50',
+    mapColor: '#eab308',
+    description: "Trial stage"
   },
   RESTRICTED: {
     label: 'Restricted',
-    borderHex: '#f43f5e',
-    textColor: 'text-rose-700',
-    bgColor: 'bg-rose-50',
-    mapColor: '#F43F5E',
+    borderHex: '#ef4444', // Red
+    textColor: 'text-red-700',
+    bgColor: 'bg-red-50',
+    mapColor: '#ef4444',
     description: "Avoid use"
   },
 };
 
 export const RATE_CATEGORY_TO_PREFERENCE: Record<string, VendorPreference> = {
-  'purple': 'NEW',
-  'blue': 'PARTNER',
   'green': 'PREFERRED',
-  'orange': 'STANDARD',
+  'blue': 'PARTNER',
+  'gray': 'STANDARD',
+  'yellow': 'NEW',
   'red': 'RESTRICTED'
 };
 
 export const PREFERENCE_TO_RATE_CATEGORY: Record<VendorPreference, ShopRateCategory> = {
-  'NEW': 'purple',
-  'PARTNER': 'blue',
   'PREFERRED': 'green',
-  'STANDARD': 'orange',
+  'PARTNER': 'blue',
+  'STANDARD': 'orange', // Keeping orange for backward compat in types, but UI will look gray
+  'NEW': 'purple',      // Keeping purple for backward compat
   'RESTRICTED': 'red'
 };
 
@@ -87,6 +87,9 @@ export interface Shop {
   city?: string;
   state?: string;
   zip?: string;
+  total_spent?: number;
+  order_count?: number;
+  last_used_at?: string;
 }
 
 export interface ShopRating {

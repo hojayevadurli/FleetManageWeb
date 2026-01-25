@@ -15,8 +15,9 @@ import ShopCard from "@/components/shops/ShopCard";
 import ShopMap from "@/pages/ShopMap";
 import AddShopDialog from "@/components/shops/AddShopDialog";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { shopsApi } from "@/lib/shopsApi";
+import { workOrdersApi } from "@/lib/workOrdersApi";
 import { Loader } from "@googlemaps/js-api-loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,10 +103,15 @@ const ShopsPage = () => {
     setTierFilter(prev => prev.filter(t => t !== tier));
   };
 
+  // Robust refresh: reload data whenever the location changes (navigation, back button, etc.)
+  // This covers all cases: initial mount, returning from detail page, etc.
+  const location = useLocation();
+
   useEffect(() => {
+    console.log('[ShopsPage] Location changed, reloading data...', location);
     loadShops();
     initializeGoogleMaps();
-  }, []);
+  }, [location]); // Depend on entire location object to catch ANY navigation event
 
   useEffect(() => {
     filterShops();
@@ -114,8 +120,47 @@ const ShopsPage = () => {
   const loadShops = async () => {
     setLoading(true);
     try {
-      const data = await shopsApi.list();
-      setShops(data);
+      const [shopsData, workOrdersData] = await Promise.all([
+        shopsApi.list(),
+        workOrdersApi.list({ pageSize: 1000 })
+      ]);
+
+      // Calculate stats per shop
+      const stats = new Map<string, { spent: number; count: number; lastUsed: string }>();
+
+      workOrdersData.forEach(wo => {
+        if (!wo.vendorId) return;
+
+        // Try to match vendor ID
+        const current = stats.get(wo.vendorId) || { spent: 0, count: 0, lastUsed: '' };
+        const cost = wo.manualActualTotal || wo.estimatedTotal || 0;
+
+        // Find latest date
+        const woDate = wo.openedAt;
+        let newMax = current.lastUsed;
+        if (woDate && (!newMax || new Date(woDate) > new Date(newMax))) {
+          newMax = woDate;
+        }
+
+        stats.set(wo.vendorId, {
+          spent: current.spent + cost,
+          count: current.count + 1,
+          lastUsed: newMax
+        });
+      });
+
+      // Merge stats into shops
+      const enrichedShops = shopsData.map(shop => {
+        const shopStats = stats.get(shop.id);
+        return {
+          ...shop,
+          total_spent: shopStats ? shopStats.spent : 0,
+          order_count: shopStats ? shopStats.count : 0,
+          last_used_at: shopStats ? shopStats.lastUsed : undefined
+        };
+      });
+
+      setShops(enrichedShops);
     } catch (error) {
       console.error('Error loading shops:', error);
       toast({
@@ -202,6 +247,14 @@ const ShopsPage = () => {
       filtered.sort((a, b) => (a.labor_rate || 0) - (b.labor_rate || 0));
     } else if (sortBy === 'recent') {
       filtered.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    } else if (sortBy === 'last_used') {
+      filtered.sort((a, b) => {
+        const timeA = a.last_used_at ? new Date(a.last_used_at).getTime() : 0;
+        const timeB = b.last_used_at ? new Date(b.last_used_at).getTime() : 0;
+        return timeB - timeA;
+      });
+    } else if (sortBy === 'spent') {
+      filtered.sort((a, b) => (b.total_spent || 0) - (a.total_spent || 0));
     }
 
     setFilteredShops(filtered);
@@ -324,11 +377,11 @@ const ShopsPage = () => {
                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Network Tier</h3>
                   <div className="space-y-3">
                     {[
-                      { key: 'NEW', label: VENDOR_PREFERENCE_CONFIG.NEW.label, count: shopStats.tierCounts.new, color: 'bg-blue-500' },
-                      { key: 'PARTNER', label: VENDOR_PREFERENCE_CONFIG.PARTNER.label, count: shopStats.tierCounts.partner, color: 'bg-indigo-500' },
+                      { key: 'NEW', label: VENDOR_PREFERENCE_CONFIG.NEW.label, count: shopStats.tierCounts.new, color: 'bg-yellow-500' },
+                      { key: 'PARTNER', label: VENDOR_PREFERENCE_CONFIG.PARTNER.label, count: shopStats.tierCounts.partner, color: 'bg-blue-500' },
                       { key: 'PREFERRED', label: VENDOR_PREFERENCE_CONFIG.PREFERRED.label, count: shopStats.tierCounts.preferred, color: 'bg-emerald-500' },
-                      { key: 'STANDARD', label: VENDOR_PREFERENCE_CONFIG.STANDARD.label, count: shopStats.tierCounts.standard, color: 'bg-orange-500' },
-                      { key: 'RESTRICTED', label: VENDOR_PREFERENCE_CONFIG.RESTRICTED.label, count: shopStats.tierCounts.warning, color: 'bg-rose-500' },
+                      { key: 'STANDARD', label: VENDOR_PREFERENCE_CONFIG.STANDARD.label, count: shopStats.tierCounts.standard, color: 'bg-slate-400' },
+                      { key: 'RESTRICTED', label: VENDOR_PREFERENCE_CONFIG.RESTRICTED.label, count: shopStats.tierCounts.warning, color: 'bg-red-500' },
                     ].map((tier) => (
                       <div key={tier.key} className="flex items-center space-x-3">
                         <Checkbox
@@ -497,6 +550,8 @@ const ShopsPage = () => {
                 className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
               >
                 <option value="name">Name (A-Z)</option>
+                <option value="last_used">Recently Used</option>
+                <option value="spent">Highest Spend</option>
                 <option value="rating">Highest Rated</option>
                 <option value="rate">Lowest Rate</option>
                 <option value="recent">Recently Added</option>
