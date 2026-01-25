@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { ShieldCheck, Bell, User as UserIcon } from "lucide-react";
 import { AuthProvider, useAuth } from "./components/auth/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { AppSidebar } from "./components/AppSidebar";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
@@ -87,6 +88,7 @@ const RootRoute = () => {
 
 const DashboardHeader = () => {
   const { user: authUser } = useAuth();
+  const { toast } = useToast();
 
   // Handle potential nested user object from backend
   const user = (authUser as any)?.user || authUser;
@@ -109,7 +111,10 @@ const DashboardHeader = () => {
       </div>
 
       <div className="flex items-center gap-8">
-        <button className="relative group">
+        <button
+          onClick={() => toast({ title: "No Notifications", description: "You're all caught up! No active alerts." })}
+          className="relative group"
+        >
           <Bell className="w-5 h-5 text-slate-400 group-hover:text-rose-500 transition-colors" />
           <div className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
         </button>

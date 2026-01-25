@@ -30,7 +30,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Equipment, EquipmentStatus, WorkOrder, ChatMessage, Warranty } from '@/lib/types';
+import { Equipment, EquipmentStatus, EquipmentOperationalStatus, WorkOrder, ChatMessage, Warranty, EquipmentDocRole } from '@/lib/types';
 import { getEquipmentChatResponse } from '@/lib/gemini';
 
 interface ExtendedChatMessage extends ChatMessage {
@@ -41,7 +41,7 @@ interface EquipmentDetailProps {
     equipment: Equipment;
     workOrders: WorkOrder[];
     onBack: () => void;
-    onUpdateStatus?: (status: EquipmentStatus) => Promise<void>;
+    onUpdateStatus?: (status: EquipmentOperationalStatus) => Promise<void>;
     onUpdate?: (data: any) => Promise<void>;
     onDelete?: () => Promise<void>;
     initialAiOpen?: boolean;
@@ -197,21 +197,26 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             <div className="flex-[3] bg-white rounded-[3rem] p-10 border border-slate-200 shadow-sm relative overflow-hidden">
                                 <div className="mb-6">
                                     <Select
-                                        value={equipment.status}
-                                        onValueChange={(val) => onUpdateStatus && onUpdateStatus(val as EquipmentStatus)}
+                                        value={equipment.operationalStatus?.toString()}
+                                        onValueChange={(val) => onUpdateStatus && onUpdateStatus(Number(val) as EquipmentOperationalStatus)}
                                     >
-                                        <SelectTrigger className={`w-auto min-w-[140px] px-4 py-1.5 h-auto rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${equipment.status === EquipmentStatus.ACTIVE ? 'bg-emerald-100/50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300' :
-                                            equipment.status === EquipmentStatus.IN_SHOP ? 'bg-amber-100/50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300' :
-                                                'bg-rose-100/50 text-rose-700 border-rose-200 hover:bg-rose-100 hover:border-rose-300'
+                                        <SelectTrigger className={`w-auto min-w-[140px] px-4 py-1.5 h-auto rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${equipment.operationalStatus === EquipmentOperationalStatus.Active ? 'bg-emerald-100/50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300' :
+                                                equipment.operationalStatus === EquipmentOperationalStatus.InShop ? 'bg-amber-100/50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300' :
+                                                    'bg-rose-100/50 text-rose-700 border-rose-200 hover:bg-rose-100 hover:border-rose-300'
                                             }`}>
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {Object.values(EquipmentStatus).map((status) => (
-                                                <SelectItem key={status} value={status} className="text-xs font-bold uppercase tracking-wide">
-                                                    {status}
-                                                </SelectItem>
-                                            ))}
+                                            {Object.keys(EquipmentOperationalStatus)
+                                                .filter((key) => isNaN(Number(key))) // Filter out numeric keys
+                                                .map((key) => {
+                                                    const statusValue = EquipmentOperationalStatus[key as keyof typeof EquipmentOperationalStatus];
+                                                    return (
+                                                        <SelectItem key={statusValue} value={statusValue.toString()} className="text-xs font-bold uppercase tracking-wide">
+                                                            {key.replace(/([A-Z])/g, ' $1').trim()}
+                                                        </SelectItem>
+                                                    );
+                                                })}
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -226,13 +231,90 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                 <div className="font-mono font-bold text-slate-800">{equipment.vin}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Registration</div>
+                                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Plate</div>
                                                 <div className="font-bold text-slate-800">{equipment.licensePlate || 'N/A'}</div>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* 2x2 Stats Grid */}
+                                    <div className="grid grid-cols-2 gap-4 flex-1 w-full">
+                                        {(() => {
+                                            const getExpirationDate = (role: EquipmentDocRole) => {
+                                                const docs = equipment.documents?.filter(d => d.docRole === role) || [];
+                                                if (docs.length === 0) return null;
+                                                // Sort by expiration date descending (assuming we want the latest valid one, or maybe the one expiring soonest? 
+                                                // Usually we want the current active one. If multiple, let's take the one with the latest expiration date => most recent renewal)
+                                                // Actually, if we have a history, we want the current valid one. 
+                                                // Let's assume the backend or logic ensures we verify against the latest one.
+                                                // Let's pick the one with the max expiration date.
+                                                return docs.sort((a, b) => {
+                                                    const da = a.expirationDate ? new Date(a.expirationDate).getTime() : 0;
+                                                    const db = b.expirationDate ? new Date(b.expirationDate).getTime() : 0;
+                                                    return db - da;
+                                                })[0].expirationDate;
+                                            };
+
+                                            const formatDate = (dateStr?: string) => {
+                                                if (!dateStr) return 'N/A';
+                                                return new Date(dateStr).toLocaleDateString();
+                                            };
+
+                                            const getStatusColor = (dateStr?: string) => {
+                                                if (!dateStr) return { color: 'text-slate-400', bg: 'bg-slate-50', label: 'Missing' };
+                                                const days = (new Date(dateStr).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
+                                                if (days < 0) return { color: 'text-rose-600', bg: 'bg-rose-50', label: 'Expired' };
+                                                if (days < 30) return { color: 'text-amber-600', bg: 'bg-amber-50', label: 'Expiring Soon' };
+                                                return { color: 'text-emerald-600', bg: 'bg-emerald-50', label: 'Active' };
+                                            };
+
+                                            const insuranceExp = getExpirationDate(EquipmentDocRole.Insurance);
+                                            const regExp = getExpirationDate(EquipmentDocRole.Registration);
+                                            const dotExp = getExpirationDate(EquipmentDocRole.DOTInspection);
+
+                                            const insStatus = getStatusColor(insuranceExp);
+                                            const regStatus = getStatusColor(regExp);
+                                            const dotStatus = getStatusColor(dotExp);
+
+                                            return [
+                                                {
+                                                    label: 'Insurance Expiration',
+                                                    val: formatDate(insuranceExp),
+                                                    icon: ShieldCheck,
+                                                    color: insStatus.color,
+                                                    bg: insStatus.bg
+                                                },
+                                                {
+                                                    label: 'Registration Expiration',
+                                                    val: formatDate(regExp),
+                                                    icon: Sparkles,
+                                                    color: regStatus.color,
+                                                    bg: regStatus.bg
+                                                },
+                                                {
+                                                    label: 'D.O.T Inspection',
+                                                    val: formatDate(dotExp),
+                                                    icon: Cpu,
+                                                    color: dotStatus.color,
+                                                    bg: dotStatus.bg
+                                                },
+                                                {
+                                                    label: 'Last Service',
+                                                    val: equipment.lastServiceDate ? equipment.lastServiceDate.split('T')[0] : 'N/A',
+                                                    icon: Wrench,
+                                                    color: 'text-amber-600',
+                                                    bg: 'bg-amber-50'
+                                                }
+                                            ].map((s, i) => (
+                                                <div key={i} className={`${s.bg} p-5 rounded-[2rem] border border-slate-100/50`}>
+                                                    <s.icon className={`w-5 h-5 ${s.color} mb-3`} />
+                                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{s.label}</div>
+                                                    <div className="text-base font-black text-slate-900">{s.val}</div>
+                                                </div>
+                                            ));
+                                        })()}
+                                    </div>
+                                    {/* 
                                     <div className="grid grid-cols-2 gap-4 flex-1 w-full">
                                         {[
                                             { label: 'Compliance', val: 'Pass', icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -246,7 +328,8 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                 <div className="text-base font-black text-slate-900">{s.val}</div>
                                             </div>
                                         ))}
-                                    </div>
+                                    </div> 
+                                    */}
                                 </div>
                             </div>
 

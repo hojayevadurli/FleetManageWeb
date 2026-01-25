@@ -279,7 +279,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                         </div>
 
                         <div className="flex items-center bg-slate-50 border border-slate-200 rounded-2xl p-1">
-                            {(['ALL', ...Object.values(EquipmentStatus)] as const).map(status => {
+                            {((['ALL', ...Object.values(EquipmentStatus)] as const).filter(s => s !== EquipmentStatus.ARCHIVED) as ('ALL' | EquipmentStatus)[]).map(status => {
                                 let activeClass = 'bg-blue-600 text-white shadow-md';
                                 if (status === EquipmentStatus.ACTIVE) activeClass = 'bg-emerald-600 text-white shadow-md';
                                 if (status === EquipmentStatus.IN_SHOP) activeClass = 'bg-amber-500 text-white shadow-md';

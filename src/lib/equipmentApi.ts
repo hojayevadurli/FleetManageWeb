@@ -46,11 +46,13 @@ export const mapDtoToEquipment = (dto: EquipmentDto): Equipment => {
         dto.operationalStatus === EquipmentOperationalStatus.InShop ? EquipmentStatus.IN_SHOP :
           dto.operationalStatus === EquipmentOperationalStatus.OutOfService ? EquipmentStatus.OUT_OF_SERVICE :
             EquipmentStatus.ACTIVE,
+    operationalStatus: dto.operationalStatus,
     lastServiceDate: dto.lastServiceDate || undefined,
     fleetCategoryId: dto.fleetCategoryId,
     fleetCategoryName: dto.fleetCategoryName,
     equipmentTypeId: dto.equipmentTypeId,
     equipmentTypeName: dto.equipmentTypeName,
+    documents: dto.documents || [],
   };
 };
 

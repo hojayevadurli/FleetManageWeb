@@ -10,7 +10,7 @@ import {
     Lock,
     Pencil
 } from 'lucide-react';
-import { Equipment, EquipmentStatus, FleetType } from '@/lib/types';
+import { Equipment, EquipmentStatus, EquipmentOperationalStatus, FleetType } from '@/lib/types';
 import { EquipmentCreatePayload } from '@/lib/equipmentApi';
 import {
     Select,
@@ -39,7 +39,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
     mode,
     initialData
 }) => {
-    const [formData, setFormData] = useState<Partial<EquipmentCreatePayload> & { fleetType?: FleetType; specificType?: string; licenseState?: string }>(() => {
+    const [formData, setFormData] = useState<Partial<EquipmentCreatePayload> & { fleetType?: FleetType; specificType?: string; licenseState?: string; operationalStatus?: EquipmentOperationalStatus }>(() => {
         if (initialData) {
             return {
                 unitNumber: initialData.unitNumber || '',
@@ -73,6 +73,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
             model: '',
             year: new Date().getFullYear(),
             status: EquipmentStatus.ACTIVE,
+            operationalStatus: EquipmentOperationalStatus.Active,
             vin: '',
             serialNumber: '',
             licensePlate: '',
@@ -145,12 +146,11 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
         }
     };
 
-    const getStatusColor = (status: string) => {
-        const s = status?.toLowerCase();
-        if (s === EquipmentStatus.ACTIVE) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-        if (s === EquipmentStatus.IN_SHOP) return 'bg-amber-100 text-amber-700 border-amber-200';
-        if (s === EquipmentStatus.OUT_OF_SERVICE) return 'bg-rose-100 text-rose-700 border-rose-200';
-        if (s === EquipmentStatus.SOLD) return 'bg-slate-100 text-slate-700 border-slate-200';
+    const getStatusColor = (status: number) => {
+        if (status === EquipmentOperationalStatus.Active) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+        if (status === EquipmentOperationalStatus.InShop) return 'bg-amber-100 text-amber-700 border-amber-200';
+        if (status === EquipmentOperationalStatus.OutOfService) return 'bg-rose-100 text-rose-700 border-rose-200';
+        if (status === EquipmentOperationalStatus.Sold) return 'bg-slate-100 text-slate-700 border-slate-200';
         return 'bg-slate-100 text-slate-700 border-slate-200';
     };
 
@@ -328,15 +328,20 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Status</label>
                                     <select
-                                        className={`w-full px-5 py-4 border rounded-2xl text-sm font-black outline-none appearance-none cursor-pointer transition-all ${getStatusColor(formData.status as EquipmentStatus || EquipmentStatus.ACTIVE)}`}
-                                        value={formData.status}
-                                        onChange={e => setFormData({ ...formData, status: e.target.value as EquipmentStatus })}
+                                        className={`w-full px-5 py-4 border rounded-2xl text-sm font-black outline-none appearance-none cursor-pointer transition-all ${getStatusColor(formData.operationalStatus || EquipmentOperationalStatus.Active)}`}
+                                        value={formData.operationalStatus}
+                                        onChange={e => setFormData({ ...formData, operationalStatus: Number(e.target.value) })}
                                     >
-                                        {Object.values(EquipmentStatus).map(s => (
-                                            <option key={s} value={s} className="bg-white text-slate-900">
-                                                {s.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                                            </option>
-                                        ))}
+                                        {Object.keys(EquipmentOperationalStatus)
+                                            .filter(k => isNaN(Number(k))) // Filter out numeric keys to get string names
+                                            .map(key => {
+                                                const val = EquipmentOperationalStatus[key as keyof typeof EquipmentOperationalStatus];
+                                                return (
+                                                    <option key={val} value={val} className="bg-white text-slate-900">
+                                                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                                                    </option>
+                                                );
+                                            })}
                                     </select>
                                 </div>
 

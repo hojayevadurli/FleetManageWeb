@@ -13,10 +13,10 @@ export enum EquipmentLifecycleStatus {
 }
 
 export enum EquipmentOperationalStatus {
-  Available = 1,
+  Active = 1,
   InShop = 2,
   OutOfService = 3,
-  OnRoad = 4
+  Sold = 4
 }
 
 // 63+ types supported now
@@ -129,6 +129,7 @@ export interface Equipment {
   serialNumber?: string;
   licensePlate?: string;
   status: EquipmentStatus;
+  operationalStatus?: EquipmentOperationalStatus;
   lastServiceDate?: string;
   acquiredDate?: string;
 
@@ -157,6 +158,31 @@ export interface Equipment {
   fleetCategoryName?: string;
   equipmentTypeId?: string;
   equipmentTypeName?: string;
+  documents?: EquipmentDocument[];
+}
+
+export enum EquipmentDocRole {
+  General = 0,
+  Registration = 1,
+  Title = 2,
+  Insurance = 3,
+  Warranty = 4,
+  Lease = 5,
+  Other = 6,
+  DOTInspection = 7
+}
+
+export interface EquipmentDocument {
+  id: string;
+  equipmentId: string;
+  documentId: string;
+  fileUrl: string;
+  fileType: string;
+  vendorNameRaw?: string;
+  docRole: EquipmentDocRole;
+  startDate?: string;
+  expirationDate?: string;
+  addedAt: string;
 }
 
 export interface Warranty {
@@ -195,6 +221,7 @@ export interface EquipmentDto {
   outOfServiceDate: string;
   notes: string;
   recalls: any[]; // Define clearer recall type later if needed
+  documents: EquipmentDocument[];
 }
 
 export interface EquipmentTypeDto {
