@@ -34,7 +34,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
     contact_name: "",
     labor_rate: "",
     rate_category: "green",
-    vendor_preference: "PREFERRED", // Added default
+    vendor_preference: "NEW", // Added default
     comment: "",
     phone: "",
     email: "",
@@ -101,6 +101,8 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
     if (open) {
       if (shopToEdit) {
         // ... (existing logic)
+        setStep("details"); // Skip selection
+        setSelectedMethod("manual"); // Enable validation/map
         setFormData({
           shop_name: shopToEdit.shop_name,
           address: shopToEdit.address,
@@ -132,7 +134,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
             contact_name: initialData.contact_name || "",
             labor_rate: initialData.labor_rate || "",
             rate_category: initialData.rate_category || "green",
-            vendor_preference: initialData.vendor_preference || "PREFERRED",
+            vendor_preference: initialData.vendor_preference || "NEW",
             comment: initialData.comment || "",
             phone: initialData.phone || "",
             email: initialData.email || "",
@@ -159,7 +161,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
             contact_name: "",
             labor_rate: "",
             rate_category: "green",
-            vendor_preference: "PREFERRED",
+            vendor_preference: "NEW",
             comment: "",
             phone: "",
             email: "",
@@ -779,7 +781,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
               )}
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="p-8 space-y-8 relative">
+            <form onSubmit={handleSubmit} className="p-6 space-y-8 relative">
               {isSubmitting && (
                 <div className="absolute inset-0 bg-white/80 z-20 flex items-center justify-center rounded-[2.5rem]">
                   <div className="flex flex-col items-center gap-4">
@@ -801,25 +803,25 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-3 col-span-2">
+                <div className="space-y-2 col-span-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1 flex items-center gap-2">
                       Shop Name <span className="text-red-500">*</span>
                       {autoFilledName && (
                         <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full animate-in zoom-in">
                           <Sparkles className="w-3 h-3" />
-                          <span className="text-[9px]">Auto-filled</span>
+                          <span className="text-[10px]">Auto-filled</span>
                         </span>
                       )}
                     </label>
-                    {touched.shop_name && errors.shop_name && <span className="text-xs font-bold text-red-500">{errors.shop_name}</span>}
+                    {touched.shop_name && errors.shop_name && <span className="text-xs font-medium text-red-500">{errors.shop_name}</span>}
                   </div>
                   <div className="relative">
-                    <Globe className={`absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 ${touched.shop_name && errors.shop_name ? "text-red-400" : "text-slate-400"}`} />
+                    <Globe className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 ${touched.shop_name && errors.shop_name ? "text-red-400" : "text-gray-400"}`} />
                     <input
                       ref={shopNameInputRef}
                       required
-                      className={`w-full pl-14 pr-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.shop_name && errors.shop_name ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
+                      className={`w-full h-12 pl-12 pr-4 py-3 bg-white border rounded-lg text-base text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all ${touched.shop_name && errors.shop_name ? "border-red-300 focus:border-red-500" : "border-gray-200"}`}
                       placeholder="Enter shop name or search..."
                       value={formData.shop_name}
                       onChange={e => {
@@ -837,21 +839,21 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                   </div>
                 </div>
 
-                <div className="space-y-3 col-span-2">
+                <div className="space-y-2 col-span-2">
                   <div className="flex justify-between">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1 flex items-center gap-2">
                       Address <span className="text-red-500">*</span>
                       {initialData?.address && (
                         <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full animate-in zoom-in">
                           <Sparkles className="w-3 h-3" />
-                          <span className="text-[9px]">Auto-filled</span>
+                          <span className="text-[10px]">Auto-filled</span>
                         </span>
                       )}
                     </label>
-                    {touched.address && errors.address && <span className="text-xs font-bold text-red-500">{errors.address}</span>}
+                    {touched.address && errors.address && <span className="text-xs font-medium text-red-500">{errors.address}</span>}
                   </div>
                   <div className="relative">
-                    <MapPin className={`absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 ${touched.address && errors.address ? "text-red-400" : "text-slate-400"}`} />
+                    <MapPin className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 ${touched.address && errors.address ? "text-red-400" : "text-gray-400"}`} />
                     {formData.latitude && formData.longitude && (
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500 animate-in zoom-in">
                         <CheckCircle2 className="w-5 h-5" />
@@ -861,7 +863,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                     <input
                       ref={addressInputRef}
                       required
-                      className={`w-full pl-14 pr-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.address && errors.address ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
+                      className={`w-full h-12 pl-12 pr-4 py-3 bg-white border rounded-lg text-base text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all ${touched.address && errors.address ? "border-red-300 focus:border-red-500" : "border-gray-200"}`}
                       placeholder="Start typing to search address..."
                       value={formData.address}
                       onChange={e => {
@@ -879,11 +881,11 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                 </div>
 
                 <div className="grid grid-cols-6 gap-4 col-span-2">
-                  <div className="col-span-3 space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">City <span className="text-red-500">*</span></label>
+                  <div className="col-span-3 space-y-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">City <span className="text-red-500">*</span></label>
                     <input
                       required
-                      className={`w-full px-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.city && errors.city ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
+                      className={`w-full h-12 px-4 py-3 bg-white border rounded-lg text-base text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all ${touched.city && errors.city ? "border-red-300 focus:border-red-500" : "border-gray-200"}`}
                       placeholder="City"
                       value={formData.city || ""}
                       onChange={e => {
@@ -893,11 +895,11 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                       onBlur={() => handleBlur('city')}
                     />
                   </div>
-                  <div className="col-span-1 space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">State <span className="text-red-500">*</span></label>
+                  <div className="col-span-1 space-y-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">State <span className="text-red-500">*</span></label>
                     <input
                       required
-                      className={`w-full px-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.state && errors.state ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
+                      className={`w-full h-12 px-2 py-3 bg-white border rounded-lg text-base text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all text-center ${touched.state && errors.state ? "border-red-300 focus:border-red-500" : "border-gray-200"}`}
                       placeholder="State"
                       value={formData.state || ""}
                       onChange={e => {
@@ -907,10 +909,10 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                       onBlur={() => handleBlur('state')}
                     />
                   </div>
-                  <div className="col-span-2 space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Zip <span className="text-red-500">*</span></label>
+                  <div className="col-span-2 space-y-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Zip <span className="text-red-500">*</span></label>
                     <input
-                      className={`w-full px-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.zip && errors.zip ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
+                      className={`w-full h-12 px-4 py-3 bg-white border rounded-lg text-base text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all ${touched.zip && errors.zip ? "border-red-300 focus:border-red-500" : "border-gray-200"}`}
                       placeholder="Zip"
                       value={formData.zip || ""}
                       onChange={e => {
@@ -921,17 +923,17 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                   </div>
                 </div>
 
-                <div className="col-span-2 space-y-3">
+                <div className="col-span-2 space-y-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1 flex items-center gap-2">
                       <MapPin className="w-3 h-3" /> Location Preview
                     </label>
                   </div>
-                  <div className="w-full h-80 rounded-[2rem] overflow-hidden border-2 border-slate-100 shadow-sm relative group">
+                  <div className="w-full h-[250px] rounded-xl overflow-hidden border border-gray-200 relative group">
                     <div ref={mapRef} className="w-full h-full bg-slate-50" />
                     {(!formData.latitude || !formData.longitude) && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-slate-50/50 backdrop-blur-[1px] z-10">
-                        <p className="text-sm font-bold text-slate-400 bg-white/80 px-4 py-2 rounded-full shadow-sm border border-slate-100">
+                        <p className="text-sm font-semibold text-gray-400 bg-white/90 px-4 py-2 rounded-full shadow-sm border border-gray-100">
                           Select an address to see location
                         </p>
                       </div>
@@ -939,23 +941,23 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                   </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div className="flex justify-between">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1 flex items-center gap-2">
                       Phone
                       {initialData?.phone && (
                         <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full animate-in zoom-in">
                           <Sparkles className="w-3 h-3" />
-                          <span className="text-[9px]">Auto-filled</span>
+                          <span className="text-[10px]">Auto-filled</span>
                         </span>
                       )}
                     </label>
-                    {touched.phone && errors.phone && <span className="text-xs font-bold text-red-500">{errors.phone}</span>}
+                    {touched.phone && errors.phone && <span className="text-xs font-medium text-red-500">{errors.phone}</span>}
                   </div>
                   <div className="relative">
-                    <Phone className={`absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 ${touched.phone && errors.phone ? "text-red-400" : "text-slate-400"}`} />
+                    <Phone className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 ${touched.phone && errors.phone ? "text-red-400" : "text-gray-400"}`} />
                     <input
-                      className={`w-full pl-14 pr-6 py-5 bg-slate-50 border-2 rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${touched.phone && errors.phone ? "border-red-200 focus:border-red-500" : "border-transparent focus:border-blue-500"}`}
+                      className={`w-full h-12 pl-12 pr-4 py-3 bg-white border rounded-lg text-base text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all ${touched.phone && errors.phone ? "border-red-300 focus:border-red-500" : "border-gray-200"}`}
                       placeholder="(555) 123-4567"
                       value={formData.phone}
                       onChange={e => {
@@ -967,13 +969,13 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hourly Labor Rate</label>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Hourly Labor Rate</label>
                   <div className="relative">
-                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 font-black">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">$</span>
                     <input
                       type="number"
-                      className="w-full pl-14 pr-6 py-5 bg-slate-50 border-2 border-transparent rounded-[2rem] font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all focus:border-blue-500"
+                      className="w-full h-12 pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-lg text-base text-gray-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
                       placeholder="0.00"
                       value={formData.labor_rate}
                       onChange={e => {
@@ -984,30 +986,30 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                   </div>
                 </div>
 
-                <div className="space-y-3 col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Vendor Preference</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                <div className="space-y-2 col-span-2">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Vendor Preference</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                     {Object.entries(VENDOR_PREFERENCE_CONFIG).map(([key, config]) => (
                       <button
                         key={key}
                         type="button"
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         onClick={() => setFormData(prev => ({ ...prev, vendor_preference: key as any }))}
-                        className={`py-3 px-3 rounded-xl border-2 transition-all text-left ${formData.vendor_preference === key
-                          ? config.bgColor + " " + config.textColor + " " + config.borderHex + " ring-4 ring-blue-500/10"
-                          : "bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100"
+                        className={`py-3 px-3 rounded-lg border-2 transition-all text-left ${formData.vendor_preference === key
+                          ? config.bgColor + " " + config.textColor + " " + config.borderHex + " ring-2 ring-blue-500/10"
+                          : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
                           }`}
                         style={formData.vendor_preference === key ? { borderColor: config.borderHex } : {}}
                       >
-                        <div className="font-black uppercase tracking-wide text-[10px]">{config.label}</div>
-                        <div className={`text-[9px] mt-0.5 font-medium ${formData.vendor_preference === key ? "opacity-70" : "opacity-50"}`}>{config.description}</div>
+                        <div className="font-semibold uppercase tracking-wide text-[11px]">{config.label}</div>
+                        <div className={`text-[10px] mt-0.5 font-medium ${formData.vendor_preference === key ? "opacity-90" : "opacity-60"}`}>{config.description}</div>
                       </button>
                     ))}
                   </div>
 
                   {/* Rating Inputs */}
-                  <div className="space-y-3 col-span-2">
-                    <Label className="text-[10px] font-black uppercase text-slate-500 mb-2 block">Initial Rating (Optional)</Label>
+                  <div className="space-y-2 col-span-2">
+                    <Label className="text-xs font-semibold uppercase text-gray-500 mb-2 block tracking-wide">Initial Rating (Optional)</Label>
                     <ShopRatingInputs
                       data={ratingData}
                       onChange={setRatingData}
@@ -1015,8 +1017,8 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                     />
                   </div>
 
-                  <div className="space-y-3 col-span-2">
-                    <Label className="text-[10px] font-black uppercase text-slate-500 mb-2 block">Specialties</Label>
+                  <div className="space-y-2 col-span-2">
+                    <Label className="text-xs font-semibold uppercase text-gray-500 mb-2 block tracking-wide">Specialties</Label>
                     <div className="flex flex-wrap gap-2">
                       {SERVICE_SPECIALTIES.map(spec => (
                         <button
@@ -1035,10 +1037,10 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                   </div>
 
                   {/* Comments */}
-                  <div className="space-y-3 col-span-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Internal Notes</label>
+                  <div className="space-y-2 col-span-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Internal Notes</label>
                     <textarea
-                      className="w-full p-6 bg-slate-50 border-2 border-transparent rounded-[2rem] font-medium text-slate-700 focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-200 outline-none transition-all resize-none min-h-[120px]"
+                      className="w-full p-4 bg-white border border-gray-200 rounded-lg font-normal text-base text-gray-800 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all resize-none min-h-[120px]"
                       placeholder="Add any internal notes about this shop..."
                       value={formData.comment}
                       onChange={e => setFormData(prev => ({ ...prev, comment: e.target.value }))}
@@ -1046,7 +1048,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                   </div>
                 </div>
 
-                <div className="pt-6 border-t border-slate-100 flex gap-4">
+                <div className="pt-6 border-t border-gray-100 flex gap-4 mt-4">
                   <button
                     type="button"
                     onClick={() => {
@@ -1056,14 +1058,14 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
                         onOpenChange(false);
                       }
                     }}
-                    className="flex-1 py-4 rounded-[1.5rem] font-black text-slate-500 hover:bg-slate-100 transition-colors"
+                    className="h-12 px-6 rounded-lg font-semibold text-gray-500 hover:bg-gray-50 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex-[2] py-4 bg-slate-900 text-white rounded-[1.5rem] font-black hover:bg-slate-800 transition-all transform active:scale-95 shadow-xl shadow-slate-200 disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
+                    className="flex-1 h-12 px-6 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                       <>

@@ -19,9 +19,12 @@ import {
   ShieldCheck,
   ExternalLink,
   Zap,
-  Navigation
+  Navigation,
+  Trophy,
+  Handshake,
+  Ban
 } from "lucide-react";
-import { Shop, ShopRating } from "./types/ShopTypes";
+import { Shop, ShopRating, VENDOR_PREFERENCE_CONFIG, VendorPreference } from "./types/ShopTypes";
 import { shopsApi } from "@/lib/shopsApi";
 import { workOrdersApi } from "@/lib/workOrdersApi";
 import { WorkOrderDto } from "@/lib/types";
@@ -118,12 +121,13 @@ const ShopDetailsDialog = ({ shop, open, onOpenChange }: ShopDetailsDialogProps)
     );
   };
 
-  const getRateColor = (category: string) => {
-    switch (category) {
-      case "green": return "bg-emerald-50 text-emerald-600 border-emerald-100";
-      case "orange": return "bg-orange-50 text-orange-600 border-orange-100";
-      case "red": return "bg-rose-50 text-rose-600 border-rose-100";
-      default: return "bg-slate-50 text-slate-600 border-slate-100";
+  const getTierIcon = (preference: VendorPreference) => {
+    switch (preference) {
+      case 'PREFERRED': return <Trophy className="w-3.5 h-3.5" />;
+      case 'PARTNER': return <Handshake className="w-3.5 h-3.5" />;
+      case 'NEW': return <Star className="w-3.5 h-3.5 fill-current" />;
+      case 'RESTRICTED': return <Ban className="w-3.5 h-3.5" />;
+      default: return null;
     }
   };
 
@@ -135,6 +139,8 @@ const ShopDetailsDialog = ({ shop, open, onOpenChange }: ShopDetailsDialogProps)
 
   if (!shop) return null;
 
+  const tierConfig = VENDOR_PREFERENCE_CONFIG[shop.vendor_preference];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl p-0 bg-slate-50 border-0 rounded-[3rem] overflow-hidden shadow-2xl h-[90vh] flex flex-col">
@@ -145,8 +151,9 @@ const ShopDetailsDialog = ({ shop, open, onOpenChange }: ShopDetailsDialogProps)
           <div className="flex justify-between items-start relative z-10">
             <div className="space-y-6">
               <div className="flex items-center gap-3">
-                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border flex items-center gap-2 ${getRateColor(shop.rate_category)}`}>
-                  <Award className="w-3.5 h-3.5" /> {shop.rate_category} Tier Partner
+                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border flex items-center gap-2 ${tierConfig.bgColor} ${tierConfig.textColor} border-${tierConfig.textColor.split('-')[1]}-100`}>
+                  {getTierIcon(shop.vendor_preference)}
+                  {tierConfig.label}
                 </span>
                 <span className="px-4 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                   <ShieldCheck className="w-3.5 h-3.5" /> Verified Shop
