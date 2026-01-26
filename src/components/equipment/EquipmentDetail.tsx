@@ -26,6 +26,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import AddWarrantyDialog from './AddWarrantyDialog';
 import EquipmentFormModal from './EquipmentFormModal';
+import EquipmentDocumentsTab from './EquipmentDocumentsTab';
 import {
     Select,
     SelectContent,
@@ -158,7 +159,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     }, [sessions, isLoaded, equipment.id]);
 
     // Tab State
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'ai' | 'spend' | 'warranty'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'documents' | 'ai' | 'spend' | 'warranty'>('dashboard');
 
     const equipmentHistory = workOrders.filter(wo => wo.equipmentId === equipment.id);
 
@@ -317,7 +318,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                 )}
 
                 <div className="flex p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm">
-                    {(['dashboard', 'history', 'ai', 'spend', 'warranty'] as const).map(tab => (
+                    {(['dashboard', 'history', 'documents', 'ai', 'spend', 'warranty'] as const).map(tab => (
                         <Button
                             key={tab}
                             variant={activeTab === tab ? "default" : "ghost"}
@@ -327,6 +328,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             <span className="flex items-center gap-2">
                                 {tab === 'dashboard' && <Container className="w-4 h-4" />}
                                 {tab === 'history' && <History className="w-4 h-4" />}
+                                {tab === 'documents' && <FileText className="w-4 h-4" />}
                                 {tab === 'ai' && <Sparkles className="w-4 h-4" />}
                                 {tab === 'spend' && <Cpu className="w-4 h-4" />}
                                 {tab === 'warranty' && <FileCheck className="w-4 h-4" />}
@@ -572,6 +574,25 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             <h3 className="text-xl font-black text-slate-900">Spend Analytics</h3>
                             <p className="text-slate-500 mt-2">Visualization engine initializing...</p>
                         </div>
+                    </div>
+                )}
+
+                {/* DOCUMENTS VIEW */}
+                {activeTab === 'documents' && (
+                    <div className="animate-in fade-in zoom-in duration-300">
+                        <EquipmentDocumentsTab
+                            equipment={equipment}
+                            onRefresh={() => {
+                                // Trigger a refresh by passing current data back up?
+                                // Ideally the parent should expose a generic 'refresh' method.
+                                // For now, we try calling onUpdate with partial data to force re-render if parent supports it,
+                                // or reliance on parent re-fetching.
+                                // If onUpdate expects full payload, this might be tricky.
+                                // Let's try to assume onBack or equivalent might effectively reset, but we want live update.
+                                // Actually, calling onUpdate({}) might trigger a refetch if parent logic is "refetch on update".
+                                if (onUpdate) onUpdate({});
+                            }}
+                        />
                     </div>
                 )}
 

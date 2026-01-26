@@ -1,5 +1,6 @@
 import api from "@/lib/Api";
-import { Equipment, EquipmentDto, EquipmentOperationalStatus } from "@/lib/types";
+import { Equipment, EquipmentDto, EquipmentOperationalStatus, EquipmentDocument } from "@/lib/types";
+import { uploadsApi } from "@/lib/uploadsApi";
 
 export const mapDtoToEquipment = (dto: EquipmentDto): Equipment => {
   return {
@@ -83,6 +84,52 @@ export const equipmentApi = {
   async bulkDelete(ids: string[]): Promise<void> {
     if (!ids.length) return;
     await api.post("/equipment/bulk-delete", { ids });
+  },
+
+  // POST /api/equipment/{id}/documents (frontend helper, maps to backend 2-step)
+  async uploadDocument(equipmentId: string, formData: FormData): Promise<EquipmentDocument> {
+    // 1. Extract file and metadata from FormData
+    const file = formData.get('file') as File;
+    const docRole = parseInt(formData.get('docRole') as string);
+    const startDate = formData.get('startDate') as string;
+    const expirationDate = formData.get('expirationDate') as string;
+    const notes = formData.get('notes') as string;
+
+    if (!file) throw new Error("No file provided");
+
+    // 2. Upload file to storage
+    const fileUrl = await uploadsApi.uploadDocument(file);
+
+    // 3. Create document record via DocumentsController
+    const payload = {
+      fileUrl,
+      fileType: file.type,
+      docKind: this.mapRoleToKind(docRole),
+      vendorNameRaw: notes, // Mapping notes to vendorNameRaw/description for now as per UI
+      equipmentId: equipmentId,
+      runAiExtract: false // Or true if we want backend AI
+    };
+
+    // We call the DocumentsController endpoint
+    const response = await api.post<EquipmentDocument>("/documents", payload);
+    return response.data;
+  },
+
+  mapRoleToKind(role: number): string {
+    switch (role) {
+      case 0: return 'general';
+      case 1: return 'registration';
+      case 2: return 'title';
+      case 3: return 'insurance';
+      case 4: return 'warranty';
+      case 7: return 'inspection';
+      default: return 'unknown';
+    }
+  },
+
+  // DELETE /api/equipment/{id}/documents/{documentId}
+  async deleteDocument(id: string, documentId: string): Promise<void> {
+    await api.delete(`/equipment/${id}/documents/${documentId}`);
   }
 };
 
