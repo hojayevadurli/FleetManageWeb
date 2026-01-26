@@ -84,6 +84,7 @@ function sanitizeUpsertDto(dto: WorkOrderUpsertDto): WorkOrderUpsertDto {
  * - response header Location: /api/workorders/{id} (requires CORS expose sometimes)
  */
 async function resolveCreatedWorkOrder(res: any): Promise<WorkOrderDto> {
+  console.log("resolveCreatedWorkOrder received:", res);
   let rawData = res?.data;
 
   // Case 2: backend returns id as plain string
@@ -205,7 +206,24 @@ export const workOrdersApi = {
    */
   create: async (dto: WorkOrderUpsertDto): Promise<WorkOrderDto> => {
     const res = await api.post("/workorders", sanitizeUpsertDto(dto));
-    return await resolveCreatedWorkOrder(res);
+    try {
+      return await resolveCreatedWorkOrder(res);
+    } catch (e) {
+      // Fallback: if 201 Created but parsing failed, try to find the latest for this asset
+      if (res.status === 201 && dto.equipmentId) {
+        console.warn("Create 201 but no ID returned. Fallback: fetching latest for equipment...");
+        // Fetch recent
+        const list = await workOrdersApi.list({ equipmentId: dto.equipmentId, pageSize: 5 });
+        // Assuming list returns newest first. If not, we might need client-side sort.
+        // Let's sort client side just in case
+        const sorted = list.sort((a, b) => new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime());
+
+        if (sorted.length > 0) {
+          return sorted[0];
+        }
+      }
+      throw e;
+    }
   },
 
   /**

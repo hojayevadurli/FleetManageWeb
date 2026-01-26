@@ -11,9 +11,12 @@ import {
     Sparkles,
     DollarSign,
     Navigation2,
-    Phone
+    Phone,
+    Handshake,
+    Ban
 } from 'lucide-react';
-import { Shop, VENDOR_PREFERENCE_CONFIG } from './types/ShopTypes';
+import { Shop, VENDOR_PREFERENCE_CONFIG, VendorPreference } from './types/ShopTypes';
+import { formatDistanceToNow } from 'date-fns';
 
 interface ShopCardProps {
     shop: Shop;
@@ -26,9 +29,19 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, onClick, onManageAudit }) => 
     const reviews = shop.total_reviews || 0;
     const tierConfig = VENDOR_PREFERENCE_CONFIG[shop.vendor_preference];
 
-    // Placeholder values - these would come from real data
-    const totalSpent = 0; // Would be calculated from work orders
-    const orderCount = reviews; // Using reviews as proxy for orders
+    // Real values calculated in ShopsPage
+    const totalSpent = shop.total_spent || 0;
+    const orderCount = shop.order_count || 0;
+
+    const getTierIcon = (preference: VendorPreference) => {
+        switch (preference) {
+            case 'PREFERRED': return <Trophy className="w-3 h-3" />;
+            case 'PARTNER': return <Handshake className="w-3 h-3" />;
+            case 'NEW': return <Star className="w-3 h-3 fill-current" />;
+            case 'RESTRICTED': return <Ban className="w-3 h-3" />;
+            default: return null;
+        }
+    };
 
     return (
         <div
@@ -41,7 +54,8 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, onClick, onManageAudit }) => 
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                         {/* Tier Badge */}
-                        <span className={`px-2.5 py-1 rounded-lg ${tierConfig.bgColor} ${tierConfig.textColor} text-[9px] font-black uppercase tracking-widest border`}>
+                        <span className={`px-2.5 py-1 rounded-lg ${tierConfig.bgColor} ${tierConfig.textColor} text-[9px] font-black uppercase tracking-widest border flex items-center gap-1.5`}>
+                            {getTierIcon(shop.vendor_preference)}
                             {tierConfig.label}
                         </span>
                         {/* New indicator (if created within 30 days) */}
@@ -53,6 +67,13 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, onClick, onManageAudit }) => 
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Last Used Badge */}
+                        {shop.last_used_at && (
+                            <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-md">
+                                <Clock className="w-3 h-3" />
+                                Used {formatDistanceToNow(new Date(shop.last_used_at))} ago
+                            </span>
+                        )}
                         {/* Audits Count */}
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-1 rounded-md">
                             {reviews} Audits
@@ -76,7 +97,7 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, onClick, onManageAudit }) => 
                         <div className="flex items-start gap-1.5 text-slate-400">
                             <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                             <p className="text-xs font-bold leading-relaxed line-clamp-2">
-                                {shop.address}{shop.city && `, ${shop.city}`}{shop.state && `, ${shop.state}`}
+                                {shop.address}{shop.city && `, ${shop.city}`}{shop.state && `, ${shop.state}`}{shop.zip ? ` ${shop.zip}` : ''}
                             </p>
                         </div>
                         {/* Star Rating Line */}

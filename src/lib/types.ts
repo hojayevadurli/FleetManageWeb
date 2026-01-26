@@ -1,26 +1,13 @@
-export enum EquipmentStatus {
-  ACTIVE = 'active',
-  IN_SHOP = 'in shop',
-  OUT_OF_SERVICE = 'out of service',
-  SOLD = 'sold',
-  ARCHIVED = 'archived'
-}
-
-export enum EquipmentLifecycleStatus {
-  Active = 1,
-  Retired = 2,
-  Sold = 3
-}
-
 export enum EquipmentOperationalStatus {
-  Available = 1,
+  Active = 1,
   InShop = 2,
   OutOfService = 3,
-  OnRoad = 4
+  Sold = 4
 }
 
+
+
 // 63+ types supported now
-export type FleetType = 'TRUCK' | 'TRAILER' | 'HEAVY_EQUIPMENT';
 export type EquipmentType = string;
 
 export enum WorkOrderStatus {
@@ -128,7 +115,7 @@ export interface Equipment {
   vin?: string;
   serialNumber?: string;
   licensePlate?: string;
-  status: EquipmentStatus;
+  status: EquipmentOperationalStatus;
   lastServiceDate?: string;
   acquiredDate?: string;
 
@@ -138,10 +125,12 @@ export interface Equipment {
 
   // Common optional specs
   mileage?: number;
+  hours?: number;
   engineType?: string;
   fuelType?: string;
   length?: number;
   weightCapacity?: number;
+  licenseState?: string;
   purchasedAt?: string;
   notes?: string;
 
@@ -149,7 +138,6 @@ export interface Equipment {
   specs?: Record<string, string | number | boolean>;
 
   // Categorization
-  fleetType?: 'TRUCK' | 'TRAILER' | 'HEAVY_EQUIPMENT';
   specificType?: string; // e.g. "Sleeper Tractor", "Dry Van"
 
   // Department/Industry links
@@ -157,6 +145,31 @@ export interface Equipment {
   fleetCategoryName?: string;
   equipmentTypeId?: string;
   equipmentTypeName?: string;
+  documents?: EquipmentDocument[];
+}
+
+export enum EquipmentDocRole {
+  General = 0,
+  Registration = 1,
+  Title = 2,
+  Insurance = 3,
+  Warranty = 4,
+  Lease = 5,
+  Other = 6,
+  DOTInspection = 7
+}
+
+export interface EquipmentDocument {
+  id: string;
+  equipmentId: string;
+  documentId: string;
+  fileUrl: string;
+  fileType: string;
+  vendorNameRaw?: string;
+  docRole: EquipmentDocRole;
+  startDate?: string;
+  expirationDate?: string;
+  addedAt: string;
 }
 
 export interface Warranty {
@@ -186,7 +199,6 @@ export interface EquipmentDto {
   model: string;
   year: number;
   plateNumber: string;
-  lifecycleStatus: EquipmentLifecycleStatus;
   operationalStatus: EquipmentOperationalStatus;
   odometerCurrent: number;
   hoursCurrent: number;
@@ -195,6 +207,7 @@ export interface EquipmentDto {
   outOfServiceDate: string;
   notes: string;
   recalls: any[]; // Define clearer recall type later if needed
+  documents: EquipmentDocument[];
 }
 
 export interface EquipmentTypeDto {

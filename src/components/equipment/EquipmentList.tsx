@@ -19,14 +19,15 @@ import {
     Hammer,
     Lock,
     Zap,
-    Map as MapIcon
+    Map as MapIcon,
+    Bus
 } from 'lucide-react';
 import { equipmentApi, EquipmentCreatePayload } from '@/lib/equipmentApi';
 import { fleetCategoriesApi, FleetCategory } from '@/lib/fleetCategoriesApi';
 import { equipmentTypesApi } from '@/lib/equipmentTypesApi';
 import { tenantsApi } from '@/lib/tenantsApi';
-import { Equipment, EquipmentStatus, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource, EquipmentTypeDto, FleetType } from '@/lib/types';
-import { FLEET_TYPES, getSpecificTypes, getManufacturers, TRUCK_TYPES, TRAILER_TYPES, HEAVY_EQUIPMENT_TYPES, US_STATES } from '@/lib/fleetData';
+import { Equipment, EquipmentOperationalStatus, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource, EquipmentTypeDto } from '@/lib/types';
+import { US_STATES } from '@/lib/fleetData';
 import { decodeVin, validateVin } from '@/lib/nhtsaApi'; // Import VIN helpers
 
 import { verifyVendorAddress, searchVendorSuggestions } from '@/lib/gemini';
@@ -42,11 +43,11 @@ import CreateWorkOrderDialog from "@/components/workorder/CreateWorkOrderDialog"
 interface EquipmentListProps {
     equipment: Equipment[];
     onSelect: (e: Equipment, openAi?: boolean) => void;
-    onAddEquipment: (e: Omit<Equipment, 'id'>) => Promise<{ status: number; message: string } | null>;
+    onAddEquipment: (e: EquipmentCreatePayload) => Promise<{ status: number; message: string } | null>;
     onNewWorkOrder: (unitId: string) => void;
     onAddWorkOrder: (wo: Omit<WorkOrder, 'id'>, files?: File[]) => void;
     onBulkDelete?: (ids: string[]) => Promise<void>;
-    initialStatusFilter?: 'ALL' | EquipmentStatus;
+    initialStatusFilter?: 'ALL' | EquipmentOperationalStatus;
 }
 
 const EquipmentList: React.FC<EquipmentListProps> = ({
@@ -59,10 +60,30 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
     initialStatusFilter = 'ALL'
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [typeFilter, setTypeFilter] = useState<'ALL' | FleetType>('ALL');
-    const [statusFilter, setStatusFilter] = useState<'ALL' | EquipmentStatus>(initialStatusFilter);
+    const [typeFilter, setTypeFilter] = useState<'ALL' | number | string>('ALL');
+    const [statusFilter, setStatusFilter] = useState<'ALL' | EquipmentOperationalStatus>(initialStatusFilter);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [categories, setCategories] = useState<FleetCategory[]>([]);
+    const [companyName, setCompanyName] = useState("Fleet Company");
+
+    useEffect(() => {
+        const fetchCategoriesAndTenant = async () => {
+            try {
+                const [cats, tenant] = await Promise.all([
+                    fleetCategoriesApi.list(),
+                    tenantsApi.getCurrent()
+                ]);
+                setCategories(cats);
+                if (tenant?.name) {
+                    setCompanyName(tenant.name);
+                }
+            } catch (err) {
+                console.error("Failed to fetch initial data", err);
+            }
+        };
+        fetchCategoriesAndTenant();
+    }, []);
 
     // Filter Logic
 
@@ -89,9 +110,9 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
     useEffect(() => {
         const total = (woFormData.partsCost || 0) + (woFormData.laborCost || 0);
         if (total !== woFormData.totalCost) {
-            setWoFormData(prev => ({ ...prev, totalCost: total }));
+            setWoFormData((prev: any) => ({ ...prev, totalCost: total }));
         }
-    }, [woFormData.partsCost, woFormData.laborCost]);
+    }, [woFormData.partsCost, woFormData.laborCost, woFormData.totalCost]);
 
     useEffect(() => {
         const input = woFormData.vendor;
@@ -158,14 +179,14 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
         // Pass to parent
         // Just minimal transform if needed, but EquipmentFormModal returns correct shape
         const payload = {
+            ...data,
             unitNumber: data.unitNumber!,
-            type: data.type || 'Truck',
-            fleetType: data.fleetType || 'TRUCK',
+            type: data.type || 'Asset',
             specificType: data.specificType || '',
             make: data.make || '',
             model: data.model || '',
             year: data.year || new Date().getFullYear(),
-            status: data.status || EquipmentStatus.ACTIVE,
+            status: data.status || EquipmentOperationalStatus.Active,
             vin: data.vin || '',
             serialNumber: data.serialNumber || '',
             licensePlate: data.licensePlate || '',
@@ -184,12 +205,11 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
         setIsAddModalOpen(false);
     };
 
-    const getStatusColor = (status: string) => {
-        const s = status?.toLowerCase();
-        if (s === EquipmentStatus.ACTIVE) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-        if (s === EquipmentStatus.IN_SHOP) return 'bg-amber-100 text-amber-700 border-amber-200';
-        if (s === EquipmentStatus.OUT_OF_SERVICE) return 'bg-rose-100 text-rose-700 border-rose-200';
-        if (s === EquipmentStatus.SOLD) return 'bg-slate-100 text-slate-700 border-slate-200';
+    const getStatusColor = (status: EquipmentOperationalStatus) => {
+        if (status === EquipmentOperationalStatus.Active) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+        if (status === EquipmentOperationalStatus.InShop) return 'bg-amber-100 text-amber-700 border-amber-200';
+        if (status === EquipmentOperationalStatus.OutOfService) return 'bg-rose-100 text-rose-700 border-rose-200';
+        if (status === EquipmentOperationalStatus.Sold) return 'bg-slate-100 text-slate-700 border-slate-200';
         return 'bg-slate-100 text-slate-700 border-slate-200';
     };
 
@@ -204,14 +224,13 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
 
             let matchesType = true;
             if (typeFilter !== 'ALL') {
-                if (e.fleetType) {
-                    matchesType = e.fleetType === typeFilter;
+                if (typeof typeFilter === 'number') {
+                    matchesType = e.fleetCategoryId === typeFilter;
                 } else {
-                    // Fallback for legacy data
-                    const t = e.type.toLowerCase();
-                    if (typeFilter === 'TRUCK') matchesType = t.includes('truck') || t.includes('tractor') || t.includes('van');
-                    else if (typeFilter === 'TRAILER') matchesType = t.includes('trailer') || t.includes('chassis') || t.includes('dolly');
-                    else if (typeFilter === 'HEAVY_EQUIPMENT') matchesType = t.includes('dozer') || t.includes('crane') || t.includes('excavator') || t.includes('lift');
+                    // Filter fallback for legacy data if needed, but simplified
+                    const t = (e.type || '').toLowerCase();
+                    const filterStr = String(typeFilter).toLowerCase();
+                    matchesType = t.includes(filterStr);
                 }
             }
 
@@ -226,8 +245,8 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
                     <div className="flex-1">
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Fleet Control Center</h1>
-                        <p className="text-slate-500 font-medium">Manage assets and service history.</p>
+                        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Fleet Control Center</h1>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Manage assets and service history</p>
                     </div>
                     <div className="flex gap-3">
 
@@ -239,7 +258,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                                 <Plus className="w-5 h-5" /> Add Equipment
                             </Button>
                         </div>
-                    </div>
+                    </div >
                 </div >
 
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
@@ -265,34 +284,36 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                             >
                                 All
                             </Button>
-                            {(Object.keys(FLEET_TYPES) as FleetType[]).map(type => (
-                                <Button
-                                    key={type}
-                                    variant={typeFilter === type ? 'default' : 'ghost'}
-                                    onClick={() => setTypeFilter(type)}
-                                    className={`px-4 py-1.5 h-auto text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${typeFilter === type ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'
-                                        }`}
-                                >
-                                    {FLEET_TYPES[type]}
-                                </Button>
-                            ))}
+                            {categories.map(cat => {
+                                const displayName = cat.name === 'School Bus' ? 'Bus' : cat.name;
+                                return (
+                                    <Button
+                                        key={cat.id}
+                                        variant={typeFilter === cat.id ? 'default' : 'ghost'}
+                                        onClick={() => setTypeFilter(cat.id)}
+                                        className={`px-4 py-1.5 h-auto text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${typeFilter === cat.id ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
+                                    >
+                                        {displayName}
+                                    </Button>
+                                );
+                            })}
                         </div>
 
                         <div className="flex items-center bg-slate-50 border border-slate-200 rounded-2xl p-1">
-                            {(['ALL', ...Object.values(EquipmentStatus)] as const).map(status => {
+                            {(['ALL', ...Object.values(EquipmentOperationalStatus).filter(v => typeof v === 'number')] as const).map(status => {
                                 let activeClass = 'bg-blue-600 text-white shadow-md';
-                                if (status === EquipmentStatus.ACTIVE) activeClass = 'bg-emerald-600 text-white shadow-md';
-                                if (status === EquipmentStatus.IN_SHOP) activeClass = 'bg-amber-500 text-white shadow-md';
-                                if (status === EquipmentStatus.OUT_OF_SERVICE) activeClass = 'bg-rose-600 text-white shadow-md';
+                                if (status === EquipmentOperationalStatus.Active) activeClass = 'bg-emerald-600 text-white shadow-md';
+                                if (status === EquipmentOperationalStatus.InShop) activeClass = 'bg-amber-500 text-white shadow-md';
+                                if (status === EquipmentOperationalStatus.OutOfService) activeClass = 'bg-rose-600 text-white shadow-md';
                                 if (status === 'ALL') activeClass = 'bg-slate-900 text-white shadow-md';
 
                                 return (
                                     <Button
                                         key={status}
-                                        onClick={() => setStatusFilter(status)}
+                                        onClick={() => setStatusFilter(status as any)}
                                         className={`px-4 py-1.5 h-auto text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${statusFilter === status ? activeClass : 'text-slate-500 hover:text-slate-800 bg-transparent hover:bg-transparent'}`}
                                     >
-                                        {status === 'ALL' ? 'All Status' : status}
+                                        {status === 'ALL' ? 'All Status' : EquipmentOperationalStatus[status as number].replace(/([A-Z])/g, ' $1').trim()}
                                     </Button>
                                 );
                             })}
@@ -316,22 +337,24 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
 
                                         <div className="p-6 pb-2 flex justify-between items-start">
                                             <div className="flex items-center gap-3">
-                                                <div className={`p-2.5 rounded-xl border border-slate-100 group-hover:bg-blue-50 transition-colors ${e.fleetType === 'HEAVY_EQUIPMENT' ? 'bg-amber-50' : 'bg-slate-50'}`}>
-                                                    {e.fleetType === 'TRUCK' ? <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
-                                                        e.fleetType === 'TRAILER' ? <Container className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
-                                                            e.fleetType === 'HEAVY_EQUIPMENT' ? <Hammer className="w-5 h-5 text-amber-500 group-hover:text-amber-600" /> :
-                                                                <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />}
+                                                <div className={`p-2.5 rounded-xl border border-slate-100 group-hover:bg-blue-50 transition-colors ${e.fleetCategoryId === 4 ? 'bg-amber-50' : 'bg-slate-50'}`}>
+                                                    {e.fleetCategoryId === 1 ? <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
+                                                        e.fleetCategoryId === 2 ? <Container className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
+                                                            e.fleetCategoryId === 4 ? <Hammer className="w-5 h-5 text-amber-500 group-hover:text-amber-600" /> :
+                                                                e.fleetCategoryId === 3 ? <Bus className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
+                                                                    <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />}
                                                 </div>
                                                 <div>
                                                     <h3 className="font-black text-xl text-slate-900 tracking-tight">{e.unitNumber}</h3>
                                                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1">
-                                                        {e.fleetType ? FLEET_TYPES[e.fleetType] : 'Unknown'}
+                                                        {categories.find(c => c.id === e.fleetCategoryId)?.name === 'School Bus' ? 'Bus' :
+                                                            categories.find(c => c.id === e.fleetCategoryId)?.name || 'Unknown'}
                                                     </p>
                                                 </div>
                                             </div>
                                             <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase border tracking-widest flex items-center gap-1.5 ${getStatusColor(e.status)}`}>
-                                                {e.status === EquipmentStatus.OUT_OF_SERVICE && <AlertCircle className="w-3 h-3" />}
-                                                {e.status}
+                                                {e.status === EquipmentOperationalStatus.OutOfService && <AlertCircle className="w-3 h-3" />}
+                                                {EquipmentOperationalStatus[e.status].replace(/([A-Z])/g, ' $1').trim()}
                                             </span>
                                         </div>
 
@@ -354,10 +377,23 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                                         <div className="mt-auto p-3 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-2">
                                             <Button
                                                 variant="outline"
-                                                onClick={(evt) => { evt.stopPropagation(); handleOpenWOModal(e); }}
-                                                className="flex flex-col items-center gap-1 p-2 h-auto rounded-xl hover:bg-white hover:text-amber-600 text-slate-400 transition-all group/btn border border-transparent hover:border-amber-100 hover:shadow-sm"
+                                                disabled={e.status === EquipmentOperationalStatus.OutOfService || e.status === EquipmentOperationalStatus.Sold}
+                                                onClick={(evt) => {
+                                                    evt.stopPropagation();
+                                                    if (e.status !== EquipmentOperationalStatus.OutOfService && e.status !== EquipmentOperationalStatus.Sold) {
+                                                        handleOpenWOModal(e);
+                                                    }
+                                                }}
+                                                className={`flex flex-col items-center gap-1 p-2 h-auto rounded-xl transition-all group/btn border border-transparent ${e.status === EquipmentOperationalStatus.OutOfService || e.status === EquipmentOperationalStatus.Sold
+                                                    ? 'opacity-40 cursor-not-allowed text-slate-300'
+                                                    : 'hover:bg-white hover:text-amber-600 text-slate-400 hover:border-amber-100 hover:shadow-sm'
+                                                    }`}
                                             >
-                                                <ClipboardList className="w-4 h-4" />
+                                                {e.status === EquipmentOperationalStatus.OutOfService || e.status === EquipmentOperationalStatus.Sold ? (
+                                                    <Lock className="w-4 h-4" />
+                                                ) : (
+                                                    <ClipboardList className="w-4 h-4" />
+                                                )}
                                                 <span className="text-[9px] font-black uppercase tracking-widest">New WO</span>
                                             </Button>
                                             <Button
@@ -394,7 +430,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                 <CreateWorkOrderDialog
                     open={createWoDialogState.open}
                     onOpenChange={(isOpen) => setCreateWoDialogState(prev => ({ ...prev, open: isOpen }))}
-                    initialCompanyName="Fleet Company"
+                    initialCompanyName={companyName}
                     initialVehicleId={createWoDialogState.initialVehicleId}
                     initialVehicleType={createWoDialogState.initialVehicleType}
                     initialUnitNumber={createWoDialogState.initialUnitNumber}

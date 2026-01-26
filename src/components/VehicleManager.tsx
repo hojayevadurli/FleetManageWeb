@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
+import { equipmentApi, mapDtoToEquipment, EquipmentCreatePayload } from "@/lib/equipmentApi";
 import { fleetCategoriesApi, FleetCategory } from "@/lib/fleetCategoriesApi";
 import { equipmentTypesApi } from "@/lib/equipmentTypesApi";
 import { tenantsApi } from "@/lib/tenantsApi";
@@ -9,12 +9,12 @@ import { tenantsApi } from "@/lib/tenantsApi";
 import EquipmentDetail from "@/components/equipment/EquipmentDetail";
 import EquipmentList from "@/components/equipment/EquipmentList";
 import { workOrdersApi } from "@/lib/workOrdersApi";
-import { Equipment, WorkOrder, EquipmentStatus, WorkOrderStatus, EquipmentLifecycleStatus, EquipmentOperationalStatus, WorkOrderPriority, WorkOrderCostSource, EquipmentTypeDto, FleetType } from "@/lib/types";
+import { Equipment, WorkOrder, EquipmentOperationalStatus, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource, EquipmentTypeDto } from "@/lib/types";
 
 const VehicleManager = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const initialStatus = queryParams.get('status') as EquipmentStatus | null;
+  const initialStatus = queryParams.get('status') ? parseInt(queryParams.get('status')!) as EquipmentOperationalStatus : null;
 
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,54 +127,17 @@ const VehicleManager = () => {
     fetchWO();
   }, [selectedEquipment]);
 
-  const handleAddEquipment = async (e: Omit<Equipment, 'id'>) => {
+  const handleAddEquipment = async (e: EquipmentCreatePayload) => {
     try {
-      // Logic to find best matching Category and Type IDs based on user selection
-      let mappedCatId = e.fleetCategoryId;
-      let mappedTypeId = e.equipmentTypeId;
-
-      if (!mappedCatId && e.fleetType) {
-        // Try to map from fleetType string (TRUCK, TRAILER, etc.) to a Category Name
-        // Simple heuristic: Category Name contains "Truck", "Trailer", "Heavy"
-        const targetName = e.fleetType === 'TRUCK' ? 'Truck' : e.fleetType === 'TRAILER' ? 'Trailer' : 'Heavy';
-        const match = fleetCategories.find(c => c.name.toLowerCase().includes(targetName.toLowerCase()));
-        if (match) mappedCatId = match.id;
-        else if (fleetCategories.length > 0) mappedCatId = fleetCategories[0].id; // Fallback to first available
-      }
-
-      if (!mappedTypeId && e.specificType) {
-        // Try to find exact name match for specific type
-        const match = equipmentTypes.find(t => t.name.toLowerCase() === e.specificType?.toLowerCase());
-        if (match) mappedTypeId = match.id.toString();
-
-        // If not found, try to find one that matches fleetType to be safe
-        if (!mappedTypeId && mappedCatId) {
-          const fallbackMatch = equipmentTypes.find(t => t.fleetCategoryId === mappedCatId);
-          if (fallbackMatch) mappedTypeId = fallbackMatch.id.toString();
-        }
-      }
-
-      const payload: any = {
-        equipmentTypeId: mappedTypeId,
-        fleetCategoryId: mappedCatId,
-        unitNumber: e.unitNumber,
+      const payload: EquipmentCreatePayload = {
+        ...e,
+        plateNumber: e.licensePlate, // Map for backend
         displayName: e.unitNumber,
-        vin: e.vin,
-        serialNumber: e.serialNumber,
-        plateNumber: e.licensePlate,
-        make: e.make,
-        model: e.model,
-        year: e.year,
-        operationalStatus: EquipmentOperationalStatus.Available,
-        lifecycleStatus: EquipmentLifecycleStatus.Active,
+        operationalStatus: e.operationalStatus || EquipmentOperationalStatus.Active,
         acquiredDate: new Date().toISOString().split('T')[0],
         inServiceDate: new Date().toISOString().split('T')[0],
-        notes: e.notes,
-        initialOdometer: (e as any).initialOdometer || 0,
-        initialHours: (e as any).initialHours || 0,
-        specs: {
-          licenseState: (e as any).licenseState
-        }
+        initialOdometer: e.initialOdometer || 0,
+        initialHours: e.initialHours || 0,
       };
       await equipmentApi.create(payload);
       toast({ title: "Equipment Added", description: `${e.unitNumber} has been successfully onboarded.` });
@@ -220,11 +183,11 @@ const VehicleManager = () => {
     }
   };
 
-  const handleUpdateStatus = async (status: EquipmentStatus) => {
+  const handleUpdateStatus = async (status: EquipmentOperationalStatus) => {
     if (!selectedEquipment) return;
     try {
       // Optimistic update
-      const updatedEquipment = { ...selectedEquipment, status };
+      const updatedEquipment = { ...selectedEquipment, status: status };
       setSelectedEquipment(updatedEquipment);
       setEquipmentList(prev => prev.map(v => v.id === selectedEquipment.id ? updatedEquipment : v));
 
@@ -240,24 +203,14 @@ const VehicleManager = () => {
         make: selectedEquipment.make,
         model: selectedEquipment.model,
         year: selectedEquipment.year,
-        operationalStatus: (() => {
-          switch (status) {
-            case EquipmentStatus.ACTIVE: return EquipmentOperationalStatus.Available;
-            case EquipmentStatus.IN_SHOP: return EquipmentOperationalStatus.InShop;
-            case EquipmentStatus.OUT_OF_SERVICE: return EquipmentOperationalStatus.OutOfService;
-            default: return EquipmentOperationalStatus.Available;
-          }
-        })(),
-        lifecycleStatus: status === EquipmentStatus.SOLD ? EquipmentLifecycleStatus.Sold :
-          status === EquipmentStatus.ARCHIVED ? EquipmentLifecycleStatus.Retired :
-            EquipmentLifecycleStatus.Active,
-        outOfServiceDate: status === EquipmentStatus.OUT_OF_SERVICE ? new Date().toISOString().split('T')[0] : selectedEquipment.outOfServiceDate,
+        operationalStatus: status,
+        outOfServiceDate: status === EquipmentOperationalStatus.OutOfService ? new Date().toISOString().split('T')[0] : selectedEquipment.outOfServiceDate,
         notes: selectedEquipment.notes
         // Add other fields if needed by backend DTO
       };
 
       await equipmentApi.update(selectedEquipment.id, payload);
-      toast({ title: "Status Updated", description: `Unit is now ${status}` });
+      toast({ title: "Status Updated", description: `Unit status updated` });
     } catch (err: any) {
       console.error("Status update error details:", err.response?.data);
       const errorMsg = err.response?.data?.message || err.message;
@@ -290,40 +243,29 @@ const VehicleManager = () => {
         vin: data.vin,
         serialNumber: data.serialNumber,
         plateNumber: data.licensePlate, // Map licensePlate to plateNumber
-        state: data.licenseState,
+        // state: data.licenseState, // Backend doesn't support State directly yet, might be inside JSON specs if implemented
         make: data.make,
         model: data.model,
         year: data.year,
-        status: data.status,
-        type: data.type,
 
         // Operational Status mapping
-        operationalStatus: (() => {
-          switch (data.status) {
-            case EquipmentStatus.ACTIVE: return EquipmentOperationalStatus.Available;
-            case EquipmentStatus.IN_SHOP: return EquipmentOperationalStatus.InShop;
-            case EquipmentStatus.OUT_OF_SERVICE: return EquipmentOperationalStatus.OutOfService;
-            default: return EquipmentOperationalStatus.Available;
-          }
-        })(),
-        lifecycleStatus: data.status === EquipmentStatus.SOLD ? EquipmentLifecycleStatus.Sold :
-          data.status === EquipmentStatus.ARCHIVED ? EquipmentLifecycleStatus.Retired :
-            EquipmentLifecycleStatus.Active,
+        operationalStatus: data.status,
 
         // Specs
-        length: data.length,
+        length: Number(data.length) || 0,
         width: 0,
         height: 0,
-        color: 'White', // Default
-        grossVehicleWeightRating: data.weightCapacity,
+        color: 'White',
+        grossVehicleWeightRating: Number(data.weightCapacity) || 0,
 
         // Meters
-        currentOdometer: data.mileage,
-        currentHobbs: data.hours,
+        odometerCurrent: Number(data.mileage) || 0,
+        hoursCurrent: Number(data.hours) || 0,
 
         notes: selectedEquipment.notes
       };
 
+      console.log("Sending Update Payload:", payload);
       await equipmentApi.update(selectedEquipment.id, payload);
 
       // Update local state
@@ -334,7 +276,21 @@ const VehicleManager = () => {
       toast({ title: "Equipment Updated", description: "Changes saved successfully." });
     } catch (err: any) {
       console.error("Update failed:", err);
-      toast({ title: "Update Failed", description: err.message || "Failed to save changes", variant: "destructive" });
+      // Re-throw so the modal knows it failed
+      throw new Error(err.message || "Failed to save changes");
+    }
+  };
+
+  const handleDeleteEquipment = async () => {
+    if (!selectedEquipment) return;
+    try {
+      await equipmentApi.delete(selectedEquipment.id);
+      setEquipmentList(prev => prev.filter(e => e.id !== selectedEquipment.id));
+      setSelectedEquipment(null);
+      toast({ title: "Asset Deleted", description: "Equipment removed successfully." });
+    } catch (err: any) {
+      console.error("Delete failed", err);
+      toast({ title: "Delete Failed", description: err.message, variant: "destructive" });
     }
   };
 
@@ -346,6 +302,7 @@ const VehicleManager = () => {
         onBack={() => setSelectedEquipment(null)}
         onUpdate={handleUpdateEquipment}
         onUpdateStatus={handleUpdateStatus}
+        onDelete={handleDeleteEquipment}
         initialAiOpen={false}
       />
     );

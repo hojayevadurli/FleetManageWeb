@@ -6,6 +6,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { shopsApi } from "@/lib/shopsApi";
 import { Shop, ShopFormData, PREFERENCE_TO_RATE_CATEGORY } from "./types/ShopTypes";
+import ShopRatingInputs, { ShopRatingData } from "./ShopRatingInputs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -119,6 +120,16 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
         city: "",
         state: "",
         zip: ""
+    });
+
+    const [ratingData, setRatingData] = useState<ShopRatingData>({
+        mainRating: 0,
+        qualityRating: 0,
+        timelinessRating: 0,
+        communicationRating: 0,
+        valueRating: 0,
+        wouldRecommend: null,
+        comment: ""
     });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -357,6 +368,27 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const newShop = await shopsApi.create(shopData);
+
+            // Handle Rating
+            if (ratingData.mainRating > 0) {
+                try {
+                    await shopsApi.createRating(newShop.id, {
+                        rating: ratingData.mainRating,
+                        reviewText: ratingData.comment,
+                        serviceDate: new Date().toISOString(),
+                        qualityRating: ratingData.qualityRating,
+                        timelinessRating: ratingData.timelinessRating,
+                        communicationRating: ratingData.communicationRating,
+                        valueRating: ratingData.valueRating,
+                        wouldRecommend: ratingData.wouldRecommend === true
+                    });
+                } catch (ratingErr) {
+                    console.error("InlineAddShopForm: Failed to submit rating", ratingErr);
+                    // Don't block success, just log/toast warning?
+                    toast({ title: "Note", description: "Shop created but rating failed to save.", variant: "default" });
+                }
+            }
+
             onSuccess(newShop);
         } catch (e) {
             console.error(e);
@@ -509,6 +541,18 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
                                 {spec}
                             </button>
                         ))}
+                    </div>
+                </div>
+
+                {/* Rating Inputs */}
+                <div>
+                    <Label className="text-[10px] font-black uppercase text-slate-500 mb-2 block">Initial Rating</Label>
+                    <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <ShopRatingInputs
+                            data={ratingData}
+                            onChange={setRatingData}
+                            variant="compact"
+                        />
                     </div>
                 </div>
 

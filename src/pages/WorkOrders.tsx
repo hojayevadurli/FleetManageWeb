@@ -14,6 +14,7 @@ import { WorkOrderDto, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource }
 import { workOrdersApi, WorkOrderUpsertDto } from "@/lib/workOrdersApi";
 import { equipmentApi } from "@/lib/equipmentApi";
 import { shopsApi } from "@/lib/shopsApi";
+import { tenantsApi } from "@/lib/tenantsApi";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -40,6 +41,7 @@ const WorkOrders = () => {
   // Maps for displaying names
   const [equipmentMap, setEquipmentMap] = useState<Record<string, string>>({});
   const [vendorMap, setVendorMap] = useState<Record<string, VendorData>>({});
+  const [companyName, setCompanyName] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | WorkOrderDto["status"]>("all");
@@ -60,13 +62,17 @@ const WorkOrders = () => {
     try {
       setLoading(true);
 
-      const [woData, equipData, shopData] = await Promise.all([
+      const [woData, equipData, shopData, tenantData] = await Promise.all([
         workOrdersApi.list({ page: 1, pageSize: 50 }),
         equipmentApi.list(),
-        shopsApi.list()
+        shopsApi.list(),
+        tenantsApi.getCurrent()
       ]);
 
       setWorkOrders(woData);
+      if (tenantData?.name) {
+        setCompanyName(tenantData.name);
+      }
 
       // Build Maps
       const eMap: Record<string, string> = {};
@@ -237,7 +243,7 @@ const WorkOrders = () => {
       <CreateWorkOrderDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
-        initialCompanyName={"Fleet Company"}
+        initialCompanyName={companyName || "Fleet Company"}
         onAfterCreated={loadData}
       />
 

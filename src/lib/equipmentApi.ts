@@ -1,56 +1,30 @@
 import api from "@/lib/Api";
-import { Equipment, EquipmentDto, EquipmentStatus, EquipmentLifecycleStatus, EquipmentOperationalStatus } from "@/lib/types";
+import { Equipment, EquipmentDto, EquipmentOperationalStatus } from "@/lib/types";
 
 export const mapDtoToEquipment = (dto: EquipmentDto): Equipment => {
-  // Simulation Logic for Categorization
-  let mappedFleetType: 'TRUCK' | 'TRAILER' | 'HEAVY_EQUIPMENT' | undefined;
-
-  const typeName = (dto.equipmentTypeName || '').toLowerCase();
-  const make = (dto.make || '').toLowerCase();
-
-  // HEAVY EQUIPMENT
-  if (typeName.includes('dozer') || typeName.includes('excavator') || typeName.includes('loader') || typeName.includes('lift') || typeName.includes('crane') || typeName.includes('backhoe')) {
-    mappedFleetType = 'HEAVY_EQUIPMENT';
-  }
-  // TRAILERS
-  else if (typeName.includes('trailer') || typeName.includes('chassis') || typeName.includes('dolly') || typeName.includes('dry van') || typeName.includes('reefer') || typeName.includes('flatbed')) {
-    mappedFleetType = 'TRAILER';
-  }
-  // TRUCKS (Default fallback for most vehicles)
-  else {
-    mappedFleetType = 'TRUCK';
-  }
-
-  // Force specific known manufacturer mapping if needed
-  if (make.includes('freightliner') || make.includes('peterbilt') || make.includes('kenworth')) {
-    mappedFleetType = 'TRUCK';
-  }
-  if (make.includes('caterpillar') || make.includes('jcb') || make.includes('komatsu')) {
-    mappedFleetType = 'HEAVY_EQUIPMENT';
-  }
-
   return {
     id: dto.id,
     unitNumber: dto.unitNumber,
-    type: dto.equipmentTypeName || 'Truck', // Map DTO type name
-    fleetType: mappedFleetType,
-    specificType: dto.equipmentTypeName, // Allow direct mapping
+    type: dto.equipmentTypeName || 'Asset', // Map DTO type name
     make: dto.make || 'Unknown',
     model: dto.model || 'Unknown',
     year: dto.year || new Date().getFullYear(),
     vin: dto.vin,
     serialNumber: dto.serialNumber,
     licensePlate: dto.plateNumber || '',
-    status: dto.lifecycleStatus === EquipmentLifecycleStatus.Sold ? EquipmentStatus.SOLD :
-      dto.lifecycleStatus === EquipmentLifecycleStatus.Retired ? EquipmentStatus.ARCHIVED :
-        dto.operationalStatus === EquipmentOperationalStatus.InShop ? EquipmentStatus.IN_SHOP :
-          dto.operationalStatus === EquipmentOperationalStatus.OutOfService ? EquipmentStatus.OUT_OF_SERVICE :
-            EquipmentStatus.ACTIVE,
+    status: dto.operationalStatus,
     lastServiceDate: dto.lastServiceDate || undefined,
     fleetCategoryId: dto.fleetCategoryId,
     fleetCategoryName: dto.fleetCategoryName,
     equipmentTypeId: dto.equipmentTypeId,
     equipmentTypeName: dto.equipmentTypeName,
+    documents: dto.documents || [],
+    mileage: dto.odometerCurrent,
+    hours: dto.hoursCurrent,
+    notes: dto.notes,
+    acquiredDate: dto.acquiredDate,
+    inServiceDate: dto.inServiceDate,
+    outOfServiceDate: dto.outOfServiceDate,
   };
 };
 
@@ -61,10 +35,13 @@ export interface EquipmentCreatePayload extends Partial<Equipment> {
   initialOdometer: number;
   initialHours: number;
   operationalStatus: EquipmentOperationalStatus;
-  lifecycleStatus: EquipmentLifecycleStatus;
+  plateNumber?: string;
+  displayName?: string;
+  acquiredDate?: string;
+  inServiceDate?: string;
 }
 
-export interface EquipmentUpdatePayload extends Partial<Equipment> { }
+export type EquipmentUpdatePayload = Partial<Equipment>;
 
 export const equipmentApi = {
   // GET /api/equipment

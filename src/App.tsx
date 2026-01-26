@@ -7,11 +7,13 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { ShieldCheck, Bell, User as UserIcon } from "lucide-react";
 import { AuthProvider, useAuth } from "./components/auth/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { AppSidebar } from "./components/AppSidebar";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
+import ConfirmEmail from "./pages/ConfirmEmail";
 import NotFound from "./pages/NotFound";
 import Equipment from "./pages/Equipment";
 import WorkOrders from "./pages/WorkOrders";
@@ -23,6 +25,8 @@ import InspectionsPage from "./pages/InspectionsPage";
 import ShopsPage from "./pages/ShopsPage";
 import ShopMap from "./pages/ShopMap";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Terms from "./pages/Terms";
+import Contact from "./pages/Contact";
 import AIChatPage from "./pages/AIChatPage";
 import FleetMap from "./pages/FleetMap";
 import ServiceRecordDetailPage from "./pages/ServiceRecordDetailPage";
@@ -84,6 +88,7 @@ const RootRoute = () => {
 
 const DashboardHeader = () => {
   const { user: authUser } = useAuth();
+  const { toast } = useToast();
 
   // Handle potential nested user object from backend
   const user = (authUser as any)?.user || authUser;
@@ -106,7 +111,10 @@ const DashboardHeader = () => {
       </div>
 
       <div className="flex items-center gap-8">
-        <button className="relative group">
+        <button
+          onClick={() => toast({ title: "No Notifications", description: "You're all caught up! No active alerts." })}
+          className="relative group"
+        >
           <Bell className="w-5 h-5 text-slate-400 group-hover:text-rose-500 transition-colors" />
           <div className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
         </button>
@@ -140,6 +148,8 @@ const DashboardHeader = () => {
   );
 };
 
+import { HelmetProvider } from "react-helmet-async";
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -151,6 +161,10 @@ const App = () => (
             <Route path="/" element={<RootRoute />} />
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            {/* Backend sends /reset link */}
+            <Route path="/reset" element={<ResetPassword />} />
+            {/* Backend sends /confirm-email link */}
+            <Route path="/confirm-email" element={<ConfirmEmail />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/app/*" element={
               <ProtectedRoute>

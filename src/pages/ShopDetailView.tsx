@@ -17,10 +17,13 @@ import {
     Wrench,
     LayoutDashboard,
     ExternalLink,
-    User
+    User,
+    Trophy,
+    Handshake,
+    Ban
 } from 'lucide-react';
 import { shopsApi } from '@/lib/shopsApi';
-import { Shop, ShopRating, VENDOR_PREFERENCE_CONFIG } from '@/components/shops/types/ShopTypes';
+import { Shop, ShopRating, VENDOR_PREFERENCE_CONFIG, VendorPreference } from '@/components/shops/types/ShopTypes';
 import { useToast } from '@/hooks/use-toast';
 import AddShopDialog from '@/components/shops/AddShopDialog';
 import WriteReviewDialog from '@/components/shops/WriteReviewDialog';
@@ -38,31 +41,27 @@ import {
 import { workOrdersApi } from "@/lib/workOrdersApi";
 import { WorkOrderDto } from "@/lib/types";
 import { Calendar, Receipt, FileText } from "lucide-react";
+import LocationPreview from "@/components/shops/LocationPreview";
+
 
 interface ShopServicesListProps {
-    shopId: string;
+    workOrders: WorkOrderDto[];
+    loading: boolean;
+    ratingsMap: Record<string, number>;
 }
 
-const ShopServicesList = ({ shopId }: ShopServicesListProps) => {
-    const [workOrders, setWorkOrders] = useState<WorkOrderDto[]>([]);
-    const [loading, setLoading] = useState(true);
+const getTierIcon = (preference: VendorPreference) => {
+    switch (preference) {
+        case 'PREFERRED': return <Trophy className="w-4 h-4" />;
+        case 'PARTNER': return <Handshake className="w-4 h-4" />;
+        case 'NEW': return <Sparkles className="w-4 h-4" />;
+        case 'RESTRICTED': return <Ban className="w-4 h-4" />;
+        default: return <ShieldCheck className="w-4 h-4" />;
+    }
+};
 
-    useEffect(() => {
-        const fetchWorkOrders = async () => {
-            try {
-                const data = await workOrdersApi.list({ vendorId: shopId });
-                setWorkOrders(data);
-            } catch (error) {
-                console.error("Failed to fetch work orders:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (shopId) {
-            fetchWorkOrders();
-        }
-    }, [shopId]);
+const ShopServicesList = ({ workOrders, loading, ratingsMap }: ShopServicesListProps) => {
+    const navigate = useNavigate();
 
     if (loading) {
         return <div className="p-8 text-center text-slate-400 animate-pulse">Loading service history...</div>;
@@ -85,10 +84,14 @@ const ShopServicesList = ({ shopId }: ShopServicesListProps) => {
                 const serviceNames = wo.lines.map(l => l.description).join(", ");
 
                 return (
-                    <div key={wo.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-md transition-all">
+                    <div
+                        key={wo.id}
+                        onClick={() => navigate(`/app/maintenance/service-history/${wo.id}`)}
+                        className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-xl hover:border-blue-100 cursor-pointer transition-all group"
+                    >
                         <div className="space-y-2">
                             <div className="flex items-center gap-3">
-                                <span className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-1">
+                                <span className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-1 group-hover:text-blue-500 transition-colors">
                                     <FileText className="w-3 h-3" /> {wo.workOrderNumber || "WO-PENDING"}
                                 </span>
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide
@@ -97,8 +100,14 @@ const ShopServicesList = ({ shopId }: ShopServicesListProps) => {
                                             'bg-slate-100 text-slate-600'}`}>
                                     {wo.status}
                                 </span>
+                                {ratingsMap[wo.id] !== undefined && (
+                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 border border-amber-200">
+                                        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                                        {ratingsMap[wo.id].toFixed(1)}
+                                    </span>
+                                )}
                             </div>
-                            <h4 className="font-bold text-slate-900 text-lg">{wo.title}</h4>
+                            <h4 className="font-bold text-slate-900 text-lg group-hover:text-blue-600 transition-colors">{wo.title}</h4>
                             <div className="text-sm text-slate-600 font-medium mb-1 line-clamp-2">
                                 {serviceNames || "No items"}
                             </div>
@@ -120,12 +129,11 @@ const ShopServicesList = ({ shopId }: ShopServicesListProps) => {
                                     {grandTotal.toFixed(2)}
                                 </div>
                             </div>
-                            <a
-                                href={`/app/work-orders/${wo.id}`}
-                                className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                            <div
+                                className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm"
                             >
                                 <Receipt className="w-5 h-5" />
-                            </a>
+                            </div>
                         </div>
                     </div>
                 );
@@ -143,7 +151,12 @@ const ShopReviewsList = ({ shopId }: { shopId: string }) => {
             try {
                 const data = await shopsApi.getRatings(shopId);
                 // Sort by date desc
-                const sorted = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const sorted = data.sort((a, b) => {
+                    const dateA = new Date(a.created_at || (a as any).createdAt);
+                    const dateB = new Date(b.created_at || (b as any).createdAt);
+                    return dateB.getTime() - dateA.getTime();
+                });
                 setReviews(sorted);
             } catch (error) {
                 console.error("Failed to fetch reviews:", error);
@@ -167,41 +180,48 @@ const ShopReviewsList = ({ shopId }: { shopId: string }) => {
 
     return (
         <div className="space-y-4 animate-in fade-in duration-300">
-            {reviews.map((review) => (
-                <div key={review.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
-                                <User className="w-4 h-4" />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <div className="text-sm font-bold text-slate-900">Verified User</div>
-                                    {review.work_order_id && (
-                                        <div className="bg-green-100 text-green-700 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                                            <ShieldCheck className="w-2.5 h-2.5" /> Verified Order
-                                        </div>
-                                    )}
+            {reviews.map((review) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const createdDate = new Date(review.created_at || (review as any).createdAt);
+
+                return (
+                    <div key={review.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
+                                    <User className="w-4 h-4" />
                                 </div>
-                                <div className="text-[10px] text-slate-400">{new Date(review.created_at).toLocaleDateString()}</div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-sm font-bold text-slate-900">Verified User</div>
+                                        {review.work_order_id && (
+                                            <div className="bg-green-100 text-green-700 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                                                <ShieldCheck className="w-2.5 h-2.5" /> Verified Order
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="text-[10px] text-slate-400">
+                                        {!isNaN(createdDate.getTime()) ? createdDate.toLocaleDateString() : 'Date unavailable'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex gap-1">
+                                {[...Array(5)].map((_, i) => (
+                                    <Star key={i} className={`w-3.5 h-3.5 ${i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+                                ))}
                             </div>
                         </div>
-                        <div className="flex gap-1">
-                            {[...Array(5)].map((_, i) => (
-                                <Star key={i} className={`w-3.5 h-3.5 ${i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
-                            ))}
-                        </div>
+                        {review.service_date && (
+                            <div className="text-xs text-slate-400 mb-2 font-medium bg-slate-50 inline-block px-2 py-1 rounded-lg">
+                                Service Date: {new Date(review.service_date).toLocaleDateString()}
+                            </div>
+                        )}
+                        <p className="text-slate-600 text-sm leading-relaxed">
+                            {review.review_text || <span className="italic text-slate-400">No written review.</span>}
+                        </p>
                     </div>
-                    {review.service_date && (
-                        <div className="text-xs text-slate-400 mb-2 font-medium bg-slate-50 inline-block px-2 py-1 rounded-lg">
-                            Service Date: {new Date(review.service_date).toLocaleDateString()}
-                        </div>
-                    )}
-                    <p className="text-slate-600 text-sm leading-relaxed">
-                        {review.review_text || <span className="italic text-slate-400">No written review.</span>}
-                    </p>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 };
@@ -216,24 +236,53 @@ const ShopDetailView = () => {
     const navigate = useNavigate();
     const { toast } = useToast();
     const [shop, setShop] = useState<Shop | null>(null);
+
+    const [workOrders, setWorkOrders] = useState<WorkOrderDto[]>([]);
+    const [ratings, setRatings] = useState<ShopRating[]>([]);
     const [loading, setLoading] = useState(true);
+    const [woLoading, setWoLoading] = useState(true);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isReviewOpen, setIsReviewOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'reviews'>('overview');
 
+    // Create ratings map - Must be before conditional returns
+    const ratingsMap = React.useMemo(() => {
+        const map: Record<string, number> = {};
+        ratings.forEach(r => {
+            if (r.work_order_id) {
+                map[r.work_order_id] = r.rating;
+            }
+        });
+        return map;
+    }, [ratings]);
+
     useEffect(() => {
-        if (id) loadShop();
+        if (id) {
+            loadShopData();
+        }
     }, [id]);
 
-    const loadShop = async () => {
+    const loadShopData = async () => {
         if (!id) return;
         setLoading(true);
+        setWoLoading(true);
         try {
-            const data = await shopsApi.get(id);
-            if (!data) throw new Error("Shop not found");
-            setShop(data);
+
+            const [shopData, woData] = await Promise.all([
+                shopsApi.get(id),
+                workOrdersApi.list({ vendorId: id })
+            ]);
+
+            // Fetch ratings separately to avoid blocking critical UI
+            shopsApi.getRatings(id).then(setRatings).catch(err => console.error("Ratings fetch failed", err));
+
+            if (!shopData) throw new Error("Shop not found");
+            setShop(shopData);
+
+            // Filter WOs just in case access control didn't filter it
+            setWorkOrders(woData.filter(wo => wo.vendorId === id));
         } catch (error) {
-            console.error('Error loading shop:', error);
+            console.error('Error loading shop data:', error);
             toast({
                 title: "Error loading shop",
                 description: "This shop profile is currently unavailable.",
@@ -241,6 +290,7 @@ const ShopDetailView = () => {
             });
         } finally {
             setLoading(false);
+            setWoLoading(false);
         }
     };
 
@@ -276,6 +326,13 @@ const ShopDetailView = () => {
 
     const tierConfig = VENDOR_PREFERENCE_CONFIG[shop.vendor_preference] || VENDOR_PREFERENCE_CONFIG.STANDARD;
     const mapQuery = encodeURIComponent(`${shop.shop_name} ${shop.address}, ${shop.city || ''} ${shop.state || ''}`);
+
+
+    // Calculate stats
+    const orderCount = workOrders.length;
+    const totalSpent = workOrders.reduce((sum, wo) => sum + (wo.manualActualTotal || wo.estimatedTotal || 0), 0);
+
+
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] pb-20">
@@ -350,7 +407,7 @@ const ShopDetailView = () => {
                         <div className="flex flex-col gap-2">
                             <div className="flex items-center gap-3 text-slate-500 font-bold text-lg">
                                 <MapPin className="w-5 h-5 flex-shrink-0" />
-                                <span>{shop.address}, {shop.city}, {shop.state}</span>
+                                <span>{shop.address}, {shop.city}, {shop.state} {shop.zip || ''}</span>
                             </div>
                             {shop.phone && (
                                 <div className="flex items-center gap-3 text-slate-500 font-bold text-lg">
@@ -362,9 +419,9 @@ const ShopDetailView = () => {
 
                         <div className="flex flex-wrap items-center gap-4 pt-4">
                             {/* Partner Badge */}
-                            <span className={`px-4 py-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2`}>
-                                <ShieldCheck className="w-4 h-4" />
-                                {shop.vendor_preference}
+                            <span className={`px-4 py-1.5 ${tierConfig.bgColor} ${tierConfig.textColor} border border-${tierConfig.textColor.split('-')[1]}-100 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2`}>
+                                {getTierIcon(shop.vendor_preference)}
+                                {tierConfig.label}
                             </span>
 
                             {/* Rating Badge */}
@@ -405,19 +462,7 @@ const ShopDetailView = () => {
                                     {shop.phone || "No Phone Listed"}
                                 </div>
 
-                                <div className="flex gap-4">
-                                    {shop.phone && (
-                                        <a
-                                            href={`tel:${shop.phone}`}
-                                            className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95"
-                                        >
-                                            Call Shop
-                                        </a>
-                                    )}
-                                    <button className="flex-1 py-4 bg-slate-50 text-slate-600 border border-slate-200 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-100 transition-all active:scale-95">
-                                        Message
-                                    </button>
-                                </div>
+
                             </div>
 
                             {/* Pricing Card */}
@@ -454,7 +499,7 @@ const ShopDetailView = () => {
                                         <MapPin className="w-4 h-4" />
                                         <span className="text-[10px] font-black uppercase tracking-widest">Location</span>
                                     </div>
-                                    <div className="text-xl font-bold text-slate-900">{shop.address}, {shop.city}</div>
+                                    <div className="text-xl font-bold text-slate-900">{shop.address}, {shop.city}, {shop.state} {shop.zip || ''}</div>
                                 </div>
                                 <div className="flex gap-4">
                                     <a
@@ -465,27 +510,17 @@ const ShopDetailView = () => {
                                     >
                                         <ExternalLink className="w-4 h-4" /> Open in Maps
                                     </a>
-                                    <a
-                                        href={`https://www.google.com/maps/dir/?api=1&destination=${shop.latitude},${shop.longitude}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg"
-                                    >
-                                        <Navigation className="w-4 h-4" /> Get Directions
-                                    </a>
+
                                 </div>
                             </div>
 
                             {/* Interactive Map */}
                             <div className="w-full relative h-[500px] lg:h-[600px] bg-slate-100">
-                                {shop.latitude && shop.longitude && !IS_DEMO_KEY ? (
-                                    <iframe
-                                        width="100%"
+                                {shop.latitude && shop.longitude ? (
+                                    <LocationPreview
+                                        latitude={shop.latitude}
+                                        longitude={shop.longitude}
                                         height="100%"
-                                        style={{ border: 0 }}
-                                        loading="lazy"
-                                        allowFullScreen
-                                        src={`https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(`${shop.shop_name} ${shop.address}`)}`}
                                     />
                                 ) : (
                                     <div className="absolute inset-0 flex flex-col items-center justify-center p-12 bg-slate-50 text-slate-400 space-y-8 text-center">
@@ -495,10 +530,7 @@ const ShopDetailView = () => {
                                         <div className="space-y-3 max-w-lg">
                                             <h3 className="text-2xl font-black text-slate-900">Map Preview Unavailable</h3>
                                             <p className="text-base text-slate-500 font-medium leading-relaxed">
-                                                {IS_DEMO_KEY
-                                                    ? "Google Maps API Key is missing or invalid. Please configure your API key to see the live map."
-                                                    : "Location coordinates are missing for this shop."
-                                                }
+                                                Location coordinates are missing for this shop.
                                             </p>
                                         </div>
                                         <a
@@ -522,13 +554,13 @@ const ShopDetailView = () => {
                                     onClick={() => setActiveTab('overview')}
                                     className={`px-8 py-5 text-xs font-black uppercase tracking-widest border-b-[3px] transition-all ${activeTab === 'overview' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    Specializations
+                                    Specializations ({shop.specialties?.length || 0})
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('services')}
                                     className={`px-8 py-5 text-xs font-black uppercase tracking-widest border-b-[3px] transition-all ${activeTab === 'services' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    Services
+                                    Services ({workOrders.length})
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('reviews')}
@@ -562,7 +594,7 @@ const ShopDetailView = () => {
                             )}
 
                             {activeTab === 'services' && (
-                                <ShopServicesList shopId={shop.id} />
+                                <ShopServicesList workOrders={workOrders} loading={woLoading} ratingsMap={ratingsMap} />
                             )}
 
                             {activeTab === 'reviews' && (
@@ -609,36 +641,43 @@ const ShopDetailView = () => {
 
                                 {/* Intelligent Empty State / Stats */}
                                 <div className="space-y-8">
-                                    {/* Since we don't have real history data connected yet, we assume new/empty for now or show zeros */}
-                                    <div className="p-8 bg-slate-800/50 rounded-2xl border border-slate-700/50 text-center space-y-4">
-                                        <div className="mx-auto w-14 h-14 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400">
-                                            <Sparkles className="w-7 h-7" />
+                                    {orderCount === 0 ? (
+                                        <div className="p-8 bg-slate-800/50 rounded-2xl border border-slate-700/50 text-center space-y-4">
+                                            <div className="mx-auto w-14 h-14 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400">
+                                                <Sparkles className="w-7 h-7" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-white text-base">New to Network</h4>
+                                                <p className="text-sm text-slate-400 mt-1">Start building history with this shop.</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h4 className="font-bold text-white text-base">New to Network</h4>
-                                            <p className="text-sm text-slate-400 mt-1">Start building history with this shop.</p>
+                                    ) : (
+                                        <div className="p-8 bg-slate-800/50 rounded-2xl border border-slate-700/50 text-center space-y-4">
+                                            <div className="mx-auto w-14 h-14 bg-emerald-500/20 rounded-full flex items-center justify-center text-emerald-400">
+                                                <LayoutDashboard className="w-7 h-7" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-white text-base">Active Partner</h4>
+                                                <p className="text-sm text-slate-400 mt-1">{orderCount} completed services</p>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
-                                    <div className="opacity-50 mix-blend-screen">
+                                    <div className={orderCount === 0 ? "opacity-50 mix-blend-screen" : "opacity-100"}>
                                         <div className="grid grid-cols-2 gap-6">
                                             <div>
                                                 <div className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Orders</div>
-                                                <div className="text-2xl font-black text-slate-300">0</div>
+                                                <div className="text-2xl font-black text-slate-300">{orderCount}</div>
                                             </div>
                                             <div>
                                                 <div className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Spent</div>
-                                                <div className="text-2xl font-black text-slate-300">$0</div>
+                                                <div className="text-2xl font-black text-slate-300">${totalSpent.toLocaleString()}</div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="pt-8 border-t border-white/10">
-                                    <button className="w-full py-5 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20 active:scale-95 flex items-center justify-center gap-3">
-                                        <Wrench className="w-4 h-4" /> Create First Work Order
-                                    </button>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -650,8 +689,16 @@ const ShopDetailView = () => {
             <AddShopDialog
                 open={isEditDialogOpen}
                 onOpenChange={setIsEditDialogOpen}
-                onShopAdded={() => {
-                    loadShop();
+                onShopAdded={(updatedShop) => {
+                    if (updatedShop) {
+                        setShop(updatedShop);
+                        toast({
+                            title: "Shop Updated",
+                            description: "Changes have been saved successfully."
+                        });
+                    } else {
+                        loadShopData();
+                    }
                     setIsEditDialogOpen(false);
                 }}
                 shopToEdit={shop}
@@ -662,7 +709,7 @@ const ShopDetailView = () => {
                 onOpenChange={setIsReviewOpen}
                 shopId={shop.id}
                 shopName={shop.shop_name}
-                onReviewSubmitted={loadShop}
+                onReviewSubmitted={loadShopData}
             />
         </div>
     );

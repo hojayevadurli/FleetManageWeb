@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
-import { Equipment, EquipmentStatus } from "@/lib/types";
+import { Equipment, EquipmentOperationalStatus } from "@/lib/types";
 
 interface VehicleSelectorProps {
   selectedVehicleId: string;
@@ -14,16 +14,10 @@ interface VehicleSelectorProps {
   equipment?: Equipment[]; // Optional prop to avoid redundant fetching
 }
 
-const isSelectable = (status?: string | null) => {
-  const s = (status ?? "").trim().toLowerCase();
-  // Allow Active, In Shop, and Out of Service. Exclude Sold/Archived.
-  return s === "" ||
-    s === EquipmentStatus.ACTIVE ||
-    s === EquipmentStatus.IN_SHOP ||
-    s === EquipmentStatus.OUT_OF_SERVICE ||
-    s === "active" ||
-    s === "in shop" ||
-    s === "out of service";
+const isSelectable = (status: EquipmentOperationalStatus) => {
+  // Allow Active and In Shop. Exclude Out of Service and Sold.
+  return status === EquipmentOperationalStatus.Active ||
+    status === EquipmentOperationalStatus.InShop;
 };
 
 const VehicleSelector = ({

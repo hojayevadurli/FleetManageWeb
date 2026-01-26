@@ -8,6 +8,12 @@ export interface Tenant {
     email: string;
     phone: string;
     createdAt?: string;
+    // New fields from backend DTO
+    status: string;
+    billingStatus?: string;
+    trialEndsAt?: string;
+    currentPeriodEnd?: string;
+    planKey?: string;
 }
 
 export interface UpdateTenantPayload {

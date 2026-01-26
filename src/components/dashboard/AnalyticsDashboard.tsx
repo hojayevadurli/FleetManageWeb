@@ -1,6 +1,6 @@
 import React from 'react';
 import { Truck, AlertTriangle, DollarSign, ShieldCheck, ClipboardList, Zap, ChevronRight, ArrowRight } from 'lucide-react';
-import { Equipment, EquipmentStatus, WorkOrder, WorkOrderStatus } from '@/lib/types';
+import { Equipment, EquipmentOperationalStatus, WorkOrder, WorkOrderStatus } from '@/lib/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import AIPredictiveForecast from './AIPredictiveForecast';
@@ -14,36 +14,38 @@ interface DashboardProps {
 
 const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, serviceRecords, onTabChange }) => {
     const totalFleet = equipment.length;
-    const inShop = equipment.filter(e => e.status?.toLowerCase() === EquipmentStatus.IN_SHOP.toLowerCase()).length;
-    const activeUnits = equipment.filter(e => e.status?.toLowerCase() === EquipmentStatus.ACTIVE.toLowerCase()).length;
+    const inShop = equipment.filter(e => e.status === EquipmentOperationalStatus.InShop).length;
+    const activeUnits = equipment.filter(e => e.status === EquipmentOperationalStatus.Active).length;
+    const soldUnits = equipment.filter(e => e.status === EquipmentOperationalStatus.Sold).length;
 
     // Work orders logic (active rescues/breakdowns)
     // Note: WorkOrder interface in types.ts HAS isRoadside, but the API DTO might not.
     const breakdowns = workOrders.filter(wo => (wo as any).isRoadside && wo.status !== WorkOrderStatus.Completed);
 
     // Maintenance Spend from Service Records
-    const totalSpend = serviceRecords.reduce((acc, sr) => acc + (sr.estimatedTotal || 0), 0);
+    const totalSpend = serviceRecords.reduce((acc, sr) => acc + (sr.totalCost || 0), 0);
 
     const statusData = [
         { name: 'Active', value: activeUnits, color: '#10b981' }, // emerald-500
         { name: 'In Shop', value: inShop, color: '#f59e0b' },   // amber-500
-        { name: 'OOS', value: totalFleet - activeUnits - inShop, color: '#f43f5e' }, // rose-500
+        { name: 'OOS', value: totalFleet - activeUnits - inShop - soldUnits, color: '#f43f5e' }, // rose-500
+        { name: 'Sold', value: soldUnits, color: '#64748b' },   // slate-500
     ];
 
     return (
         <div className="space-y-6 pb-12">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-2 pb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
                 <div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Fleet Performance Center</h1>
-                    <p className="text-slate-500 font-medium text-lg mt-3 leading-relaxed">
-                        Track work, control costs, and answer any question about a unit’s history in seconds.
+                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">Fleet Performance Center</h1>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                        Track work, control costs, and answer questions about your fleet
                     </p>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 <div
-                    onClick={() => onTabChange('equipment', EquipmentStatus.ACTIVE)}
+                    onClick={() => onTabChange('equipment', EquipmentOperationalStatus.Active.toString())}
                     className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group cursor-pointer hover:shadow-lg hover:border-blue-100 transition-all duration-300"
                 >
                     <div className="flex items-center gap-6">
@@ -59,7 +61,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                 </div>
 
                 <div
-                    onClick={() => onTabChange('equipment', EquipmentStatus.IN_SHOP)}
+                    onClick={() => onTabChange('equipment', EquipmentOperationalStatus.InShop.toString())}
                     className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group cursor-pointer hover:shadow-lg hover:border-amber-100 transition-all duration-300"
                 >
                     <div className="flex items-center gap-6">
@@ -97,7 +99,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                         </div>
                         <div className="h-80 w-full">
                             <ResponsiveContainer width="100%" height="100%" debounce={100}>
-                                <BarChart data={statusData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                <BarChart data={statusData} margin={{ top: 10, right: 30, left: 0, bottom: 30 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                     <XAxis
                                         dataKey="name"
@@ -193,7 +195,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                                             <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate mt-0.5">{vendorDisplay}</div>
                                         </div>
                                         <div className="text-right shrink-0">
-                                            <div className="text-sm font-black text-slate-900 tracking-tight">${(sr.estimatedTotal || 0).toLocaleString()}</div>
+                                            <div className="text-sm font-black text-slate-900 tracking-tight">${(sr.totalCost || 0).toLocaleString()}</div>
                                             <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md mt-1 inline-block ${statusColor}`}>
                                                 {statusLabel}
                                             </div>
