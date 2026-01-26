@@ -28,6 +28,7 @@ interface DocumentUploadModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     equipmentId: string;
+    assetType?: string; // "truck" | "trailer"
     onUploadComplete: () => void;
 }
 
@@ -46,6 +47,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     open,
     onOpenChange,
     equipmentId,
+    assetType,
     onUploadComplete
 }) => {
     const [files, setFiles] = useState<FileUploadState[]>([]);
@@ -55,17 +57,21 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.length) return;
 
-        const newFiles: FileUploadState[] = Array.from(e.target.files).map(file => ({
+        // Limiting to the first file selected since we removed 'multiple'
+        const file = e.target.files[0];
+
+        const newFiles: FileUploadState[] = [{
             id: Math.random().toString(36).substr(2, 9),
             file,
             status: 'pending',
             role: EquipmentDocRole.Other,
             notes: '',
-        }));
+        }];
 
-        setFiles(prev => [...prev, ...newFiles]);
+        // Replace existing files with the new one
+        setFiles(newFiles);
 
-        // Trigger scan for new files
+        // Trigger scan for new file
         newFiles.forEach(fileState => scanFile(fileState));
 
         // Reset input
@@ -135,8 +141,10 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     const handleUploadAll = async () => {
         setIsGlobalUploading(true);
         let successCount = 0;
+        let hasError = false;
 
         for (const fileState of files) {
+            // Skip already completed files
             if (fileState.status === 'complete') continue;
 
             updateFileStatus(fileState.id, 'uploading');
@@ -147,6 +155,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 if (fileState.issueDate) formData.append('startDate', fileState.issueDate);
                 if (fileState.expirationDate) formData.append('expirationDate', fileState.expirationDate);
                 formData.append('notes', fileState.notes);
+                if (assetType) formData.append('assetType', assetType);
 
                 await equipmentApi.uploadDocument(equipmentId, formData);
                 updateFileStatus(fileState.id, 'complete');
@@ -154,6 +163,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             } catch (err) {
                 console.error("Upload failed", err);
                 updateFileStatus(fileState.id, 'error', "Upload failed");
+                hasError = true;
             }
         }
 
@@ -161,7 +171,16 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         if (successCount > 0) {
             toast.success(`Successfully uploaded ${successCount} documents`);
             onUploadComplete();
-            if (files.every(f => f.status === 'complete')) {
+
+            // Close if we had no errors in this batch, or if all items are now effectively complete
+            // Since we know we just processed everything that wasn't complete,
+            // 'hasError' being false means everything we touched succeeded.
+            // If there were existing errors we didn't touch, they would block closing?
+            // Actually, if hasError is false, it means every file we attempted in this loop succeeded.
+            // And since we attempt all non-complete files, this implies all files are now complete (assuming no error files from before were skipped).
+            // But wait, if fileState.status was 'error' before, it is !== 'complete', so we retried it.
+            // So logic holds: if !hasError, all files are complete.
+            if (!hasError) {
                 setTimeout(() => {
                     setFiles([]);
                     onOpenChange(false);
@@ -189,7 +208,6 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                             type="file"
                             ref={fileInputRef}
                             className="hidden"
-                            multiple
                             accept=".pdf,.jpg,.jpeg,.png,.webp"
                             onChange={handleFileSelect}
                         />
@@ -197,7 +215,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                             <div className="p-4 bg-blue-50 rounded-full text-blue-600">
                                 <FileText className="w-6 h-6" />
                             </div>
-                            <h3 className="font-bold text-slate-900">Click to upload documents</h3>
+                            <h3 className="font-bold text-slate-900">Click to upload document</h3>
                             <p className="text-sm text-slate-500">PDF, JPG, PNG supported</p>
                         </div>
                     </div>

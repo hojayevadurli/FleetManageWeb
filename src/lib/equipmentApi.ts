@@ -86,7 +86,7 @@ export const equipmentApi = {
     await api.post("/equipment/bulk-delete", { ids });
   },
 
-  // POST /api/equipment/{id}/documents (frontend helper, maps to backend 2-step)
+  // POST /api/equipment/{id}/documents
   async uploadDocument(equipmentId: string, formData: FormData): Promise<EquipmentDocument> {
     // 1. Extract file and metadata from FormData
     const file = formData.get('file') as File;
@@ -100,18 +100,17 @@ export const equipmentApi = {
     // 2. Upload file to storage
     const fileUrl = await uploadsApi.uploadDocument(file);
 
-    // 3. Create document record via DocumentsController
+    // 3. Create document record via new EquipmentController endpoint
     const payload = {
       fileUrl,
       fileType: file.type,
-      docKind: this.mapRoleToKind(docRole),
-      vendorNameRaw: notes, // Mapping notes to vendorNameRaw/description for now as per UI
-      equipmentId: equipmentId,
-      runAiExtract: false // Or true if we want backend AI
+      docRole,
+      notes,
+      startDate: startDate || null,
+      expirationDate: expirationDate || null
     };
 
-    // We call the DocumentsController endpoint
-    const response = await api.post<EquipmentDocument>("/documents", payload);
+    const response = await api.post<EquipmentDocument>(`/equipment/${equipmentId}/documents`, payload);
     return response.data;
   },
 
@@ -122,6 +121,8 @@ export const equipmentApi = {
       case 2: return 'title';
       case 3: return 'insurance';
       case 4: return 'warranty';
+      case 5: return 'lease';
+      case 6: return 'other';
       case 7: return 'inspection';
       default: return 'unknown';
     }

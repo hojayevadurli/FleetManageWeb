@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { format, parseISO } from 'date-fns';
 import {
     ArrowLeft,
     Container,
@@ -55,11 +56,12 @@ interface EquipmentDetailProps {
     onBack: () => void;
     onUpdateStatus?: (status: EquipmentOperationalStatus) => Promise<void>;
     onUpdate?: (data: any) => Promise<void>;
+    onRefresh?: () => Promise<void>;
     onDelete?: () => Promise<void>;
     initialAiOpen?: boolean;
 }
 
-const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders, onBack, onUpdateStatus, onUpdate, onDelete, initialAiOpen }) => {
+const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders, onBack, onUpdateStatus, onUpdate, onRefresh, onDelete, initialAiOpen }) => {
     const navigate = useNavigate();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAddWarrantyOpen, setIsAddWarrantyOpen] = useState(false);
@@ -375,8 +377,8 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     </Select>
                                 </div>
 
-                                <div className="flex flex-col md:flex-row gap-12 items-start relative z-10">
-                                    <div className="space-y-2 max-w-sm">
+                                <div className="flex flex-col md:flex-row gap-6 items-start relative z-10">
+                                    <div className="space-y-2 shrink-0">
                                         <h2 className="text-5xl font-black text-slate-900 tracking-tighter leading-[0.9]">{equipment.year} {equipment.make} {equipment.model}</h2>
 
                                         <div className="flex gap-8 pt-6">
@@ -394,14 +396,38 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     {/* 2x2 Stats Grid */}
                                     <div className="grid grid-cols-2 gap-4 flex-1 w-full">
                                         {(() => {
-                                            const getExpirationDate = (role: EquipmentDocRole) => {
-                                                const docs = equipment.documents?.filter(d => d.docRole === role) || [];
+                                            // Robust helper to map any doc role/kind format to our Enum
+                                            const getRole = (d: any): EquipmentDocRole | null => {
+                                                if (typeof d.docRole === 'number') return d.docRole;
+
+                                                const k = (d.docRole || d.docKind || '').toString().toLowerCase();
+
+                                                if (k === 'registration' || k.includes('registration')) return EquipmentDocRole.Registration;
+                                                if (k === 'title' || k.includes('title')) return EquipmentDocRole.Title;
+                                                if (k === 'insurance' || k.includes('insurance')) return EquipmentDocRole.Insurance;
+                                                if (k === 'warranty' || k.includes('warranty')) return EquipmentDocRole.Warranty;
+                                                if (k === 'lease' || k.includes('lease')) return EquipmentDocRole.Lease;
+                                                if (k === 'inspection' || k === 'dotinspection' || k.includes('dot') || k.includes('inspection')) return EquipmentDocRole.DOTInspection;
+                                                if (k === 'general' || k.includes('general')) return EquipmentDocRole.General;
+
+                                                // Handle stringified enum values
+                                                if (k === '0') return EquipmentDocRole.General;
+                                                if (k === '1') return EquipmentDocRole.Registration;
+                                                if (k === '2') return EquipmentDocRole.Title;
+                                                if (k === '3') return EquipmentDocRole.Insurance;
+                                                if (k === '4') return EquipmentDocRole.Warranty;
+                                                if (k === '5') return EquipmentDocRole.Lease;
+                                                if (k === '6') return EquipmentDocRole.Other;
+                                                if (k === '7') return EquipmentDocRole.DOTInspection;
+
+                                                return EquipmentDocRole.Other;
+                                            };
+
+                                            const getExpirationDate = (targetRole: EquipmentDocRole) => {
+                                                const docs = equipment.documents?.filter(d => getRole(d) === targetRole) || [];
                                                 if (docs.length === 0) return null;
-                                                // Sort by expiration date descending (assuming we want the latest valid one, or maybe the one expiring soonest? 
-                                                // Usually we want the current active one. If multiple, let's take the one with the latest expiration date => most recent renewal)
-                                                // Actually, if we have a history, we want the current valid one. 
-                                                // Let's assume the backend or logic ensures we verify against the latest one.
-                                                // Let's pick the one with the max expiration date.
+
+                                                // Sort by expiration date descending to find the latest valid one
                                                 return docs.sort((a, b) => {
                                                     const da = a.expirationDate ? new Date(a.expirationDate).getTime() : 0;
                                                     const db = b.expirationDate ? new Date(b.expirationDate).getTime() : 0;
@@ -411,7 +437,9 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
 
                                             const formatDate = (dateStr?: string) => {
                                                 if (!dateStr) return 'N/A';
-                                                return new Date(dateStr).toLocaleDateString();
+                                                try {
+                                                    return format(parseISO(dateStr), 'MM/dd/yyyy');
+                                                } catch { return 'N/A'; }
                                             };
 
                                             const getStatusColor = (dateStr?: string) => {
@@ -421,6 +449,18 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                 if (days < 30) return { color: 'text-amber-600', bg: 'bg-amber-50', label: 'Expiring Soon' };
                                                 return { color: 'text-emerald-600', bg: 'bg-emerald-50', label: 'Active' };
                                             };
+
+                                            // Calculate Last Service Date
+                                            let lastServiceDate = equipment.lastServiceDate;
+                                            if (!lastServiceDate && equipmentHistory.length > 0) {
+                                                const completedOrders = equipmentHistory
+                                                    .filter(wo => wo.status === 3 || wo.status === 4 || wo.status === 6) // Completed, Closed, Paid
+                                                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                                                if (completedOrders.length > 0) {
+                                                    lastServiceDate = completedOrders[0].date;
+                                                }
+                                            }
 
                                             const insuranceExp = getExpirationDate(EquipmentDocRole.Insurance);
                                             const regExp = getExpirationDate(EquipmentDocRole.Registration);
@@ -454,7 +494,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                 },
                                                 {
                                                     label: 'Last Service',
-                                                    val: equipment.lastServiceDate ? equipment.lastServiceDate.split('T')[0] : 'N/A',
+                                                    val: lastServiceDate ? new Date(lastServiceDate).toLocaleDateString() : 'N/A',
                                                     icon: Wrench,
                                                     color: 'text-amber-600',
                                                     bg: 'bg-amber-50'
@@ -583,14 +623,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                         <EquipmentDocumentsTab
                             equipment={equipment}
                             onRefresh={() => {
-                                // Trigger a refresh by passing current data back up?
-                                // Ideally the parent should expose a generic 'refresh' method.
-                                // For now, we try calling onUpdate with partial data to force re-render if parent supports it,
-                                // or reliance on parent re-fetching.
-                                // If onUpdate expects full payload, this might be tricky.
-                                // Let's try to assume onBack or equivalent might effectively reset, but we want live update.
-                                // Actually, calling onUpdate({}) might trigger a refetch if parent logic is "refetch on update".
-                                if (onUpdate) onUpdate({});
+                                if (onRefresh) onRefresh();
                             }}
                         />
                     </div>

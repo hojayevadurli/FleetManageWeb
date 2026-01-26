@@ -230,37 +230,52 @@ const VehicleManager = () => {
     }
   };
 
+  /* 
+   * NEW: Fetch just one equipment to refresh the detailed view
+   */
+  const handleRefreshEquipment = async () => {
+    if (!selectedEquipment) return;
+    try {
+      const refreshed = await equipmentApi.get(selectedEquipment.id);
+      if (refreshed) {
+        // preserve the detailed view by updating state
+        setSelectedEquipment(refreshed);
+        setEquipmentList(prev => prev.map(e => e.id === refreshed.id ? refreshed : e));
+      }
+    } catch (err) {
+      console.error("Failed to refresh equipment", err);
+    }
+  };
+
   const handleUpdateEquipment = async (data: any) => {
     if (!selectedEquipment) return;
     try {
-      // Map to API DTO
+      // Map to API DTO with full safety defaults to existing values
       const payload: any = {
         id: selectedEquipment.id,
-        equipmentTypeId: data.equipmentTypeId || selectedEquipment.equipmentTypeId,
-        fleetCategoryId: data.fleetCategoryId || selectedEquipment.fleetCategoryId,
-        unitNumber: data.unitNumber,
-        displayName: data.unitNumber,
-        vin: data.vin,
-        serialNumber: data.serialNumber,
-        plateNumber: data.licensePlate, // Map licensePlate to plateNumber
-        // state: data.licenseState, // Backend doesn't support State directly yet, might be inside JSON specs if implemented
-        make: data.make,
-        model: data.model,
-        year: data.year,
+        equipmentTypeId: data.equipmentTypeId ?? selectedEquipment.equipmentTypeId,
+        fleetCategoryId: data.fleetCategoryId ?? selectedEquipment.fleetCategoryId,
+        unitNumber: data.unitNumber ?? selectedEquipment.unitNumber,
+        displayName: data.displayName ?? selectedEquipment.displayName ?? selectedEquipment.unitNumber,
+        vin: data.vin ?? selectedEquipment.vin,
+        serialNumber: data.serialNumber ?? selectedEquipment.serialNumber,
+        plateNumber: data.licensePlate ?? selectedEquipment.licensePlate, // Map licensePlate to plateNumber
+        make: data.make ?? selectedEquipment.make,
+        model: data.model ?? selectedEquipment.model,
+        year: data.year ?? selectedEquipment.year,
 
         // Operational Status mapping
-        operationalStatus: data.status,
+        operationalStatus: data.status ?? selectedEquipment.status,
 
-        // Specs
-        length: Number(data.length) || 0,
-        width: 0,
-        height: 0,
-        color: 'White',
-        grossVehicleWeightRating: Number(data.weightCapacity) || 0,
+        // Specs - use nullish coalescing to avoid overwriting with 0 if data isn't provided but exists
+        // However, if data IS provided (e.g. edit form), it should be used.
+        // If data is empty object (refresh hack), we fallback to existing.
+        // The edit form usually sends all fields or specific ones. 
+        // We generally assume 'data' contains the changes.
 
-        // Meters
-        odometerCurrent: Number(data.mileage) || 0,
-        hoursCurrent: Number(data.hours) || 0,
+        // Meters - carefully update only if present in 'data' or fallback
+        odometerCurrent: data.mileage !== undefined ? Number(data.mileage) : selectedEquipment.mileage,
+        hoursCurrent: data.hours !== undefined ? Number(data.hours) : selectedEquipment.hours,
 
         notes: selectedEquipment.notes
       };
@@ -302,6 +317,7 @@ const VehicleManager = () => {
         onBack={() => setSelectedEquipment(null)}
         onUpdate={handleUpdateEquipment}
         onUpdateStatus={handleUpdateStatus}
+        onRefresh={handleRefreshEquipment}
         onDelete={handleDeleteEquipment}
         initialAiOpen={false}
       />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Equipment, EquipmentDocRole, EquipmentDocument } from '@/lib/types';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import {
 import { FileText, MoreVertical, Download, Trash2, Eye, Plus, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { equipmentApi } from '@/lib/equipmentApi';
+import { documentsApi, DocumentDto } from '@/lib/documentsApi';
 import { toast } from 'sonner';
 import DocumentUploadModal from './DocumentUploadModal';
 
@@ -28,11 +29,87 @@ interface EquipmentDocumentsTabProps {
 const EquipmentDocumentsTab: React.FC<EquipmentDocumentsTabProps> = ({ equipment, onRefresh }) => {
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [docs, setDocs] = useState<EquipmentDocument[]>(equipment.documents || []);
+    const [loading, setLoading] = useState(false);
 
-    const documents = equipment.documents || [];
+    // Map string docKind to Enum role
+    const mapKindToRole = (kind: string): EquipmentDocRole | null => {
+        const k = kind?.toLowerCase();
+        if (!k) return null;
+
+        // Exact matches or known keywords
+        if (k === 'registration' || k.includes('registration')) return EquipmentDocRole.Registration;
+        if (k === 'title' || k.includes('title')) return EquipmentDocRole.Title;
+        if (k === 'insurance' || k.includes('insurance')) return EquipmentDocRole.Insurance;
+        if (k === 'warranty' || k.includes('warranty')) return EquipmentDocRole.Warranty;
+        if (k === 'lease' || k.includes('lease')) return EquipmentDocRole.Lease;
+        if (k === 'inspection' || k === 'dotinspection' || k.includes('dot') || k.includes('inspection')) return EquipmentDocRole.DOTInspection;
+        if (k === 'general' || k.includes('general')) return EquipmentDocRole.General;
+        if (k === 'other') return EquipmentDocRole.Other;
+
+        // Handle stringified enum values
+        if (k === '0') return EquipmentDocRole.General;
+        if (k === '1') return EquipmentDocRole.Registration;
+        if (k === '2') return EquipmentDocRole.Title;
+        if (k === '3') return EquipmentDocRole.Insurance;
+        if (k === '4') return EquipmentDocRole.Warranty;
+        if (k === '5') return EquipmentDocRole.Lease;
+        if (k === '6') return EquipmentDocRole.Other;
+        if (k === '7') return EquipmentDocRole.DOTInspection;
+
+        return null;
+    };
+
+    const fetchDocuments = useCallback(async () => {
+        try {
+            setLoading(true);
+            // Fetch the full equipment details to get the authoritative list of documents
+            const eq = await equipmentApi.get(equipment.id);
+
+            if (eq && eq.documents) {
+                const mapped: EquipmentDocument[] = eq.documents.reduce((acc, d) => {
+                    // Handle docRole if it comes as a string or number. 
+                    // We try to use the direct docRole if it matches the enum, otherwise try to map from string.
+                    let role: EquipmentDocRole | null = null;
+
+                    if (typeof d.docRole === 'number') {
+                        role = d.docRole as EquipmentDocRole;
+                    } else if (typeof d.docRole === 'string') {
+                        // Attempt to parse string/enum name
+                        role = mapKindToRole(d.docRole);
+                    } else if ((d as any).docKind) {
+                        // Fallback to docKind if docRole is missing (legacy DTO support)
+                        role = mapKindToRole((d as any).docKind);
+                    }
+
+                    if (role !== null) {
+                        acc.push({
+                            ...d,
+                            docRole: role,
+                            // Ensure dates are stringified if they aren't already
+                            startDate: d.startDate,
+                            expirationDate: d.expirationDate,
+                            vendorNameRaw: d.vendorNameRaw
+                        });
+                    }
+                    return acc;
+                }, [] as EquipmentDocument[]);
+
+                setDocs(mapped);
+            }
+        } catch (err) {
+            console.error("Failed to fetch documents", err);
+        } finally {
+            setLoading(false);
+        }
+    }, [equipment.id]);
+
+    useEffect(() => {
+        fetchDocuments();
+    }, [fetchDocuments]);
 
     // Group documents by role
-    const groupedDocs = documents.reduce((acc, doc) => {
+    const groupedDocs = docs.reduce((acc, doc) => {
         const role = doc.docRole;
         if (!acc[role]) acc[role] = [];
         acc[role].push(doc);
@@ -79,10 +156,11 @@ const EquipmentDocumentsTab: React.FC<EquipmentDocumentsTabProps> = ({ equipment
         if (!confirm("Are you sure you want to delete this document?")) return;
         setDeletingId(docId);
         try {
-            await equipmentApi.deleteDocument(equipment.id, docId);
+            await documentsApi.delete(docId);
             toast.success("Document deleted");
+            fetchDocuments();
             onRefresh();
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
             toast.error("Failed to delete document");
         } finally {
@@ -106,7 +184,12 @@ const EquipmentDocumentsTab: React.FC<EquipmentDocumentsTabProps> = ({ equipment
                 </Button>
             </div>
 
-            {documents.length === 0 ? (
+            {loading && docs.length === 0 ? (
+                <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-slate-400 mt-2">Loading documents...</p>
+                </div>
+            ) : docs.length === 0 ? (
                 <div className="text-center py-12 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
                     <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                         <FileText className="w-8 h-8 text-slate-300" />
@@ -133,63 +216,109 @@ const EquipmentDocumentsTab: React.FC<EquipmentDocumentsTabProps> = ({ equipment
                                     </div>
                                 </AccordionTrigger>
                                 <AccordionContent className="px-6 pb-6 pt-2">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                         {roleDocs.map(doc => {
+                                            // Helper to format date for display or return placeholder
+                                            const formatDateDisplay = (dateStr?: string) => {
+                                                if (!dateStr) return '-';
+                                                try {
+                                                    return format(parseISO(dateStr), 'MM/dd/yyyy');
+                                                } catch (e) {
+                                                    return dateStr;
+                                                }
+                                            };
+
                                             const expStatus = getExpirationStatus(doc.expirationDate);
+
                                             return (
-                                                <div key={doc.id} className="group relative bg-white border border-slate-100 rounded-xl p-4 hover:shadow-md hover:border-blue-100 transition-all">
-                                                    <div className="flex items-start justify-between mb-3">
-                                                        <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-                                                            <FileText className="w-5 h-5" />
+                                                <div key={doc.documentId} className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-all">
+                                                    {/* Header: Icon, Name, Actions */}
+                                                    <div className="flex items-start gap-3 mb-4">
+                                                        <div className="p-2 bg-slate-50 rounded-lg border border-slate-100 text-slate-500">
+                                                            <FileText className="w-6 h-6" />
                                                         </div>
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full">
-                                                                    <MoreVertical className="w-4 h-4 text-slate-400" />
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                                <DropdownMenuItem onClick={() => handleView(doc.fileUrl)}>
-                                                                    <Eye className="w-4 h-4 mr-2" /> View
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => handleView(doc.fileUrl)}>
-                                                                    <Download className="w-4 h-4 mr-2" /> Download
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem
-                                                                    className="text-red-600 focus:text-red-600"
-                                                                    onClick={() => handleDelete(doc.id)}
+                                                        <div className="flex-1 min-w-0 pt-0.5">
+                                                            <div className="flex items-center justify-between">
+                                                                <h4
+                                                                    className="font-bold text-slate-900 text-sm truncate pr-2 cursor-pointer hover:text-blue-600 hover:underline decoration-blue-200 underline-offset-4"
+                                                                    onClick={() => handleView(doc.fileUrl)}
                                                                 >
-                                                                    <Trash2 className="w-4 h-4 mr-2" /> Delete
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
+                                                                    {doc.fileUrl.split('/').pop() || 'Document'}
+                                                                </h4>
+                                                                <div className="flex items-center">
+                                                                    <button onClick={() => handleView(doc.fileUrl)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors">
+                                                                        <Eye className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <DropdownMenu>
+                                                                        <DropdownMenuTrigger asChild>
+                                                                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-full text-slate-400">
+                                                                                <MoreVertical className="w-3.5 h-3.5" />
+                                                                            </Button>
+                                                                        </DropdownMenuTrigger>
+                                                                        <DropdownMenuContent align="end">
+                                                                            <DropdownMenuItem onClick={() => handleView(doc.fileUrl)}>
+                                                                                <Download className="w-4 h-4 mr-2" /> Download
+                                                                            </DropdownMenuItem>
+                                                                            <DropdownMenuItem
+                                                                                className="text-red-600 focus:text-red-600"
+                                                                                onClick={() => handleDelete(doc.documentId)}
+                                                                            >
+                                                                                <Trash2 className="w-4 h-4 mr-2" /> Delete
+                                                                            </DropdownMenuItem>
+                                                                        </DropdownMenuContent>
+                                                                    </DropdownMenu>
+                                                                </div>
+                                                            </div>
+                                                            <p className="text-[10px] text-slate-400">
+                                                                Uploaded {new Date(doc.addedAt).toLocaleDateString()}
+                                                            </p>
+                                                        </div>
                                                     </div>
 
-                                                    <div className="space-y-1 mb-3">
-                                                        <p
-                                                            className="font-bold text-slate-900 truncate cursor-pointer hover:text-blue-600 hover:underline decoration-blue-200 underline-offset-4"
-                                                            title={doc.fileUrl.split('/').pop()}
-                                                            onClick={() => handleView(doc.fileUrl)}
-                                                        >
-                                                            {doc.fileUrl.split('/').pop() || 'Document'}
-                                                        </p>
-                                                        <p className="text-xs text-slate-500">Uploaded {new Date(doc.addedAt).toLocaleDateString()}</p>
+                                                    {/* Fields Grid */}
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        {/* Document Type */}
+                                                        <div>
+                                                            <label className="text-[9px] uppercase font-bold text-slate-400 mb-0.5 block">Document Type</label>
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700">
+                                                                {getRoleName(doc.docRole)}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Notes / Details */}
+                                                        <div>
+                                                            <label className="text-[9px] uppercase font-bold text-slate-400 mb-0.5 block">Notes / Details</label>
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 truncate" title={doc.vendorNameRaw || ''}>
+                                                                {doc.vendorNameRaw || '-'}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Issue Date */}
+                                                        <div>
+                                                            <label className="text-[9px] uppercase font-bold text-slate-400 mb-0.5 block">Issue Date</label>
+                                                            <div className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 flex items-center justify-between">
+                                                                {formatDateDisplay(doc.startDate)}
+                                                                {doc.startDate && <Clock className="w-3 h-3 text-slate-400" />}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Expiration Date */}
+                                                        <div>
+                                                            <label className="text-[9px] uppercase font-bold text-slate-400 mb-0.5 block">Expiration Date</label>
+                                                            <div className={`border rounded-md px-2.5 py-1.5 text-xs font-medium flex items-center justify-between ${expStatus.status === 'valid' ? 'bg-slate-50 border-slate-200 text-slate-700' :
+                                                                expStatus.status === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                                                                    expStatus.status === 'expired' ? 'bg-red-50 border-red-200 text-red-700' :
+                                                                        'bg-slate-50 border-slate-200 text-slate-700'
+                                                                }`}>
+                                                                <span>{formatDateDisplay(doc.expirationDate)}</span>
+                                                                {doc.expirationDate && (
+                                                                    expStatus.status === 'valid' ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> :
+                                                                        expStatus.status === 'warning' ? <AlertTriangle className="w-3 h-3 text-amber-500" /> :
+                                                                            <AlertTriangle className="w-3 h-3 text-red-500" />
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </div>
-
-                                                    {doc.expirationDate && (
-                                                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide w-fit border ${expStatus.color}`}>
-                                                            {expStatus.status === 'expired' ? <AlertTriangle className="w-3 h-3" /> :
-                                                                expStatus.status === 'warning' ? <Clock className="w-3 h-3" /> :
-                                                                    <CheckCircle2 className="w-3 h-3" />}
-                                                            {expStatus.label}
-                                                        </div>
-                                                    )}
-
-                                                    {doc.vendorNameRaw && (
-                                                        <div className="mt-2 text-xs text-slate-500 italic truncate">
-                                                            Note: {doc.vendorNameRaw}
-                                                        </div>
-                                                    )}
                                                 </div>
                                             );
                                         })}
@@ -205,7 +334,9 @@ const EquipmentDocumentsTab: React.FC<EquipmentDocumentsTabProps> = ({ equipment
                 open={isUploadOpen}
                 onOpenChange={setIsUploadOpen}
                 equipmentId={equipment.id}
+                assetType={equipment.type === 'Trailer' ? 'trailer' : 'truck'}
                 onUploadComplete={() => {
+                    fetchDocuments();
                     onRefresh();
                 }}
             />
