@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import {
-    ArrowLeft,
     Container,
     Bot,
     Send,
@@ -20,7 +19,6 @@ import {
     Pencil,
     Trash2,
     Plus,
-    AlertTriangle,
     Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -353,7 +351,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             <div className="flex-[3] bg-white rounded-[3rem] p-10 border border-slate-200 shadow-sm relative overflow-hidden">
                                 <div className="mb-6">
                                     <Select
-                                        value={equipment.status.toString()}
+                                        value={equipment.status?.toString() || ''}
                                         onValueChange={(val) => onUpdateStatus && onUpdateStatus(Number(val) as EquipmentOperationalStatus)}
                                     >
                                         <SelectTrigger className={`w-auto min-w-[140px] px-4 py-1.5 h-auto rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${equipment.status === EquipmentOperationalStatus.Active ? 'bg-emerald-100/50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300' :
@@ -585,7 +583,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                     )}
                                                     <span className="text-[9px] bg-emerald-50 px-2 py-0.5 rounded-lg text-emerald-600 uppercase font-black tracking-widest border border-emerald-100">Audit Pass</span>
                                                 </div>
-                                                <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">{wo.vendorId || 'Unknown Vendor'}</div>
+                                                <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">{wo.vendor || wo.vendorId || 'Unknown Vendor'}</div>
                                                 <p className="text-sm text-slate-600 font-medium leading-relaxed max-w-2xl">{wo.title || wo.description}</p>
                                             </div>
                                             <div className="text-right shrink-0">

@@ -26,6 +26,7 @@ import {
     Upload
 } from 'lucide-react';
 import { workOrdersApi } from '@/lib/workOrdersApi';
+import { shopsApi } from '@/lib/shopsApi';
 import { WorkOrderDto, Equipment, WorkOrder } from '@/lib/types';
 import { equipmentApi } from '@/lib/equipmentApi';
 import { useToast } from "@/hooks/use-toast";
@@ -76,12 +77,43 @@ const ServiceRecordDetailPage = () => {
                 } catch (e) { console.warn("Could not load equipment details"); }
             }
 
+            // Fetch vendor details if vendorId is present but vendorName is missing
+            let fetchedVendorName = (wo as any).vendorName;
+            if (wo.vendorId && !fetchedVendorName) {
+                try {
+                    const shop = await shopsApi.get(wo.vendorId);
+                    if (shop) fetchedVendorName = shop.shop_name;
+                } catch (e) {
+                    console.warn("Could not load shop details", e);
+                }
+            }
+
+            // Fetch attachments
+            let attachments: any[] = [];
+            try {
+                const fetchedAttachments = await workOrdersApi.listAttachments(id!);
+                if (fetchedAttachments && fetchedAttachments.length > 0) {
+                    attachments = fetchedAttachments;
+                } else if (wo.documents) {
+                    attachments = wo.documents;
+                }
+            } catch (e) {
+                console.warn("Could not load attachments", e);
+                attachments = wo.documents || [];
+            }
+
+            const mappedAttachments = attachments.map(doc => ({
+                url: doc.fileUrl,
+                type: doc.fileType?.includes('pdf') ? 'pdf' : 'image',
+                name: doc.fileName || 'Attachment'
+            }));
+
             // Map WorkOrderDto to WorkOrder
             const mapped: WorkOrder = {
                 id: wo.id,
                 woNumber: wo.workOrderNumber || `WO-${wo.id.slice(0, 5)}`,
                 equipmentId: wo.equipmentId || "",
-                vendor: (wo as any).vendorName, // We need to fetch vendor name properly if missing, but let's assume API/DTO logic handles it or we'll display "Unknown"
+                vendor: fetchedVendorName, // Use the reliably fetched name
                 status: (wo.status as any),
                 priority: (wo.priority as any),
                 date: wo.closedAt || wo.openedAt || new Date().toISOString(),
@@ -105,18 +137,11 @@ const ServiceRecordDetailPage = () => {
                     cost: l.amount,
                     type: l.type as any
                 })) || [],
-                media: [],
+                media: mappedAttachments,
                 odometer: wo.odometerAtService || 0,
                 hours: 0,
-                // Add attachment URL logic if DTO has a way to get it
-                // WorkOrderDto has documentIds. We need to fetch the document or constructing the URL?
-                // The prompt/mock implies we might have `attachmentUrl`. 
-                // Let's assume `parsedData` or `documents` exist.
-                // For now, let's look at `wo.documents` if it exists, or just use `parsedReceipt` if available.
-                // The previous code used `record.attachmentUrl`.
-                // Let's create a placeholder or try to find it.
-                attachmentUrl: (wo as any).previewUrl || (wo as any).attachmentUrl, // Checking common props
-                attachmentFileName: (wo as any).fileName // Checking common props
+                attachmentUrl: mappedAttachments.length > 0 ? mappedAttachments[0].url : ((wo as any).previewUrl || (wo as any).attachmentUrl),
+                attachmentFileName: mappedAttachments.length > 0 ? mappedAttachments[0].name : (wo as any).fileName
             };
 
             setRecord(mapped);
