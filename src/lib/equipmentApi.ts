@@ -1,5 +1,6 @@
 import api from "@/lib/Api";
-import { Equipment, EquipmentDto, EquipmentOperationalStatus } from "@/lib/types";
+import { Equipment, EquipmentDto, EquipmentOperationalStatus, EquipmentDocument } from "@/lib/types";
+import { uploadsApi } from "@/lib/uploadsApi";
 
 export const mapDtoToEquipment = (dto: EquipmentDto): Equipment => {
   return {
@@ -83,6 +84,73 @@ export const equipmentApi = {
   async bulkDelete(ids: string[]): Promise<void> {
     if (!ids.length) return;
     await api.post("/equipment/bulk-delete", { ids });
+  },
+
+  // POST /api/equipment/{id}/documents
+  async uploadDocument(equipmentId: string, formData: FormData): Promise<EquipmentDocument> {
+    // 1. Extract file and metadata from FormData
+    const file = formData.get('file') as File;
+    const docRole = parseInt(formData.get('docRole') as string);
+    const startDate = formData.get('startDate') as string;
+    const expirationDate = formData.get('expirationDate') as string;
+    const notes = formData.get('notes') as string;
+
+    if (!file) throw new Error("No file provided");
+
+    // 2. Upload file to storage first
+    const fileUrl = await uploadsApi.uploadDocument(file);
+
+    // 3. Create document record in /api/documents
+    const docPayload = {
+      fileUrl,
+      fileType: file.type,
+      docKind: equipmentApi.mapRoleToKind(docRole),
+      vendorNameRaw: notes || null,
+      runAiExtract: false  // Don't run AI for equipment docs
+    };
+
+    const docResponse = await api.post<{ id: string }>('/documents', docPayload);
+    const documentId = docResponse.data.id;
+
+    // 4. Link document to equipment via /api/equipment/{id}/documents
+    const linkPayload = {
+      documentId,
+      docRole,
+      startDate: startDate || null,
+      expirationDate: expirationDate || null,
+      notes: notes || null
+    };
+
+    const response = await api.post<EquipmentDocument>(`/equipment/${equipmentId}/documents`, linkPayload);
+    return response.data;
+  },
+
+  mapRoleToKind(role: number): string {
+    switch (role) {
+      case 0: return 'general';
+      // Equipment documents (10-16)
+      case 10: return 'insurance';
+      case 11: return 'registration';
+      case 12: return 'title';
+      case 13: return 'warranty';
+      case 14: return 'lease';
+      case 15: return 'inspection';
+      case 16: return 'scale_ticket';
+      // Legacy support (old enum values)
+      case 1: return 'registration';
+      case 2: return 'title';
+      case 3: return 'insurance';
+      case 4: return 'warranty';
+      case 5: return 'lease';
+      case 6: return 'other';
+      case 7: return 'inspection';
+      default: return 'other';
+    }
+  },
+
+  // DELETE /api/equipment/{id}/documents/{documentId}
+  async deleteDocument(id: string, documentId: string): Promise<void> {
+    await api.delete(`/equipment/${id}/documents/${documentId}`);
   }
 };
 

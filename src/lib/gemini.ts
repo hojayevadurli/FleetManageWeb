@@ -267,6 +267,61 @@ OUTPUT RULES:
 };
 
 // -----------------------------
+// Document Parsing
+// -----------------------------
+export const parseDocumentWithAI = async (
+  base64Data: string,
+  mimeType: string
+): Promise<{
+  docType: string;
+  issueDate?: string;
+  expirationDate?: string;
+  notes?: string;
+} | null> => {
+  const prompt = `Analyze this vehicle document (PDF/Image) and extract the following:
+1. DOCUMENT TYPE: Classify as one of: "Registration", "Title", "Insurance", "Warranty", "Lease", "DOT Inspection", or "Other".
+2. ISSUE DATE: Date the document was issued or effective from (YYYY-MM-DD).
+3. EXPIRATION DATE: Date the document expires (YYYY-MM-DD). Critical for Insurance/Registration.
+4. NOTES: A very brief (1 sentence) summary of key details (e.g. "Policy #12345", "Expires soon").
+
+OUTPUT JSON ONLY:
+{
+  "docType": "string",
+  "issueDate": "YYYY-MM-DD" or null,
+  "expirationDate": "YYYY-MM-DD" or null,
+  "notes": "string"
+}`;
+
+  try {
+    const res = await getAiClient().models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType, data: base64Data } },
+            { text: prompt },
+          ],
+        },
+      ],
+    });
+
+    const parsed = safeJsonParse<any>(res.text || "");
+    if (!parsed) return null;
+
+    return {
+      docType: parsed.docType || "Other",
+      issueDate: parsed.issueDate || undefined,
+      expirationDate: parsed.expirationDate || undefined,
+      notes: parsed.notes || undefined
+    };
+  } catch (error) {
+    console.warn("Document parsing error:", error);
+    return null;
+  }
+};
+
+// -----------------------------
 // Equipment Chat
 // -----------------------------
 export const getEquipmentChatResponse = async (

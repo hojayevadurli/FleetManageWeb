@@ -10,6 +10,7 @@ export interface CreateDocumentDto {
   runAiExtract?: boolean; // backend stub ok
   assetType?: "truck" | "trailer";
   assetId?: string;
+  equipmentId?: string;
 }
 
 export interface DocumentDto {
@@ -42,5 +43,9 @@ export const documentsApi = {
   ) => {
     const res = await api.put(`/documents/${id}/extracted`, body);
     return res.data;
+  },
+
+  delete: async (id: string) => {
+    await api.delete(`/documents/${id}`);
   },
 };

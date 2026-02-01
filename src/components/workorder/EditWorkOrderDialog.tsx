@@ -124,7 +124,7 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
       vendor_name: "" // Will be populated by lookup if id exists
     });
 
-    loadVendors();
+    loadVendors(workOrder);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workOrder, open]);
 
@@ -297,19 +297,22 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
     reader.readAsDataURL(file);
   };
 
-  const loadVendors = async () => {
+  const loadVendors = async (currentWorkOrder?: WorkOrderDto) => {
     try {
       const data = await shopsApi.list();
       // map to Vendor type roughly
       const mapped = data.map((s: any) => ({
         id: s.id,
-        name: s.name || s.shopName,
+        name: s.shop_name || s.name || s.shopName || "Unknown Shop",
       })) as Vendor[];
       setVendors(mapped);
 
       // If we have an initial vendor_id, set the name
-      if (currentWo?.vendorId) {
-        const found = mapped.find(v => v.id === currentWo.vendorId);
+      // Use passed workOrder if available, otherwise fallback (though state might be stale, passing arg is safer)
+      const targetVendorId = currentWorkOrder?.vendorId || currentWo?.vendorId;
+
+      if (targetVendorId) {
+        const found = mapped.find(v => v.id === targetVendorId);
         if (found) {
           setEditData(prev => ({ ...prev, vendor_name: found.name, vendor_id: found.id }));
         }
