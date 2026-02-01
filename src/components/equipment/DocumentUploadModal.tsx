@@ -18,7 +18,7 @@ import {
     SelectValue
 } from "@/components/ui/select";
 import { Loader2, X, FileText, CheckCircle2, AlertCircle, Sparkles, Eye } from 'lucide-react';
-import { EquipmentDocRole } from '@/lib/types';
+import { DocumentRole } from '@/lib/types';
 import { parseDocumentWithAI } from '@/lib/gemini';
 import { equipmentApi } from '@/lib/equipmentApi';
 import { toast } from 'sonner';
@@ -35,7 +35,7 @@ interface FileUploadState {
     id: string;
     file: File;
     status: 'pending' | 'scanning' | 'ready' | 'uploading' | 'complete' | 'error';
-    role: EquipmentDocRole;
+    role: DocumentRole;
     issueDate?: string;
     expirationDate?: string;
     notes: string;
@@ -63,7 +63,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             id: Math.random().toString(36).substr(2, 9),
             file,
             status: 'pending',
-            role: EquipmentDocRole.Other,
+            role: DocumentRole.Other,
             notes: '',
         }];
 
@@ -89,15 +89,16 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
                 if (aiResult) {
                     // Map string docType to Enum
-                    let role = EquipmentDocRole.Other;
+                    let role = DocumentRole.Other;
                     const typeLower = aiResult.docType?.toLowerCase() || '';
-                    if (typeLower.includes('registration')) role = EquipmentDocRole.Registration;
-                    else if (typeLower.includes('title')) role = EquipmentDocRole.Title;
-                    else if (typeLower.includes('insurance')) role = EquipmentDocRole.Insurance;
-                    else if (typeLower.includes('warranty')) role = EquipmentDocRole.Warranty;
-                    else if (typeLower.includes('lease')) role = EquipmentDocRole.Lease;
-                    else if (typeLower.includes('dot')) role = EquipmentDocRole.DOTInspection;
-                    else if (typeLower.includes('general')) role = EquipmentDocRole.General;
+                    if (typeLower.includes('registration')) role = DocumentRole.Registration;
+                    else if (typeLower.includes('title')) role = DocumentRole.Title;
+                    else if (typeLower.includes('insurance')) role = DocumentRole.Insurance;
+                    else if (typeLower.includes('warranty')) role = DocumentRole.Warranty;
+                    else if (typeLower.includes('lease')) role = DocumentRole.Lease;
+                    else if (typeLower.includes('dot')) role = DocumentRole.DOTInspection;
+                    else if (typeLower.includes('scale')) role = DocumentRole.ScaleTicket;
+                    else if (typeLower.includes('general')) role = DocumentRole.General;
 
                     setFiles(prev => prev.map(f => {
                         if (f.id !== fileState.id) return f;
@@ -277,13 +278,15 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value={EquipmentDocRole.Registration.toString()}>Registration</SelectItem>
-                                                <SelectItem value={EquipmentDocRole.Title.toString()}>Title</SelectItem>
-                                                <SelectItem value={EquipmentDocRole.Insurance.toString()}>Insurance</SelectItem>
-                                                <SelectItem value={EquipmentDocRole.DOTInspection.toString()}>DOT Inspection</SelectItem>
-                                                <SelectItem value={EquipmentDocRole.Warranty.toString()}>Warranty</SelectItem>
-                                                <SelectItem value={EquipmentDocRole.Lease.toString()}>Lease</SelectItem>
-                                                <SelectItem value={EquipmentDocRole.Other.toString()}>Other</SelectItem>
+                                                <SelectItem value={DocumentRole.Registration.toString()}>Registration</SelectItem>
+                                                <SelectItem value={DocumentRole.Title.toString()}>Title</SelectItem>
+                                                <SelectItem value={DocumentRole.Insurance.toString()}>Insurance</SelectItem>
+                                                <SelectItem value={DocumentRole.DOTInspection.toString()}>DOT Inspection</SelectItem>
+                                                <SelectItem value={DocumentRole.Warranty.toString()}>Warranty</SelectItem>
+                                                <SelectItem value={DocumentRole.Lease.toString()}>Lease</SelectItem>
+                                                <SelectItem value={DocumentRole.ScaleTicket.toString()}>Scale Ticket</SelectItem>
+                                                <SelectItem value={DocumentRole.General.toString()}>General</SelectItem>
+                                                <SelectItem value={DocumentRole.Other.toString()}>Other</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -312,7 +315,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                                             type="date"
                                             value={file.expirationDate || ''}
                                             onChange={(e) => updateFileMetadata(file.id, { expirationDate: e.target.value })}
-                                            className={file.role === EquipmentDocRole.Registration || file.role === EquipmentDocRole.Insurance ? "border-amber-200 bg-amber-50" : ""}
+                                            className={file.role === DocumentRole.Registration || file.role === DocumentRole.Insurance ? "border-amber-200 bg-amber-50" : ""}
                                         />
                                     </div>
                                 </div>

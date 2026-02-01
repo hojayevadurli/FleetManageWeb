@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Equipment, EquipmentDocRole, EquipmentDocument } from '@/lib/types';
+import { Equipment, DocumentRole, EquipmentDocument } from '@/lib/types';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -33,29 +33,39 @@ const EquipmentDocumentsTab: React.FC<EquipmentDocumentsTabProps> = ({ equipment
     const [loading, setLoading] = useState(false);
 
     // Map string docKind to Enum role
-    const mapKindToRole = (kind: string): EquipmentDocRole | null => {
+    const mapKindToRole = (kind: string): DocumentRole | null => {
         const k = kind?.toLowerCase();
         if (!k) return null;
 
         // Exact matches or known keywords
-        if (k === 'registration' || k.includes('registration')) return EquipmentDocRole.Registration;
-        if (k === 'title' || k.includes('title')) return EquipmentDocRole.Title;
-        if (k === 'insurance' || k.includes('insurance')) return EquipmentDocRole.Insurance;
-        if (k === 'warranty' || k.includes('warranty')) return EquipmentDocRole.Warranty;
-        if (k === 'lease' || k.includes('lease')) return EquipmentDocRole.Lease;
-        if (k === 'inspection' || k === 'dotinspection' || k.includes('dot') || k.includes('inspection')) return EquipmentDocRole.DOTInspection;
-        if (k === 'general' || k.includes('general')) return EquipmentDocRole.General;
-        if (k === 'other') return EquipmentDocRole.Other;
+        if (k === 'registration' || k.includes('registration')) return DocumentRole.Registration;
+        if (k === 'title' || k.includes('title')) return DocumentRole.Title;
+        if (k === 'insurance' || k.includes('insurance')) return DocumentRole.Insurance;
+        if (k === 'warranty' || k.includes('warranty')) return DocumentRole.Warranty;
+        if (k === 'lease' || k.includes('lease')) return DocumentRole.Lease;
+        if (k === 'inspection' || k === 'dotinspection' || k.includes('dot') || k.includes('inspection')) return DocumentRole.DOTInspection;
+        if (k === 'scale_ticket' || k.includes('scale')) return DocumentRole.ScaleTicket;
+        if (k === 'general' || k.includes('general')) return DocumentRole.General;
+        if (k === 'other') return DocumentRole.Other;
 
-        // Handle stringified enum values
-        if (k === '0') return EquipmentDocRole.General;
-        if (k === '1') return EquipmentDocRole.Registration;
-        if (k === '2') return EquipmentDocRole.Title;
-        if (k === '3') return EquipmentDocRole.Insurance;
-        if (k === '4') return EquipmentDocRole.Warranty;
-        if (k === '5') return EquipmentDocRole.Lease;
-        if (k === '6') return EquipmentDocRole.Other;
-        if (k === '7') return EquipmentDocRole.DOTInspection;
+        // Handle stringified enum values (new values 10-16)
+        if (k === '10') return DocumentRole.Insurance;
+        if (k === '11') return DocumentRole.Registration;
+        if (k === '12') return DocumentRole.Title;
+        if (k === '13') return DocumentRole.Warranty;
+        if (k === '14') return DocumentRole.Lease;
+        if (k === '15') return DocumentRole.DOTInspection;
+        if (k === '16') return DocumentRole.ScaleTicket;
+
+        // Legacy enum values (1-7) for backward compatibility
+        if (k === '0') return DocumentRole.General;
+        if (k === '1') return DocumentRole.Registration;
+        if (k === '2') return DocumentRole.Title;
+        if (k === '3') return DocumentRole.Insurance;
+        if (k === '4') return DocumentRole.Warranty;
+        if (k === '5') return DocumentRole.Lease;
+        if (k === '6') return DocumentRole.Other;
+        if (k === '7') return DocumentRole.DOTInspection;
 
         return null;
     };
@@ -70,10 +80,10 @@ const EquipmentDocumentsTab: React.FC<EquipmentDocumentsTabProps> = ({ equipment
                 const mapped: EquipmentDocument[] = eq.documents.reduce((acc, d) => {
                     // Handle docRole if it comes as a string or number. 
                     // We try to use the direct docRole if it matches the enum, otherwise try to map from string.
-                    let role: EquipmentDocRole | null = null;
+                    let role: DocumentRole | null = null;
 
                     if (typeof d.docRole === 'number') {
-                        role = d.docRole as EquipmentDocRole;
+                        role = d.docRole as DocumentRole;
                     } else if (typeof d.docRole === 'string') {
                         // Attempt to parse string/enum name
                         role = mapKindToRole(d.docRole);
@@ -118,25 +128,27 @@ const EquipmentDocumentsTab: React.FC<EquipmentDocumentsTabProps> = ({ equipment
 
     // Defined roles order for display
     const displayRoles = [
-        EquipmentDocRole.Registration,
-        EquipmentDocRole.Insurance,
-        EquipmentDocRole.Title,
-        EquipmentDocRole.DOTInspection,
-        EquipmentDocRole.Warranty,
-        EquipmentDocRole.Lease,
-        EquipmentDocRole.General,
-        EquipmentDocRole.Other
+        DocumentRole.Registration,
+        DocumentRole.Insurance,
+        DocumentRole.Title,
+        DocumentRole.DOTInspection,
+        DocumentRole.Warranty,
+        DocumentRole.Lease,
+        DocumentRole.ScaleTicket,
+        DocumentRole.General,
+        DocumentRole.Other
     ];
 
-    const getRoleName = (role: EquipmentDocRole) => {
+    const getRoleName = (role: DocumentRole) => {
         switch (role) {
-            case EquipmentDocRole.Registration: return 'Registration';
-            case EquipmentDocRole.Title: return 'Title';
-            case EquipmentDocRole.Insurance: return 'Insurance';
-            case EquipmentDocRole.Warranty: return 'Warranty';
-            case EquipmentDocRole.Lease: return 'Lease';
-            case EquipmentDocRole.DOTInspection: return 'DOT Inspection';
-            case EquipmentDocRole.General: return 'General';
+            case DocumentRole.Registration: return 'Registration';
+            case DocumentRole.Title: return 'Title';
+            case DocumentRole.Insurance: return 'Insurance';
+            case DocumentRole.Warranty: return 'Warranty';
+            case DocumentRole.Lease: return 'Lease';
+            case DocumentRole.DOTInspection: return 'DOT Inspection';
+            case DocumentRole.ScaleTicket: return 'Scale Ticket';
+            case DocumentRole.General: return 'General';
             default: return 'Other';
         }
     };

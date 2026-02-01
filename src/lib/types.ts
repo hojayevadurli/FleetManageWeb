@@ -148,16 +148,78 @@ export interface Equipment {
   documents?: EquipmentDocument[];
 }
 
-export enum EquipmentDocRole {
+// Unified DocumentRole enum for all entity types
+export enum DocumentRole {
   General = 0,
-  Registration = 1,
-  Title = 2,
-  Insurance = 3,
-  Warranty = 4,
-  Lease = 5,
-  Other = 6,
-  DOTInspection = 7
+  // Equipment Roles
+  Insurance = 10,
+  Registration = 11,
+  Title = 12,
+  Warranty = 13,
+  Lease = 14,
+  DOTInspection = 15,
+  ScaleTicket = 16,
+  // Driver Roles
+  License = 30,           // CDL
+  MedicalCard = 31,
+  TrainingCert = 32,
+  Contract = 33,
+  TWIC = 34,
+  HazmatEndorsement = 35,
+  MVR = 36,
+  BackgroundCheck = 37,
+  DrugTest = 38,
+  ClearinghouseQuery = 39,
+  RoadTest = 40,
+  Orientation = 41,
+  SafetyTraining = 42,
+  // Work Order Roles
+  Invoice = 50,
+  Receipt = 51,
+  Quote = 52,
+  WorkOrder = 53,
+  PhotoBefore = 54,
+  PhotoAfter = 55,
+  Inspection = 56,
+  WorkOrderOther = 59,
+  Other = 99
 }
+
+export interface DocumentAttachment {
+  id: string;             // PublicId of the Link or Document
+  fileUrl: string;
+  fileType: string;
+  docKind?: string;       // AI classification
+  role: DocumentRole;
+
+  // Metadata
+  startDate?: string;     // YYYY-MM-DD
+  expirationDate?: string;// YYYY-MM-DD
+  isActive: boolean;
+  amount?: number;
+  providerName?: string;
+  externalRef?: string;   // Invoice #, License #, etc.
+  notes?: string;
+
+  createdAt: string;
+  addedAt: string;
+}
+
+// Payload for attaching a document
+export interface AttachDocumentPayload {
+  documentId: string;     // ID from the upload response
+  role: DocumentRole;
+  startDate?: string;
+  expirationDate?: string;
+  amount?: number;
+  providerName?: string;
+  externalRef?: string;
+  notes?: string;
+  isActive?: boolean;
+}
+
+// Legacy alias for backward compatibility
+export const EquipmentDocRole = DocumentRole;
 
 export interface EquipmentDocument {
   id: string;
@@ -165,11 +227,15 @@ export interface EquipmentDocument {
   documentId: string;
   fileUrl: string;
   fileType: string;
+  docKind?: string;
+  status?: string;
+  confidenceScore?: number;
   vendorNameRaw?: string;
-  docRole: EquipmentDocRole;
+  docRole: DocumentRole;
   startDate?: string;
   expirationDate?: string;
   addedAt: string;
+  createdAt?: string;
 }
 
 export interface Warranty {
@@ -324,6 +390,12 @@ export interface WorkOrderDocumentDto {
   status: string;
   confidenceScore?: number;
   createdAt: string;
+  role?: DocumentRole;        // DocumentRole enum (Invoice=50, Receipt=51, etc.)
+  amount?: number;            // Invoice/receipt amount
+  providerName?: string;      // Vendor/provider name
+  startDate?: string;         // Service/invoice date
+  externalRef?: string;       // Invoice number, reference
+  notes?: string;             // Additional notes
 }
 
 export interface WorkOrderDto {

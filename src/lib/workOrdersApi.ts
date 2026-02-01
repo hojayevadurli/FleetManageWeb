@@ -113,12 +113,15 @@ async function resolveCreatedWorkOrder(res: any): Promise<WorkOrderDto> {
 }
 
 function normalizeDocument(d: any): WorkOrderDocumentDto {
+  const fileUrl = d.fileUrl || d.FileUrl;
+  const fileName = d.fileName || d.FileName || (fileUrl ? fileUrl.split('/').pop() : 'Attachment');
+
   return {
     ...d,
     id: d.id || d.Id,
-    fileName: d.fileName || d.FileName,
-    fileUrl: d.fileUrl || d.FileUrl,
-    fileType: d.fileType || d.FileType
+    fileName: fileName,
+    fileUrl: fileUrl,
+    fileType: d.fileType || d.FileType || 'application/octet-stream' // safe default
   };
 }
 

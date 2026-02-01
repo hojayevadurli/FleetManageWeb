@@ -97,26 +97,46 @@ export const equipmentApi = {
 
     if (!file) throw new Error("No file provided");
 
-    // 2. Upload file to storage
+    // 2. Upload file to storage first
     const fileUrl = await uploadsApi.uploadDocument(file);
 
-    // 3. Create document record via new EquipmentController endpoint
-    const payload = {
+    // 3. Create document record in /api/documents
+    const docPayload = {
       fileUrl,
       fileType: file.type,
-      docRole,
-      notes,
-      startDate: startDate || null,
-      expirationDate: expirationDate || null
+      docKind: equipmentApi.mapRoleToKind(docRole),
+      vendorNameRaw: notes || null,
+      runAiExtract: false  // Don't run AI for equipment docs
     };
 
-    const response = await api.post<EquipmentDocument>(`/equipment/${equipmentId}/documents`, payload);
+    const docResponse = await api.post<{ id: string }>('/documents', docPayload);
+    const documentId = docResponse.data.id;
+
+    // 4. Link document to equipment via /api/equipment/{id}/documents
+    const linkPayload = {
+      documentId,
+      docRole,
+      startDate: startDate || null,
+      expirationDate: expirationDate || null,
+      notes: notes || null
+    };
+
+    const response = await api.post<EquipmentDocument>(`/equipment/${equipmentId}/documents`, linkPayload);
     return response.data;
   },
 
   mapRoleToKind(role: number): string {
     switch (role) {
       case 0: return 'general';
+      // Equipment documents (10-16)
+      case 10: return 'insurance';
+      case 11: return 'registration';
+      case 12: return 'title';
+      case 13: return 'warranty';
+      case 14: return 'lease';
+      case 15: return 'inspection';
+      case 16: return 'scale_ticket';
+      // Legacy support (old enum values)
       case 1: return 'registration';
       case 2: return 'title';
       case 3: return 'insurance';
@@ -124,7 +144,7 @@ export const equipmentApi = {
       case 5: return 'lease';
       case 6: return 'other';
       case 7: return 'inspection';
-      default: return 'unknown';
+      default: return 'other';
     }
   },
 
