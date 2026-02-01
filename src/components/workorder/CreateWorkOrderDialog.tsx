@@ -362,6 +362,25 @@ export default function CreateWorkOrderDialog({
       // ✅ If not, we still create draft now then update it to "open".
       const id = await ensureDraftExists();
 
+      // 🚨 Auto-upload any pending files that weren't manually uploaded via the UI component
+      if (selectedFiles.length > 0) {
+        try {
+          // Tell the user what's happening if it's a large file
+          if (selectedFiles.some(f => f.size > 5 * 1024 * 1024)) {
+            toast.info("Uploading large attachments...");
+          }
+
+          await workOrdersApi.uploadAttachments(id, selectedFiles);
+          setSelectedFiles([]); // Clear pending files
+          toast.success("Attachments uploaded successfully");
+        } catch (uploadErr) {
+          console.error("Auto-upload failed", uploadErr);
+          toast.error("Failed to upload attachments. Please try again.");
+          setIsSubmitting(false); // Stop creation to allow retry
+          return;
+        }
+      }
+
       // Use the selected status directly
       const finalStatus = status;
 
@@ -742,7 +761,7 @@ export default function CreateWorkOrderDialog({
                       }));
 
                       setDraftWorkOrderId(null);
-                      setSelectedFiles([]);
+                      // Don't clear selected files here, keeps specific receipt for new vehicle
                       setIsUploading(false);
 
                       generateNextWorkOrderNumber(vehicleId, unitNumber);

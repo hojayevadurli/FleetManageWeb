@@ -23,9 +23,12 @@ import {
     Copy,
     Mail,
     Star,
-    Upload
+    Upload,
+    PlayCircle,
+    Image as ImageIcon
 } from 'lucide-react';
 import { workOrdersApi } from '@/lib/workOrdersApi';
+import { shopsApi } from '@/lib/shopsApi';
 import { WorkOrderDto, Equipment, WorkOrder } from '@/lib/types';
 import { equipmentApi } from '@/lib/equipmentApi';
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +52,7 @@ const ServiceRecordDetailPage = () => {
     const [equipment, setEquipment] = useState<Equipment | null>(null);
     const [loading, setLoading] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [activeMediaIndex, setActiveMediaIndex] = useState(0);
 
     // Dialog States
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -76,12 +80,42 @@ const ServiceRecordDetailPage = () => {
                 } catch (e) { console.warn("Could not load equipment details"); }
             }
 
+            // Fetch vendor details if vendorId is present but vendorName is missing
+            let fetchedVendorName = (wo as any).vendorName;
+            if (wo.vendorId && !fetchedVendorName) {
+                try {
+                    const shop = await shopsApi.get(wo.vendorId);
+                    if (shop) fetchedVendorName = shop.shop_name;
+                } catch (e) {
+                    console.warn("Could not load shop details", e);
+                }
+            }
+
+            // Fetch attachments
+            // Attachments are now included in the WorkOrderDto
+            const attachments = wo.documents || [];
+
+            const mappedAttachments = attachments.map(doc => {
+                const ft = (doc.fileType || '').toLowerCase();
+                const urlLower = (doc.fileUrl || '').toLowerCase();
+                let type: 'image' | 'video' | 'pdf' = 'image';
+
+                if (ft.includes('pdf') || urlLower.endsWith('.pdf')) type = 'pdf';
+                else if (ft.includes('video') || urlLower.endsWith('.mp4') || urlLower.endsWith('.mov') || urlLower.endsWith('.webm')) type = 'video';
+
+                return {
+                    url: doc.fileUrl,
+                    type,
+                    name: doc.fileName || 'Attachment'
+                };
+            });
+
             // Map WorkOrderDto to WorkOrder
             const mapped: WorkOrder = {
                 id: wo.id,
                 woNumber: wo.workOrderNumber || `WO-${wo.id.slice(0, 5)}`,
                 equipmentId: wo.equipmentId || "",
-                vendor: (wo as any).vendorName, // We need to fetch vendor name properly if missing, but let's assume API/DTO logic handles it or we'll display "Unknown"
+                vendor: fetchedVendorName, // Use the reliably fetched name
                 status: (wo.status as any),
                 priority: (wo.priority as any),
                 date: wo.closedAt || wo.openedAt || new Date().toISOString(),
@@ -105,22 +139,16 @@ const ServiceRecordDetailPage = () => {
                     cost: l.amount,
                     type: l.type as any
                 })) || [],
-                media: [],
+                media: mappedAttachments,
                 odometer: wo.odometerAtService || 0,
                 hours: 0,
-                // Add attachment URL logic if DTO has a way to get it
-                // WorkOrderDto has documentIds. We need to fetch the document or constructing the URL?
-                // The prompt/mock implies we might have `attachmentUrl`. 
-                // Let's assume `parsedData` or `documents` exist.
-                // For now, let's look at `wo.documents` if it exists, or just use `parsedReceipt` if available.
-                // The previous code used `record.attachmentUrl`.
-                // Let's create a placeholder or try to find it.
-                attachmentUrl: (wo as any).previewUrl || (wo as any).attachmentUrl, // Checking common props
-                attachmentFileName: (wo as any).fileName // Checking common props
+                attachmentUrl: mappedAttachments.length > 0 ? mappedAttachments[0].url : ((wo as any).previewUrl || (wo as any).attachmentUrl),
+                attachmentFileName: mappedAttachments.length > 0 ? mappedAttachments[0].name : (wo as any).fileName
             };
 
             setRecord(mapped);
             setNotes(wo.notes || "");
+            setActiveMediaIndex(0);
 
         } catch (err) {
             console.error("Error loading record:", err);
@@ -189,6 +217,8 @@ const ServiceRecordDetailPage = () => {
     }
 
     if (!record) return <div>Record Not Found</div>;
+
+    const currentMedia = record?.media?.[activeMediaIndex] || (record?.attachmentUrl ? { url: record.attachmentUrl, type: record.attachmentUrl.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image', name: 'Receipt' } : null);
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] pb-20">
@@ -311,7 +341,9 @@ const ServiceRecordDetailPage = () => {
                     <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden">
                         <CardHeader className="bg-white py-6 flex flex-row items-center justify-between">
                             <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-900">Services Performed</CardTitle>
-                            {!hasLines && <Button size="sm" variant="outline" onClick={() => setIsEditDialogOpen(true)}>+ Add Items</Button>}
+                            <Button size="sm" variant={hasLines ? "ghost" : "outline"} onClick={() => setIsEditDialogOpen(true)}>
+                                {hasLines ? <><Edit className="w-3 h-3 mr-2" /> Edit Items</> : "+ Add Items"}
+                            </Button>
                         </CardHeader>
                         <CardContent className="p-6 pt-0">
                             {hasLines ? (
@@ -368,37 +400,72 @@ const ServiceRecordDetailPage = () => {
                 <div className="space-y-8">
 
                     {/* Receipt Preview */}
-                    <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden flex flex-col h-[400px]">
+                    <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
                         <CardHeader className="py-4 border-b border-slate-100 flex flex-row items-center justify-between bg-slate-50/50">
-                            <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500">Receipt</CardTitle>
-                            {record.attachmentUrl && (
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownloadReceipt}><Download className="w-3 h-3" /></Button>
+                            <div className="flex items-center gap-2">
+                                <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-500">Attachments</CardTitle>
+                                {record.media && record.media.length > 0 && (
+                                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{activeMediaIndex + 1} / {record.media.length}</Badge>
+                                )}
+                            </div>
+                            {currentMedia && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => window.open(currentMedia.url, '_blank')}><Download className="w-3 h-3" /></Button>
                             )}
                         </CardHeader>
-                        <div className="flex-1 bg-slate-100 relative group overflow-hidden flex items-center justify-center">
-                            {record.attachmentUrl ? (
+
+                        {/* Main Preview Area */}
+                        <div className="flex-1 bg-slate-100 relative group overflow-hidden flex items-center justify-center bg-slate-900/5">
+                            {currentMedia ? (
                                 <>
-                                    {record.attachmentUrl.toLowerCase().endsWith('.pdf') ? (
-                                        <iframe src={record.attachmentUrl} className="w-full h-full border-0" title="Receipt" />
+                                    {currentMedia.type === 'pdf' ? (
+                                        <iframe src={currentMedia.url} className="w-full h-full border-0" title="Receipt" />
+                                    ) : currentMedia.type === 'video' ? (
+                                        <video src={currentMedia.url} controls className="max-w-full max-h-full object-contain" />
                                     ) : (
-                                        <img src={record.attachmentUrl} className="object-contain max-h-full max-w-full" alt="Receipt" />
+                                        <img src={currentMedia.url} className="object-contain max-h-full max-w-full shadow-sm" alt="Receipt" />
                                     )}
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+
+                                    <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pb-16">
                                         <Button variant="secondary" size="sm" onClick={() => setIsFullscreen(true)}>
-                                            <Maximize2 className="w-4 h-4 mr-2" /> View Full
+                                            <Maximize2 className="w-4 h-4 mr-2" /> View Fullscreen
                                         </Button>
                                     </div>
                                 </>
                             ) : (
                                 <EmptyState
                                     icon={<Upload className="w-6 h-6 text-slate-300" />}
-                                    description="No receipt attached"
+                                    description="No attachments found"
                                     actions={[
                                         { label: "Upload", onClick: () => toast({ title: "Upload", description: "Upload dialog would open here." }) }
                                     ]}
                                 />
                             )}
                         </div>
+
+                        {/* Thumbnails Strip */}
+                        {record.media && record.media.length > 1 && (
+                            <div className="h-20 border-t border-slate-200 bg-white p-2 flex gap-2 overflow-x-auto">
+                                {record.media.map((m, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => setActiveMediaIndex(idx)}
+                                        className={`relative w-16 h-full rounded-lg overflow-hidden border-2 flex-shrink-0 transition-all ${activeMediaIndex === idx ? 'border-blue-600 ring-1 ring-blue-600' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                                    >
+                                        {m.type === 'video' ? (
+                                            <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                                                <PlayCircle className="w-6 h-6 text-white/80" />
+                                            </div>
+                                        ) : m.type === 'pdf' ? (
+                                            <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                                                <FileText className="w-6 h-6 text-slate-400" />
+                                            </div>
+                                        ) : (
+                                            <img src={m.url} className="w-full h-full object-cover" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </Card>
 
                     {/* Quick Actions */}
@@ -462,24 +529,28 @@ const ServiceRecordDetailPage = () => {
             )}
 
             {/* Fullscreen Preview Modal */}
-            {isFullscreen && record.attachmentUrl && (
+            {isFullscreen && currentMedia && (
                 <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-xl flex flex-col animate-in fade-in duration-300">
                     <div className="p-6 flex items-center justify-between border-b border-white/10">
                         <div className="flex items-center gap-4">
                             <div className="bg-blue-600 p-2 rounded-lg">
-                                <FileText className="w-5 h-5 text-white" />
+                                {currentMedia.type === 'video' ? <PlayCircle className="w-5 h-5 text-white" /> :
+                                    currentMedia.type === 'pdf' ? <FileText className="w-5 h-5 text-white" /> :
+                                        <ImageIcon className="w-5 h-5 text-white" />}
                             </div>
-                            <h2 className="text-white font-black tracking-tight">Receipt Preview</h2>
+                            <h2 className="text-white font-black tracking-tight">{currentMedia.name || 'Attachment Preview'}</h2>
                         </div>
                         <Button variant="ghost" onClick={() => setIsFullscreen(false)} className="text-white hover:bg-white/10">
                             Close
                         </Button>
                     </div>
                     <div className="flex-1 p-8 flex items-center justify-center overflow-hidden">
-                        {record.attachmentUrl.toLowerCase().endsWith('.pdf') ? (
-                            <iframe src={record.attachmentUrl} className="w-full h-full rounded-2xl" />
+                        {currentMedia.type === 'pdf' ? (
+                            <iframe src={currentMedia.url} className="w-full h-full rounded-2xl bg-white" />
+                        ) : currentMedia.type === 'video' ? (
+                            <video src={currentMedia.url} controls autoPlay className="max-w-full max-h-full rounded-2xl shadow-2xl" />
                         ) : (
-                            <img src={record.attachmentUrl} className="max-w-full max-h-full object-contain" />
+                            <img src={currentMedia.url} className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl" />
                         )}
                     </div>
                 </div>

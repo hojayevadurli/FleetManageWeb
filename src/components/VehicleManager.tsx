@@ -9,6 +9,8 @@ import { tenantsApi } from "@/lib/tenantsApi";
 import EquipmentDetail from "@/components/equipment/EquipmentDetail";
 import EquipmentList from "@/components/equipment/EquipmentList";
 import { workOrdersApi } from "@/lib/workOrdersApi";
+import { shopsApi } from "@/lib/shopsApi";
+import { Shop } from "@/components/shops/types/ShopTypes";
 import { Equipment, WorkOrder, EquipmentOperationalStatus, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource, EquipmentTypeDto } from "@/lib/types";
 
 const VehicleManager = () => {
@@ -24,6 +26,7 @@ const VehicleManager = () => {
   // Cache for mapping logic
   const [fleetCategories, setFleetCategories] = useState<FleetCategory[]>([]);
   const [equipmentTypes, setEquipmentTypes] = useState<EquipmentTypeDto[]>([]);
+  const [shops, setShops] = useState<Shop[]>([]);
 
   const { toast } = useToast();
 
@@ -64,6 +67,10 @@ const VehicleManager = () => {
             allTypes.push(...types);
           }
           setEquipmentTypes(allTypes);
+
+          // Fetch shops for mapping vendor names in Work Orders
+          const shopList = await shopsApi.list();
+          setShops(shopList);
         }
       } catch (e) {
         console.error("Failed to load mapping config", e);
@@ -82,40 +89,73 @@ const VehicleManager = () => {
       try {
         const wos = await workOrdersApi.list({ equipmentId: selectedEquipment.id });
 
-        const mappedWos: WorkOrder[] = wos.map(wo => ({
-          id: wo.id,
-          woNumber: wo.workOrderNumber || 'Draft',
-          equipmentId: wo.equipmentId,
-          status: (WorkOrderStatus as any)[wo.status] ?? WorkOrderStatus.Open,
-          priority: (WorkOrderPriority as any)[wo.priority] ?? WorkOrderPriority.Normal,
-          date: wo.openedAt,
-          technician: 'Unknown',
-          totalCost: wo.manualActualTotal || wo.estimatedTotal,
-          partsCost: 0,
-          laborCost: 0,
-          title: wo.title,
-          complaint: wo.complaint,
-          diagnosis: wo.diagnosis || '',
-          resolution: wo.resolution || '',
-          costSource: (WorkOrderCostSource as any)[wo.costSource] ?? WorkOrderCostSource.Estimated,
-          estimatedTotal: wo.estimatedTotal,
-          manualActualTotal: wo.manualActualTotal,
-          description: wo.notes || '',
-          vendor: wo.vendorName || '',
-          items: (wo.lines || []).map(l => ({
-            id: l.id || Math.random().toString(),
-            description: l.description,
-            quantity: l.qty,
-            unitPrice: l.unitPrice,
-            cost: l.qty * l.unitPrice,
-            type: l.type as any,
-            serviceType: l.type
-          })),
-          media: wo.documents?.map(doc => ({
-            url: doc.fileUrl,
-            type: doc.fileType.includes('pdf') ? 'pdf' : 'image',
-            name: 'Attachment'
-          })) || []
+        const mappedWos: WorkOrder[] = await Promise.all(wos.map(async (wo) => {
+          let vendorName = wo.vendorName || '';
+
+          // Try to resolve vendor name if missing
+          if (!vendorName && wo.vendorId) {
+            // 1. Try local cache (case-insensitive)
+            const cached = shops.find(s => s.id?.toLowerCase() === wo.vendorId?.toLowerCase());
+            if (cached) {
+              vendorName = cached.shop_name;
+            } else {
+              // 2. Fallback: Fetch individually if not in list
+              try {
+                const s = await shopsApi.get(wo.vendorId);
+                if (s) vendorName = s.shop_name;
+              } catch (e) {
+                console.warn(`[VehicleManager] Failed to resolve shop ${wo.vendorId}`, e);
+              }
+            }
+          }
+
+          // Fetch attachments specifically as requested
+          let attachments = wo.documents || [];
+          try {
+            const fetchedAttachments = await workOrdersApi.listAttachments(wo.id);
+            if (fetchedAttachments && fetchedAttachments.length > 0) {
+              attachments = fetchedAttachments;
+            }
+          } catch (e) {
+            console.warn(`[VehicleManager] Failed to fetch attachments for WO ${wo.id}`, e);
+          }
+
+          return {
+            id: wo.id,
+            woNumber: wo.workOrderNumber || 'Draft',
+            equipmentId: wo.equipmentId,
+            status: (WorkOrderStatus as any)[wo.status] ?? WorkOrderStatus.Open,
+            priority: (WorkOrderPriority as any)[wo.priority] ?? WorkOrderPriority.Normal,
+            date: wo.openedAt,
+            technician: 'Unknown',
+            totalCost: wo.manualActualTotal || wo.estimatedTotal,
+            partsCost: 0,
+            laborCost: 0,
+            title: wo.title,
+            complaint: wo.complaint,
+            diagnosis: wo.diagnosis || '',
+            resolution: wo.resolution || '',
+            costSource: (WorkOrderCostSource as any)[wo.costSource] ?? WorkOrderCostSource.Estimated,
+            estimatedTotal: wo.estimatedTotal,
+            manualActualTotal: wo.manualActualTotal,
+            description: wo.notes || '',
+            vendorId: wo.vendorId,
+            vendor: vendorName,
+            items: (wo.lines || []).map(l => ({
+              id: l.id || Math.random().toString(),
+              description: l.description,
+              quantity: l.qty,
+              unitPrice: l.unitPrice,
+              cost: l.qty * l.unitPrice,
+              type: l.type as any,
+              serviceType: l.type
+            })),
+            media: attachments.map(doc => ({
+              url: doc.fileUrl,
+              type: doc.fileType?.includes('pdf') ? 'pdf' : 'image',
+              name: doc.fileName || 'Attachment'
+            }))
+          };
         }));
 
         const combined = mappedWos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -125,7 +165,7 @@ const VehicleManager = () => {
       }
     };
     fetchWO();
-  }, [selectedEquipment]);
+  }, [selectedEquipment, shops]);
 
   const handleAddEquipment = async (e: EquipmentCreatePayload) => {
     try {
@@ -230,37 +270,52 @@ const VehicleManager = () => {
     }
   };
 
+  /* 
+   * NEW: Fetch just one equipment to refresh the detailed view
+   */
+  const handleRefreshEquipment = async () => {
+    if (!selectedEquipment) return;
+    try {
+      const refreshed = await equipmentApi.get(selectedEquipment.id);
+      if (refreshed) {
+        // preserve the detailed view by updating state
+        setSelectedEquipment(refreshed);
+        setEquipmentList(prev => prev.map(e => e.id === refreshed.id ? refreshed : e));
+      }
+    } catch (err) {
+      console.error("Failed to refresh equipment", err);
+    }
+  };
+
   const handleUpdateEquipment = async (data: any) => {
     if (!selectedEquipment) return;
     try {
-      // Map to API DTO
+      // Map to API DTO with full safety defaults to existing values
       const payload: any = {
         id: selectedEquipment.id,
-        equipmentTypeId: data.equipmentTypeId || selectedEquipment.equipmentTypeId,
-        fleetCategoryId: data.fleetCategoryId || selectedEquipment.fleetCategoryId,
-        unitNumber: data.unitNumber,
-        displayName: data.unitNumber,
-        vin: data.vin,
-        serialNumber: data.serialNumber,
-        plateNumber: data.licensePlate, // Map licensePlate to plateNumber
-        // state: data.licenseState, // Backend doesn't support State directly yet, might be inside JSON specs if implemented
-        make: data.make,
-        model: data.model,
-        year: data.year,
+        equipmentTypeId: data.equipmentTypeId ?? selectedEquipment.equipmentTypeId,
+        fleetCategoryId: data.fleetCategoryId ?? selectedEquipment.fleetCategoryId,
+        unitNumber: data.unitNumber ?? selectedEquipment.unitNumber,
+        displayName: data.displayName ?? selectedEquipment.displayName ?? selectedEquipment.unitNumber,
+        vin: data.vin ?? selectedEquipment.vin,
+        serialNumber: data.serialNumber ?? selectedEquipment.serialNumber,
+        plateNumber: data.licensePlate ?? selectedEquipment.licensePlate, // Map licensePlate to plateNumber
+        make: data.make ?? selectedEquipment.make,
+        model: data.model ?? selectedEquipment.model,
+        year: data.year ?? selectedEquipment.year,
 
         // Operational Status mapping
-        operationalStatus: data.status,
+        operationalStatus: data.status ?? selectedEquipment.status,
 
-        // Specs
-        length: Number(data.length) || 0,
-        width: 0,
-        height: 0,
-        color: 'White',
-        grossVehicleWeightRating: Number(data.weightCapacity) || 0,
+        // Specs - use nullish coalescing to avoid overwriting with 0 if data isn't provided but exists
+        // However, if data IS provided (e.g. edit form), it should be used.
+        // If data is empty object (refresh hack), we fallback to existing.
+        // The edit form usually sends all fields or specific ones. 
+        // We generally assume 'data' contains the changes.
 
-        // Meters
-        odometerCurrent: Number(data.mileage) || 0,
-        hoursCurrent: Number(data.hours) || 0,
+        // Meters - carefully update only if present in 'data' or fallback
+        odometerCurrent: data.mileage !== undefined ? Number(data.mileage) : selectedEquipment.mileage,
+        hoursCurrent: data.hours !== undefined ? Number(data.hours) : selectedEquipment.hours,
 
         notes: selectedEquipment.notes
       };
@@ -302,6 +357,7 @@ const VehicleManager = () => {
         onBack={() => setSelectedEquipment(null)}
         onUpdate={handleUpdateEquipment}
         onUpdateStatus={handleUpdateStatus}
+        onRefresh={handleRefreshEquipment}
         onDelete={handleDeleteEquipment}
         initialAiOpen={false}
       />

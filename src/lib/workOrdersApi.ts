@@ -112,6 +112,19 @@ async function resolveCreatedWorkOrder(res: any): Promise<WorkOrderDto> {
   );
 }
 
+function normalizeDocument(d: any): WorkOrderDocumentDto {
+  const fileUrl = d.fileUrl || d.FileUrl;
+  const fileName = d.fileName || d.FileName || (fileUrl ? fileUrl.split('/').pop() : 'Attachment');
+
+  return {
+    ...d,
+    id: d.id || d.Id,
+    fileName: fileName,
+    fileUrl: fileUrl,
+    fileType: d.fileType || d.FileType || 'application/octet-stream' // safe default
+  };
+}
+
 function normalizeWorkOrder(data: any): WorkOrderDto {
   if (!data) return data;
   return {
@@ -144,13 +157,7 @@ function normalizeWorkOrder(data: any): WorkOrderDto {
       unitPrice: l.unitPrice ?? l.UnitPrice ?? 0,
       amount: l.amount ?? l.Amount ?? 0
     })),
-    documents: (data.documents || data.Documents || []).map((d: any) => ({
-      ...d,
-      id: d.id || d.Id,
-      fileName: d.fileName || d.FileName,
-      fileUrl: d.fileUrl || d.FileUrl,
-      fileType: d.fileType || d.FileType
-    }))
+    documents: (data.documents || data.Documents || []).map(normalizeDocument)
   } as WorkOrderDto;
 }
 
@@ -277,7 +284,7 @@ export const workOrdersApi = {
     files.forEach((f) => form.append("files", f));
 
     const res = await api.post(`/workorders/${workOrderId}/attachments`, form);
-    return res.data; // Attachments typically simple DTOs, usually camelCase from NestJS/ASP.NET default formatter, but we could normalize if needed.
+    return (res.data || []).map(normalizeDocument); // Attachments typically simple DTOs, usually camelCase from NestJS/ASP.NET default formatter, but we could normalize if needed.
   },
 
   /**
@@ -286,7 +293,7 @@ export const workOrdersApi = {
    */
   listAttachments: async (workOrderId: string): Promise<WorkOrderDocumentDto[]> => {
     const res = await api.get(`/workorders/${workOrderId}/attachments`);
-    return res.data;
+    return (res.data || []).map(normalizeDocument);
   },
 
   /**
