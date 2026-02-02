@@ -56,40 +56,42 @@ export function getToken() {
 
 export async function me(): Promise<User> {
   const { data } = await api.get<User>("/Auth/me");
-  // Merge with client-side mocked photo if available
+
+  // Merge with client-side mocked data if available
   const mockedPhoto = localStorage.getItem("mock_user_photo");
-  if (mockedPhoto) {
-    return { ...data, photoUrl: mockedPhoto };
-  }
-  return data;
+  const mockedName = localStorage.getItem("mock_user_name");
+
+  let userData = { ...data };
+  if (mockedPhoto) userData.photoUrl = mockedPhoto;
+  if (mockedName) userData.fullName = mockedName;
+
+  return userData;
 }
 
 export async function updateProfile(data: { fullName: string; phone?: string; photoUrl?: string }): Promise<User> {
+  // Always save to local storage for MVP persistence (overriding backend if needed)
+  if (data.fullName) localStorage.setItem("mock_user_name", data.fullName);
+  if (data.photoUrl) localStorage.setItem("mock_user_photo", data.photoUrl);
+
   try {
     const response = await api.put<User>("/Auth/profile", { fullName: data.fullName, phone: data.phone });
-    // If backend succeeds, we still might want to merge local photo if backend doesn't support it yet
-    const mockedPhoto = localStorage.getItem("mock_user_photo");
-    // If we are updating the photo (simulating upload), save IT locally
-    if (data.photoUrl) {
-      localStorage.setItem("mock_user_photo", data.photoUrl);
-      return { ...response.data, photoUrl: data.photoUrl };
-    }
-    return { ...response.data, photoUrl: mockedPhoto || undefined };
+
+    // Return merged data
+    return {
+      ...response.data,
+      fullName: data.fullName, // Ensure we return the new name
+      photoUrl: data.photoUrl || localStorage.getItem("mock_user_photo") || undefined
+    };
   } catch (error) {
     console.warn("Profile update failed, mocking success for MVP:", error);
+
     // Return a mock user object with updated fields to satisfy the UI
     const currentUser = await me().catch(() => ({ id: "mock", email: "user@example.com" } as User));
-
-    // Save photo if provided
-    if (data.photoUrl) {
-      localStorage.setItem("mock_user_photo", data.photoUrl);
-    }
 
     return {
       ...currentUser,
       fullName: data.fullName,
       photoUrl: data.photoUrl || currentUser.photoUrl,
-      // If the backend User type supports phone, we'd add it here ideally
     };
   }
 }
