@@ -10,7 +10,7 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { updateProfile } from "@/components/auth/Auth";
 
 const AccountTab = () => {
-    const { user } = useAuth();
+    const { user, updateUser } = useAuth();
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
@@ -65,11 +65,12 @@ const AccountTab = () => {
             });
 
             // 2. Update User Profile (Name)
-            await updateProfile({
+            const updatedUser = await updateProfile({
                 fullName: name,
                 // If the backend Profile endpoint supports phone, we could send it here too.
                 // For now, assume phone is on tenant for this business app logic.
             });
+            updateUser(updatedUser);
 
             await new Promise(resolve => setTimeout(resolve, 500)); // UX delay
             toast.success("Account details updated successfully!");

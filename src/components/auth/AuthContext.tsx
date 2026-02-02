@@ -23,6 +23,7 @@ type AuthContextType = {
     industryId?: string
   ) => Promise<{ error?: string }>;
   signOut: () => void;
+  updateUser: (user: User) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -143,6 +144,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         signIn,
         signUp,
         signOut,
+        updateUser: (u: User) => setUser(u),
       }}
     >
       {children}
