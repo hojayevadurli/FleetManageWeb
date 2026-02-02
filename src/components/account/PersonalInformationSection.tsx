@@ -12,7 +12,9 @@ interface PersonalInformationSectionProps {
   setPhone: (value: string) => void;
   companyName: string;
   setCompanyName: (value: string) => void;
-  industryName: string; // Kept in props for compatibility if needed, but ignored in render
+  industryName: string;
+  photoUrl?: string;
+  onPhotoChange?: (file: File) => void;
 }
 
 const PersonalInformationSection = ({
@@ -24,6 +26,8 @@ const PersonalInformationSection = ({
   setPhone,
   companyName,
   setCompanyName,
+  photoUrl,
+  onPhotoChange,
 }: PersonalInformationSectionProps) => {
   const formatPhoneNumber = (value: string) => {
     if (!value) return value;
@@ -44,6 +48,13 @@ const PersonalInformationSection = ({
     setPhone(formattedPhoneNumber);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onPhotoChange) {
+      onPhotoChange(file);
+    }
+  };
+
   return (
     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden p-6 space-y-8 w-full">
       <div>
@@ -59,10 +70,26 @@ const PersonalInformationSection = ({
       <div className="flex flex-col md:flex-row gap-8 items-start">
         {/* Profile Picture Placeholder */}
         <div className="flex-shrink-0 relative group">
-          <div className="w-32 h-32 bg-slate-100 rounded-full flex flex-col items-center justify-center border-4 border-white shadow-lg relative overflow-hidden opacity-80 cursor-not-allowed">
-            <User className="w-12 h-12 text-slate-300 mb-2" />
+          <div className="w-32 h-32 bg-slate-100 rounded-full flex flex-col items-center justify-center border-4 border-white shadow-lg relative overflow-hidden">
+            {photoUrl ? (
+              <img src={photoUrl} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-12 h-12 text-slate-300 mb-2" />
+            )}
+            <label htmlFor="photo-upload" className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+              <Camera className="w-8 h-8 text-white" />
+            </label>
+            <input
+              id="photo-upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
           </div>
-          <button disabled className="text-xs font-bold text-slate-400 mt-3 text-center w-full cursor-not-allowed">Photo (Coming Soon)</button>
+          <label htmlFor="photo-upload" className="block text-xs font-bold text-blue-600 mt-3 text-center w-full hover:underline cursor-pointer">
+            Upload Photo
+          </label>
         </div>
 
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 w-full">

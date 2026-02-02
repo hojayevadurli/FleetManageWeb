@@ -37,6 +37,7 @@ export type User = {
   CompanyName?: string;
   Company?: string;
   lastPasswordChange?: string;
+  photoUrl?: string; // Mocked client-side
 };
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
@@ -55,20 +56,39 @@ export function getToken() {
 
 export async function me(): Promise<User> {
   const { data } = await api.get<User>("/Auth/me");
+  // Merge with client-side mocked photo if available
+  const mockedPhoto = localStorage.getItem("mock_user_photo");
+  if (mockedPhoto) {
+    return { ...data, photoUrl: mockedPhoto };
+  }
   return data;
 }
 
-export async function updateProfile(data: { fullName: string; phone?: string }): Promise<User> {
+export async function updateProfile(data: { fullName: string; phone?: string; photoUrl?: string }): Promise<User> {
   try {
-    const response = await api.put<User>("/Auth/profile", data);
-    return response.data;
+    const response = await api.put<User>("/Auth/profile", { fullName: data.fullName, phone: data.phone });
+    // If backend succeeds, we still might want to merge local photo if backend doesn't support it yet
+    const mockedPhoto = localStorage.getItem("mock_user_photo");
+    // If we are updating the photo (simulating upload), save IT locally
+    if (data.photoUrl) {
+      localStorage.setItem("mock_user_photo", data.photoUrl);
+      return { ...response.data, photoUrl: data.photoUrl };
+    }
+    return { ...response.data, photoUrl: mockedPhoto || undefined };
   } catch (error) {
     console.warn("Profile update failed, mocking success for MVP:", error);
     // Return a mock user object with updated fields to satisfy the UI
     const currentUser = await me().catch(() => ({ id: "mock", email: "user@example.com" } as User));
+
+    // Save photo if provided
+    if (data.photoUrl) {
+      localStorage.setItem("mock_user_photo", data.photoUrl);
+    }
+
     return {
       ...currentUser,
       fullName: data.fullName,
+      photoUrl: data.photoUrl || currentUser.photoUrl,
       // If the backend User type supports phone, we'd add it here ideally
     };
   }
