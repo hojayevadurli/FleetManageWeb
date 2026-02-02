@@ -98,12 +98,7 @@ const DashboardHeader = () => {
       <div className="flex items-center gap-6">
         <SidebarTrigger className="-ml-2 text-slate-400 hover:text-slate-900 transition-colors" />
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID:</span>
-            <span className="text-xs font-black text-slate-900 tracking-tight">
-              {user?.tenant?.id?.slice(0, 7).toUpperCase() || user?.Tenant?.Id?.slice(0, 7).toUpperCase() || 'FM-7721-AI'}
-            </span>
-          </div>
+
           <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
           </div>
