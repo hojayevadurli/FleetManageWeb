@@ -45,6 +45,7 @@ import ServiceRecordDetailPage from "./pages/ServiceRecordDetailPage";
 import FuelTracking from "./pages/FuelTracking";
 import VendorAnalytics from "./pages/VendorAnalytics";
 import ShopDetailView from "./pages/ShopDetailView";
+import SupportPage from "./pages/support/SupportPage";
 
 import SettingsLayout from "./pages/settings/SettingsLayout";
 import AccountTab from "./pages/settings/tabs/AccountTab";
@@ -292,6 +293,7 @@ const App = () => (
                           <Route path="/operations/fuel" element={<FuelTracking />} />
                           <Route path="/ai-chat" element={<AIChatPage />} />
                           <Route path="/ai-chat" element={<AIChatPage />} />
+                          <Route path="/support" element={<SupportPage />} />
 
                           {/* Settings Routes */}
                           <Route path="/settings" element={<SettingsLayout />}>
