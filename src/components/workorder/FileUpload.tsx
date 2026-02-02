@@ -5,6 +5,10 @@ import { Label } from "@/components/ui/label";
 import { X, Upload, Image as ImageIcon, Video, FileText } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/Api";
+import { uploadsApi } from "@/lib/uploadsApi";
+import { documentsApi } from "@/lib/documentsApi";
+import { workOrdersApi } from "@/lib/workOrdersApi";
+import { DocumentRole } from "@/lib/types";
 
 /**
  * ✅ Enforce correct usage:
@@ -13,27 +17,27 @@ import api from "@/lib/Api";
  */
 type FileUploadProps =
   | {
-      files: File[];
-      onFilesChange: (files: File[]) => void;
+    files: File[];
+    onFilesChange: (files: File[]) => void;
 
-      /** Edit dialog */
-      workOrderId: string;
-      ensureWorkOrderId?: never;
+    /** Edit dialog */
+    workOrderId: string;
+    ensureWorkOrderId?: never;
 
-      onUploaded?: (workOrderId: string) => void;
-      onUploadingChange?: (uploading: boolean) => void;
-    }
+    onUploaded?: (workOrderId: string) => void;
+    onUploadingChange?: (uploading: boolean) => void;
+  }
   | {
-      files: File[];
-      onFilesChange: (files: File[]) => void;
+    files: File[];
+    onFilesChange: (files: File[]) => void;
 
-      /** Create dialog (id not known yet) */
-      workOrderId?: undefined;
-      ensureWorkOrderId: () => Promise<string>;
+    /** Create dialog (id not known yet) */
+    workOrderId?: undefined;
+    ensureWorkOrderId: () => Promise<string>;
 
-      onUploaded?: (workOrderId: string) => void;
-      onUploadingChange?: (uploading: boolean) => void;
-    };
+    onUploaded?: (workOrderId: string) => void;
+    onUploadingChange?: (uploading: boolean) => void;
+  };
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
@@ -99,6 +103,9 @@ export default function FileUpload(props: FileUploadProps) {
     }
 
     setUploading(true);
+    let successCount = 0;
+    const errors: string[] = [];
+
     try {
       const id = await resolveWorkOrderId();
 
@@ -108,26 +115,49 @@ export default function FileUpload(props: FileUploadProps) {
         return;
       }
 
-      const form = new FormData();
-      files.forEach((f) => form.append("files", f));
+      // Process files one by one (or in parallel) to follow the 3-step flow
+      for (const file of files) {
+        try {
+          // 1. Upload
+          const url = await uploadsApi.uploadDocument(file);
 
-      // ✅ Ensure your axios instance baseURL includes `/api`
-      // Example final URL: https://localhost:7297/api/workorders/{id}/attachments
-      await api.post(`/workorders/${id}/attachments`, form, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+          // 2. Create Document Entity
+          const doc = await documentsApi.create({
+            fileUrl: url,
+            fileType: file.type,
+            docKind: 'work_order', // Default kind
+            vendorNameRaw: null
+          });
 
-      onFilesChange([]);
-      toast.success("Attachments uploaded");
-      onUploaded?.(id);
+          // 3. Link to WorkOrder
+          await workOrdersApi.attachDocument(id, {
+            documentId: doc.id,
+            role: DocumentRole.WorkOrder, // Default role
+            startDate: new Date().toISOString().split('T')[0], // Today's date YYYY-MM-DD
+            notes: file.name
+          });
+
+          successCount++;
+        } catch (err: any) {
+          console.error(`Failed to upload/attach ${file.name}:`, err);
+          errors.push(`${file.name}: ${err.message || "Unknown error"}`);
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Successfully uploaded ${successCount} attachments`);
+        onFilesChange([]); // Clear successfully uploaded
+        onUploaded?.(id);
+      }
+
+      if (errors.length > 0) {
+        toast.error(`Failed to upload ${errors.length} files`);
+        console.error("Upload errors:", errors);
+      }
+
     } catch (err: any) {
       console.error(err);
-      const msg =
-        err?.response?.data?.message ||
-        err?.response?.data ||
-        err?.message ||
-        "Upload failed";
-      toast.error(String(msg));
+      toast.error("Critical upload error");
     } finally {
       setUploading(false);
     }

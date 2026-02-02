@@ -302,5 +302,15 @@ export const workOrdersApi = {
    */
   deleteAttachment: async (workOrderId: string, documentId: string): Promise<void> => {
     await api.delete(`/workorders/${workOrderId}/attachments/${documentId}`);
+  },
+
+  /**
+   * Link an existing document to a work order
+   * POST /api/workorders/{id}/attachments
+   * Body: AttachDocumentPayload
+   */
+  attachDocument: async (workOrderId: string, payload: any): Promise<WorkOrderDocumentDto> => {
+    const res = await api.post(`/workorders/${workOrderId}/attachments`, payload);
+    return normalizeDocument(res.data);
   }
 };

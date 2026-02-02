@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { workOrdersApi } from '@/lib/workOrdersApi';
 import { shopsApi } from '@/lib/shopsApi';
-import { WorkOrderDto, Equipment, WorkOrder } from '@/lib/types';
+import { WorkOrderDto, Equipment, WorkOrder, DocumentRole } from '@/lib/types';
 import { equipmentApi } from '@/lib/equipmentApi';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -92,8 +92,15 @@ const ServiceRecordDetailPage = () => {
             }
 
             // Fetch attachments
-            // Attachments are now included in the WorkOrderDto
-            const attachments = wo.documents || [];
+            // Attachments are now included in the WorkOrderDto, but we fetch explicitly to be safe if Include is missing
+            let attachments = wo.documents || [];
+            if (!attachments.length) {
+                try {
+                    attachments = await workOrdersApi.listAttachments(id!);
+                } catch (e) {
+                    console.warn("Could not list attachments independently", e);
+                }
+            }
 
             const mappedAttachments = attachments.map(doc => {
                 const ft = (doc.fileType || '').toLowerCase();
@@ -106,8 +113,19 @@ const ServiceRecordDetailPage = () => {
                 return {
                     url: doc.fileUrl,
                     type,
-                    name: doc.fileName || 'Attachment'
+                    name: doc.fileName || doc.role?.toString() || 'Attachment',
+                    role: doc.role
                 };
+            }).sort((a, b) => {
+                // Priority: Role 50 (Invoice) or 51 (Receipt) -> Name contains "Invoice"/"Receipt" -> Date
+                const isReceiptA = a.role === DocumentRole.Invoice || a.role === DocumentRole.Receipt ||
+                    a.name.toLowerCase().includes('invoice') || a.name.toLowerCase().includes('receipt');
+                const isReceiptB = b.role === DocumentRole.Invoice || b.role === DocumentRole.Receipt ||
+                    b.name.toLowerCase().includes('invoice') || b.name.toLowerCase().includes('receipt');
+
+                if (isReceiptA && !isReceiptB) return -1;
+                if (!isReceiptA && isReceiptB) return 1;
+                return 0;
             });
 
             // Map WorkOrderDto to WorkOrder
@@ -115,6 +133,7 @@ const ServiceRecordDetailPage = () => {
                 id: wo.id,
                 woNumber: wo.workOrderNumber || `WO-${wo.id.slice(0, 5)}`,
                 equipmentId: wo.equipmentId || "",
+                vendorId: wo.vendorId || null,
                 vendor: fetchedVendorName, // Use the reliably fetched name
                 status: (wo.status as any),
                 priority: (wo.priority as any),
@@ -181,10 +200,19 @@ const ServiceRecordDetailPage = () => {
 
     // Actions
     const handleDownloadReceipt = () => {
-        if (record?.attachmentUrl) {
-            window.open(record.attachmentUrl, '_blank');
-        } else {
+        if (!record?.media || record.media.length === 0) {
             toast({ title: "No Receipt", description: "There is no digital receipt attached to this record." });
+            return;
+        }
+
+        // Try to find a receipt/invoice
+        const receipt = record.media.find(m =>
+            m.name.toLowerCase().includes('invoice') ||
+            m.name.toLowerCase().includes('receipt')
+        ) || record.media[0];
+
+        if (receipt?.url) {
+            window.open(receipt.url, '_blank');
         }
     };
 
@@ -480,7 +508,13 @@ const ServiceRecordDetailPage = () => {
                                     <Edit className="w-4 h-4 text-slate-400" /> Rate This Service
                                 </button>
                                 <button className="w-full text-left px-6 py-4 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3"
-                                    onClick={() => toast({ title: "Shop Profile", description: "Navigating to shop..." })}>
+                                    onClick={() => {
+                                        if (record.vendorId) {
+                                            navigate(`/app/shops/${record.vendorId}`);
+                                        } else {
+                                            toast({ title: "No Shop Profile", description: "This work order is not linked to an external vendor profile." });
+                                        }
+                                    }}>
                                     <Store className="w-4 h-4 text-slate-400" /> View Shop Profile
                                 </button>
                                 <button className="w-full text-left px-6 py-4 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3"
