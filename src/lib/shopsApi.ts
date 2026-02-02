@@ -234,10 +234,26 @@ export const shopsApi = {
     },
 
     // GET /api/service-partners/{id}/ratings
+    // GET /api/service-partners/{id}/ratings
     async getRatings(id: string): Promise<ShopRating[]> {
         try {
-            const response = await api.get<ShopRating[]>(`/service-partners/${id}/ratings`);
-            return response.data;
+            const response = await api.get<any[]>(`/service-partners/${id}/ratings`);
+
+            // ✅ Normalize keys for consistent frontend usage
+            const normalizeRating = (r: any): ShopRating => ({
+                ...r,
+                id: r.id || r.Id,
+                work_order_id: r.work_order_id || r.workOrderId || r.WorkOrderId,
+                rating: r.rating || r.Rating,
+                quality_rating: r.quality_rating || r.qualityRating,
+                timeliness_rating: r.timeliness_rating || r.timelinessRating,
+                communication_rating: r.communication_rating || r.communicationRating,
+                value_rating: r.value_rating || r.valueRating,
+                would_recommend: r.would_recommend ?? r.wouldRecommend,
+                review_text: r.review_text || r.reviewText || r.comment,
+            });
+
+            return response.data.map(normalizeRating);
         } catch (error) {
             console.error(`Error fetching ratings for shop ${id}:`, error);
             return [];
@@ -246,7 +262,38 @@ export const shopsApi = {
 
     // POST /api/service-partners/{id}/ratings
     async createRating(id: string, payload: RatingCreatePayload): Promise<ShopRating> {
-        const response = await api.post<ShopRating>(`/service-partners/${id}/ratings`, payload);
+        // Map payload to snake_case for backend
+        const payloadToSend = {
+            rating: payload.rating,
+            review_text: payload.reviewText, // Align with ShopRating interface
+            comment: payload.reviewText, // Send both just in case
+            service_date: payload.serviceDate,
+            work_order_id: payload.workOrderId,
+            quality_rating: payload.qualityRating,
+            timeliness_rating: payload.timelinessRating,
+            communication_rating: payload.communicationRating,
+            value_rating: payload.valueRating,
+            would_recommend: payload.wouldRecommend
+        };
+        const response = await api.post<ShopRating>(`/service-partners/${id}/ratings`, payloadToSend);
+        return response.data;
+    },
+
+    // PUT /api/service-partners/{id}/ratings/{ratingId}
+    async updateRating(shopId: string, ratingId: string, payload: RatingCreatePayload): Promise<ShopRating> {
+        const payloadToSend = {
+            rating: payload.rating,
+            review_text: payload.reviewText,
+            comment: payload.reviewText,
+            service_date: payload.serviceDate,
+            work_order_id: payload.workOrderId,
+            quality_rating: payload.qualityRating,
+            timeliness_rating: payload.timelinessRating,
+            communication_rating: payload.communicationRating,
+            value_rating: payload.valueRating,
+            would_recommend: payload.wouldRecommend
+        };
+        const response = await api.put<ShopRating>(`/service-partners/${shopId}/ratings/${ratingId}`, payloadToSend);
         return response.data;
     },
 };

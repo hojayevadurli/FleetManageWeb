@@ -1,9 +1,21 @@
 import { Shield, Key, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
+import { useAuth } from "@/components/auth/AuthContext";
+import { formatDistanceToNow } from "date-fns";
 
 export const SecuritySection = () => {
+    const { user } = useAuth();
     const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+
+    const getLastPasswordChangeText = () => {
+        if (!user?.lastPasswordChange) return "Last changed: Never";
+        try {
+            return `Last changed ${formatDistanceToNow(new Date(user.lastPasswordChange), { addSuffix: true })}`;
+        } catch {
+            return "Last changed: Unknown";
+        }
+    };
 
     return (
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
@@ -26,7 +38,7 @@ export const SecuritySection = () => {
                         </div>
                         <div>
                             <h3 className="font-bold text-slate-900">Password</h3>
-                            <p className="text-xs font-medium text-slate-500 mt-1">Last changed 3 months ago</p>
+                            <p className="text-xs font-medium text-slate-500 mt-1">{getLastPasswordChangeText()}</p>
                         </div>
                     </div>
                     <button

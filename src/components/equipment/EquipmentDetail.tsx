@@ -33,8 +33,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Equipment, EquipmentOperationalStatus, WorkOrder, ChatMessage, Warranty, EquipmentDocRole } from '@/lib/types';
+import { Equipment, EquipmentOperationalStatus, WorkOrder, ChatMessage, Warranty, EquipmentDocRole, DocumentRole } from '@/lib/types';
 import { getEquipmentChatResponse } from '@/lib/gemini';
+import SpendAnalytics from './SpendAnalytics';
 
 interface ExtendedChatMessage extends ChatMessage {
     sources?: any[];
@@ -395,7 +396,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     <div className="grid grid-cols-2 gap-4 flex-1 w-full">
                                         {(() => {
                                             // Robust helper to map any doc role/kind format to our Enum
-                                            const getRole = (d: any): EquipmentDocRole | null => {
+                                            const getRole = (d: any): DocumentRole | null => {
                                                 if (typeof d.docRole === 'number') return d.docRole;
 
                                                 const k = (d.docRole || d.docKind || '').toString().toLowerCase();
@@ -421,7 +422,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                 return EquipmentDocRole.Other;
                                             };
 
-                                            const getExpirationDate = (targetRole: EquipmentDocRole) => {
+                                            const getExpirationDate = (targetRole: DocumentRole) => {
                                                 const docs = equipment.documents?.filter(d => getRole(d) === targetRole) || [];
                                                 if (docs.length === 0) return null;
 
@@ -574,7 +575,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             <div className="divide-y divide-slate-100 max-h-[800px] overflow-y-auto custom-scrollbar">
                                 {equipmentHistory.length > 0 ? (
                                     equipmentHistory.map(wo => (
-                                        <div key={wo.id} className="p-10 flex items-start justify-between hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/app/maintenance/service-history/${wo.id}`)}>
+                                        <div key={wo.id} className="p-10 flex items-start justify-between hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/app/service/${wo.id}`)}>
                                             <div className="space-y-3 flex-1 pr-12">
                                                 <div className="flex items-center gap-4">
                                                     <div className="text-base font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">{wo.woNumber || 'Draft'}</div>
@@ -609,11 +610,11 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
 
                 {activeTab === 'spend' && (
                     <div className="space-y-8 animate-in fade-in zoom-in duration-300">
-                        {/* Financial Summary Cards */}
-                        <div className="bg-white p-20 text-center rounded-[3rem] border border-slate-200">
-                            <h3 className="text-xl font-black text-slate-900">Spend Analytics</h3>
-                            <p className="text-slate-500 mt-2">Visualization engine initializing...</p>
-                        </div>
+                        <SpendAnalytics
+                            data={equipmentHistory}
+                            equipmentInServiceDate={equipment.inServiceDate}
+                            onAddRecord={() => navigate('/app/work-orders')}
+                        />
                     </div>
                 )}
 

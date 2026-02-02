@@ -41,12 +41,13 @@ export const Pricing = () => (
                     </div>
 
                     <div className="flex items-baseline justify-center gap-1 mb-2">
+                        <span className="line-through text-slate-500 mr-2 text-3xl">$12</span>
                         <span className="text-5xl font-bold text-white">$6</span>
-                        <span className="text-slate-400">/month per truck</span>
+                        <span className="text-slate-400">/month per fleet</span>
                     </div>
 
                     <p className="text-slate-400 text-sm mb-6">
-                        Pay for each truck you manage. Each truck includes:
+                        Flat rate for your entire fleet. Unlimited trucks. Includes:
                     </p>
 
                     <div className="space-y-3 mb-8 text-left">
@@ -66,16 +67,16 @@ export const Pricing = () => (
                     <div className="bg-[#0B1121]/50 p-4 rounded-xl mb-8 text-left space-y-2 border border-white/5">
                         <p className="text-slate-300 font-medium text-sm mb-2">Pricing Examples:</p>
                         <ul className="space-y-1 text-sm text-slate-400">
-                            <li className="flex justify-between"><span>1 truck</span> <span>= $6/month</span></li>
-                            <li className="flex justify-between"><span>10 trucks</span> <span>= $60/month</span></li>
-                            <li className="flex justify-between"><span>50 trucks</span> <span>= $300/month</span></li>
+                            <li className="flex justify-between"><span>Early Access (Now)</span> <span>= $6/month</span></li>
+                            <li className="flex justify-between"><span>Standard Price</span> <span className="line-through text-slate-600 mr-2">$12/month</span> <span>$6/month</span></li>
+                            <li className="flex justify-between"><span>Any Fleet Size</span> <span>= Flat Rate</span></li>
                         </ul>
                         <p className="text-xs text-slate-500 mt-3 pt-2 border-t border-white/5">
                             Unlimited users & drivers at no extra cost. No per-seat fees.
                         </p>
                     </div>
 
-                    <Button className="w-full h-14 text-lg bg-[#4F7CFF] hover:bg-[#4F7CFF]/90 font-bold shadow-lg shadow-blue-500/20">
+                    <Button onClick={() => (window.location.href = "/login?mode=signup")} className="w-full h-14 text-lg bg-[#4F7CFF] hover:bg-[#4F7CFF]/90 font-bold shadow-lg shadow-blue-500/20">
                         Start Free Month
                     </Button>
                     <p className="text-slate-500 text-xs mt-4">1 month free trial. Cancel anytime.</p>
@@ -188,7 +189,7 @@ export const CTASection = () => (
         <div className="container mx-auto px-4 relative z-10">
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Stop Wrestling With Paperwork.</h2>
             <p className="text-white/80 text-xl mb-10 max-w-2xl mx-auto">Start talking to your fleet today. Join fleet operators who save hours every week.</p>
-            <Button className="h-16 px-10 text-lg bg-white text-[#4F7CFF] hover:bg-white/90 font-bold shadow-2xl transition-transform hover:scale-105">
+            <Button onClick={() => (window.location.href = "/login?mode=signup")} className="h-16 px-10 text-lg bg-white text-[#4F7CFF] hover:bg-white/90 font-bold shadow-2xl transition-transform hover:scale-105">
                 Start Your Free Month
             </Button>
             <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-white/70 font-medium">

@@ -86,7 +86,7 @@ const ShopServicesList = ({ workOrders, loading, ratingsMap }: ShopServicesListP
                 return (
                     <div
                         key={wo.id}
-                        onClick={() => navigate(`/app/maintenance/service-history/${wo.id}`)}
+                        onClick={() => navigate(`/app/service/${wo.id}`)}
                         className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-xl hover:border-blue-100 cursor-pointer transition-all group"
                     >
                         <div className="space-y-2">
@@ -227,9 +227,9 @@ const ShopReviewsList = ({ shopId }: { shopId: string }) => {
 };
 
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyAeI6_E9c4EMx9T4t_FjyVUGSTN38GV69c";
 // Helper to check if using default/demo key
-const IS_DEMO_KEY = GOOGLE_MAPS_API_KEY === "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
+const IS_DEMO_KEY = GOOGLE_MAPS_API_KEY === "AIzaSyAeI6_E9c4EMx9T4t_FjyVUGSTN38GV69c";
 
 const ShopDetailView = () => {
     const { id } = useParams<{ id: string }>();

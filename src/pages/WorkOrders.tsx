@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Page, PageHeader } from "@/components/layout/Page";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -6,8 +7,8 @@ import { toast } from "sonner";
 
 import WorkOrderFilters from "@/components/workorder/WorkOrderFilters";
 import WorkOrderList, { VendorData } from "@/components/workorder/WorkOrderList";
-import CreateWorkOrderDialog from "@/components/workorder/CreateWorkOrderDialog";
-import EditWorkOrderDialog from "@/components/workorder/EditWorkOrderDialog";
+import WorkOrderDialog from "@/components/workorder/WorkOrderDialog";
+
 import ServiceMetrics from "@/components/workorder/ServiceMetrics";
 
 import { WorkOrderDto, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
@@ -227,32 +228,33 @@ const WorkOrders = () => {
   }
 
   return (
-    <div className="p-6 space-y-6 animate-in fade-in duration-500 h-full">
-      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-        <div>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight">Service</h1>
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Operational Fleet Directives</p>
-        </div>
-
+    <Page>
+      <PageHeader
+        title="Service"
+        subtitle="Operational Fleet Directives"
+      >
         <Button size="lg" className="rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-lg active:scale-95 transition-all" onClick={() => setIsCreateDialogOpen(true)}>
           <Plus className="h-4 w-4" />
           New Work Order
         </Button>
-      </div>
+      </PageHeader>
 
-      <CreateWorkOrderDialog
+      <WorkOrderDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         initialCompanyName={companyName || "Fleet Company"}
         onAfterCreated={loadData}
       />
 
-      <CreateWorkOrderDialog
+      <WorkOrderDialog
+        editWoId={selectedWorkOrder?.id}
         open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-        initialCompanyName={companyName || "Fleet Company"}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) setSelectedWorkOrder(null);
+        }}
         onAfterCreated={loadData}
-        existingWorkOrder={selectedWorkOrder}
+      />
       />
 
       <ServiceMetrics workOrders={workOrders} />
@@ -271,7 +273,7 @@ const WorkOrders = () => {
         onEditWorkOrder={handleEditWorkOrder}
         onUpdateStatus={updateWorkOrderStatus}
         onCreateClick={() => setIsCreateDialogOpen(true)}
-        onViewDetails={(id) => navigate(`/app/maintenance/service-history/${id}`)}
+        onViewDetails={(id) => navigate(`/app/service/${id}`)}
         onDelete={(wo) => setWorkOrderToDelete(wo)}
         onRateService={handleEditWorkOrder}
       />
@@ -292,7 +294,7 @@ const WorkOrders = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </Page>
   );
 };
 export default WorkOrders;

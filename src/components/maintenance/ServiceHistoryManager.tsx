@@ -554,7 +554,7 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {records.map((wo) => (
-                                <tr key={wo.id} className="hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/app/maintenance/service-history/${wo.id}`)}>
+                                <tr key={wo.id} className="hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/app/service/${wo.id}`)}>
                                     <td className="px-8 py-6">
                                         <div className="flex items-center gap-3">
                                             <div className="bg-slate-100 p-2.5 rounded-xl text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">

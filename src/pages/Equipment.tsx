@@ -1,10 +1,11 @@
 import VehicleManager from "@/components/VehicleManager";
+import { Page } from "@/components/layout/Page";
 
 const Equipment = () => {
     return (
-        <div className="p-6 h-full">
+        <Page>
             <VehicleManager />
-        </div>
+        </Page>
     );
 };
 
