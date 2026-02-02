@@ -551,7 +551,7 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
                       return (
                         <div key={d.id} className="relative group inline-block">
                           {/* Main Link/Preview */}
-                          {isPdfUrl(url) ? (
+                          {d.fileType?.includes('pdf') || isPdfUrl(url) ? (
                             <a
                               href={url}
                               target="_blank"
@@ -560,7 +560,7 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
                             >
                               📄 View PDF
                             </a>
-                          ) : isVideoUrl(url) ? (
+                          ) : d.fileType?.includes('video') || isVideoUrl(url) ? (
                             <a
                               href={url}
                               target="_blank"

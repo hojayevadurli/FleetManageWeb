@@ -317,6 +317,9 @@ export interface WorkOrder {
   odometer?: number;
   hours?: number;
   payer?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  openedAt?: string;
   attachmentUrl?: string; // Mapped from document or preview
   attachmentFileName?: string;
   assetNumber?: string; // Mapped for display
@@ -426,6 +429,8 @@ export interface WorkOrderDto {
   documents: WorkOrderDocumentDto[];
   vendorName?: string;
   vendorAddress?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ChatMessage {

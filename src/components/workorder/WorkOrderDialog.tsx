@@ -18,6 +18,7 @@ import InlineAddShopForm from "../shops/InlineAddShopForm";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import ShopRatingInputs, { ShopRatingData } from "../shops/ShopRatingInputs";
 import { shopsApi } from "@/lib/shopsApi";
+import { tenantsApi } from "@/lib/tenantsApi";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -163,6 +164,21 @@ export default function WorkOrderDialog({
       return [];
     }
   };
+
+  useEffect(() => {
+    if (open && !initialCompanyName) {
+      tenantsApi.getCurrent().then(tenant => {
+        setNewWorkOrder(prev => {
+          if (!prev.company_name && tenant.name) {
+            return { ...prev, company_name: tenant.name };
+          }
+          return prev;
+        });
+      }).catch(err => {
+        console.error("Failed to fetch tenant info", err);
+      });
+    }
+  }, [open, initialCompanyName]);
 
   // Load vendors on mount
   useEffect(() => {
@@ -343,16 +359,13 @@ export default function WorkOrderDialog({
   // Smart default for status based on type (Only call when not editing to avoid override)
   useEffect(() => {
     if (editWoId) return;
+
     if (workOrderType === 'completed') {
-      if (status === WorkOrderStatus.Draft || status === WorkOrderStatus.Open) {
-        setStatus(WorkOrderStatus.Completed);
-      }
+      setStatus(WorkOrderStatus.Completed);
     } else {
-      if (status === WorkOrderStatus.Completed || status === WorkOrderStatus.Closed) {
-        setStatus(WorkOrderStatus.Draft);
-      }
+      setStatus(WorkOrderStatus.Open);
     }
-  }, [workOrderType, status, editWoId]);
+  }, [workOrderType, editWoId]);
 
   const computedLines = useMemo(() => {
     const items = (workOrderItems ?? []).filter(x => x.description.trim());
@@ -535,9 +548,9 @@ export default function WorkOrderDialog({
         odometerAtService: null,
         openedAt: newWorkOrder.eta_date ? new Date(newWorkOrder.eta_date).toISOString() : new Date().toISOString(),
         closedAt: workOrderType === "completed" ? new Date().toISOString() : null,
-        title: cleanComplaint.split("\n")[0].slice(0, 100),
-        complaint: cleanComplaint,
-        notes: finalNotes || undefined,
+        title: (cleanComplaint.split("\n")[0].slice(0, 100)) || "Maintenance",
+        complaint: cleanComplaint || "Maintenance",
+        notes: finalNotes || null,
         status: finalStatus,
         priority: newWorkOrder.priority === "low" ? WorkOrderPriority.Low :
           newWorkOrder.priority === "normal" ? WorkOrderPriority.Normal :
@@ -545,7 +558,13 @@ export default function WorkOrderDialog({
         costSource: WorkOrderCostSource.Estimated,
         estimatedTotal: computedLines.reduce((acc, l) => acc + l.amount, 0),
         manualActualTotal: workOrderType === "completed" ? computedLines.reduce((acc, l) => acc + l.amount, 0) : 0,
-        lines: computedLines,
+        lines: computedLines.map(l => ({
+          type: l.type,
+          description: l.description,
+          qty: l.qty,
+          unitPrice: l.unitPrice,
+          partNumber: l.partNumber
+        })),
         replaceDocuments: true, // FORCE Update of docs (Saved: true)
         documentIds: currentDocIds // Pass explicitly
       };

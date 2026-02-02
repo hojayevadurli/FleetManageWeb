@@ -33,9 +33,35 @@ const VehicleManager = () => {
   const fetchEquipment = useCallback(async () => {
     try {
       setLoading(true);
-      // Fetch all equipment (backend unifies trucks, trailers, etc.)
-      const data = await equipmentApi.list();
-      setEquipmentList(data.map(mapDtoToEquipment));
+
+      const [data, allWos] = await Promise.all([
+        equipmentApi.list(),
+        workOrdersApi.list({ pageSize: 1000 }).catch(e => {
+          console.warn("Failed to fetch all work orders", e);
+          return [];
+        })
+      ]);
+
+      const serviceDates = new Map<string, string>();
+      allWos.forEach(wo => {
+        const s = String(wo.status || '').toLowerCase();
+        // Check for Completed(3), Closed(4), Paid(6) - handle both string and numeric formats
+        if ((s === 'completed' || s === 'closed' || s === 'paid' || s === '3' || s === '4' || s === '6') && wo.openedAt && wo.equipmentId) {
+          const existing = serviceDates.get(wo.equipmentId);
+          if (!existing || new Date(wo.openedAt) > new Date(existing)) {
+            serviceDates.set(wo.equipmentId, wo.openedAt);
+          }
+        }
+      });
+
+      setEquipmentList(data.map(dto => {
+        const eq = mapDtoToEquipment(dto);
+        const computed = serviceDates.get(eq.id);
+        if (computed && (!eq.lastServiceDate || new Date(computed) > new Date(eq.lastServiceDate))) {
+          return { ...eq, lastServiceDate: computed };
+        }
+        return eq;
+      }));
     } catch (error: any) {
       console.error("Failed to fetch equipment", error);
       toast({
