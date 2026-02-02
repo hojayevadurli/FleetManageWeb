@@ -58,14 +58,11 @@ const PersonalInformationSection = ({
 
       <div className="flex flex-col md:flex-row gap-8 items-start">
         {/* Profile Picture Placeholder */}
-        <div className="flex-shrink-0">
-          <div className="w-32 h-32 bg-slate-100 rounded-full flex flex-col items-center justify-center border-4 border-white shadow-lg relative group cursor-pointer overflow-hidden">
+        <div className="flex-shrink-0 relative group">
+          <div className="w-32 h-32 bg-slate-100 rounded-full flex flex-col items-center justify-center border-4 border-white shadow-lg relative overflow-hidden opacity-80 cursor-not-allowed">
             <User className="w-12 h-12 text-slate-300 mb-2" />
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <Camera className="w-8 h-8 text-white" />
-            </div>
           </div>
-          <button className="text-xs font-bold text-blue-600 mt-3 text-center w-full hover:underline">Upload Photo</button>
+          <button disabled className="text-xs font-bold text-slate-400 mt-3 text-center w-full cursor-not-allowed">Photo (Coming Soon)</button>
         </div>
 
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
