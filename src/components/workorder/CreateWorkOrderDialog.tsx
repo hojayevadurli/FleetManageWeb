@@ -40,6 +40,7 @@ import {
 import VehicleSelector from "./VehicleSelector";
 import WorkOrderItems, { WorkOrderItemData } from "./WorkOrderItems";
 import FileUpload from "./FileUpload";
+import UploadAndScan from "./UploadAndScan";
 
 
 
@@ -82,7 +83,7 @@ export default function CreateWorkOrderDialog({
   const [workOrderItems, setWorkOrderItems] = useState<WorkOrderItemData[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isParsingReceipt, setIsParsingReceipt] = useState(false);
-  const receiptInputRef = useRef<HTMLInputElement>(null);
+
   const [draftWorkOrderId, setDraftWorkOrderId] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -673,27 +674,10 @@ export default function CreateWorkOrderDialog({
                   </div>
                 </div>
               ) : (
-                <div
-                  onClick={() => receiptInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-xl p-4 transition-all group flex items-center justify-between cursor-pointer relative ${isParsingReceipt ? 'border-blue-400 bg-blue-50/50' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50'}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isParsingReceipt ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600'}`}>
-                      {isParsingReceipt ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6" />}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors">Upload & AI Scan</h4>
-                      <p className="text-xs text-slate-500 group-hover:text-blue-600/80">Auto-fill details from invoice or picture</p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="group-hover:bg-blue-200 group-hover:text-blue-800">Recommended</Badge>
-
-                  <input type="file" ref={receiptInputRef} className="hidden" accept="image/*,application/pdf" onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileUploadAi(file);
-                    e.target.value = '';
-                  }} />
-                </div>
+                <UploadAndScan
+                  isParsing={isParsingReceipt}
+                  onFileSelect={(file) => handleFileUploadAi(file)}
+                />
               )}
 
               {/* 2. work Order Type */}
