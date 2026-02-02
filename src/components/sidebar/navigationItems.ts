@@ -51,9 +51,5 @@ export const navigationItems: NavigationConfig = [
     url: "/app/shops",
     icon: Store,
   },
-  {
-    title: "Settings",
-    url: "/app/settings",
-    icon: Settings,
-  },
+
 ];
