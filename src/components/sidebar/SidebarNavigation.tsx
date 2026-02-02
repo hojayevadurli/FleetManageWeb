@@ -27,15 +27,18 @@ export function SidebarNavigation() {
         <SidebarMenu className="gap-2">
           {navigationItems.map((item) => {
             if (isNavigationItem(item)) {
-              const active = location.pathname === item.url;
+              // Exact match for dashboard, startsWith for others to catch sub-pages
+              const active = item.url === '/app/'
+                ? location.pathname === item.url
+                : location.pathname.startsWith(item.url);
               return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
                     isActive={active}
                     className={`h-12 px-4 rounded-xl transition-all duration-200 group relative ${active
-                        ? 'bg-blue-600/10 text-blue-500 font-bold'
-                        : 'text-slate-400 hover:bg-white/5 hover:text-white font-medium'
+                      ? 'bg-blue-600/10 text-blue-500 font-bold'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-white font-medium'
                       }`}
                   >
                     <Link to={item.url} className="flex items-center gap-3">
@@ -63,8 +66,8 @@ export function SidebarNavigation() {
                             asChild
                             isActive={active}
                             className={`h-12 px-4 rounded-xl transition-all duration-200 group relative ${active
-                                ? 'bg-blue-600/10 text-blue-500 font-bold'
-                                : 'text-slate-400 hover:bg-white/5 hover:text-white font-medium'
+                              ? 'bg-blue-600/10 text-blue-500 font-bold'
+                              : 'text-slate-400 hover:bg-white/5 hover:text-white font-medium'
                               }`}
                           >
                             <Link to={subItem.url} className="flex items-center gap-3">

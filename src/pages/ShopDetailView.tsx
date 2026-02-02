@@ -86,7 +86,7 @@ const ShopServicesList = ({ workOrders, loading, ratingsMap }: ShopServicesListP
                 return (
                     <div
                         key={wo.id}
-                        onClick={() => navigate(`/app/maintenance/service-history/${wo.id}`)}
+                        onClick={() => navigate(`/app/service/${wo.id}`)}
                         className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-xl hover:border-blue-100 cursor-pointer transition-all group"
                     >
                         <div className="space-y-2">

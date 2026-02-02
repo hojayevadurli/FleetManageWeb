@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { PageHeader } from "@/components/layout/Page";
 import {
     CheckCircle2,
     Calendar,
@@ -240,205 +241,197 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
         });
     }, [equipment, searchTerm, typeFilter, statusFilter]);
 
+
+
     return (
         <div className="space-y-6">
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-                    <div className="flex-1">
-                        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Fleet Control Center</h1>
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Manage assets and service history</p>
-                    </div>
-                    <div className="flex gap-3">
+            <PageHeader
+                title="Fleet Control Center"
+                subtitle="Manage assets and service history"
+            >
+                <div className="flex gap-3">
+                    <Button
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="bg-blue-600 text-white h-10 px-6 rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition-all font-bold shadow-sm active:scale-95"
+                    >
+                        <Plus className="w-5 h-5" /> Add Equipment
+                    </Button>
+                </div>
+            </PageHeader>
 
-                        <div className="flex gap-3">
-                            <Button
-                                onClick={() => setIsAddModalOpen(true)}
-                                className="bg-blue-600 text-white px-6 py-6 rounded-2xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-all font-black shadow-xl shadow-blue-500/20 active:scale-95 shrink-0 h-auto"
-                            >
-                                <Plus className="w-5 h-5" /> Add Equipment
-                            </Button>
-                        </div>
-                    </div >
-                </div >
-
-                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-
-
-                    <div className="relative flex-1 min-w-[320px]">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input
-                            type="text"
-                            placeholder="Search by Unit #, VIN, or Make..."
-                            className="w-full pl-11 pr-4 py-6 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:bg-white transition-all shadow-inner h-auto"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center bg-slate-50 border border-slate-200 rounded-2xl p-1">
-                            <Button
-                                variant={typeFilter === 'ALL' ? 'default' : 'ghost'}
-                                onClick={() => setTypeFilter('ALL')}
-                                className={`px-4 py-1.5 h-auto text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${typeFilter === 'ALL' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
-                            >
-                                All
-                            </Button>
-                            {categories.map(cat => {
-                                const displayName = cat.name === 'School Bus' ? 'Bus' : cat.name;
-                                return (
-                                    <Button
-                                        key={cat.id}
-                                        variant={typeFilter === cat.id ? 'default' : 'ghost'}
-                                        onClick={() => setTypeFilter(cat.id)}
-                                        className={`px-4 py-1.5 h-auto text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${typeFilter === cat.id ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
-                                    >
-                                        {displayName}
-                                    </Button>
-                                );
-                            })}
-                        </div>
-
-                        <div className="flex items-center bg-slate-50 border border-slate-200 rounded-2xl p-1">
-                            {(['ALL', ...Object.values(EquipmentOperationalStatus).filter(v => typeof v === 'number')] as const).map(status => {
-                                let activeClass = 'bg-blue-600 text-white shadow-md';
-                                if (status === EquipmentOperationalStatus.Active) activeClass = 'bg-emerald-600 text-white shadow-md';
-                                if (status === EquipmentOperationalStatus.InShop) activeClass = 'bg-amber-500 text-white shadow-md';
-                                if (status === EquipmentOperationalStatus.OutOfService) activeClass = 'bg-rose-600 text-white shadow-md';
-                                if (status === 'ALL') activeClass = 'bg-slate-900 text-white shadow-md';
-
-                                return (
-                                    <Button
-                                        key={status}
-                                        onClick={() => setStatusFilter(status as any)}
-                                        className={`px-4 py-1.5 h-auto text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${statusFilter === status ? activeClass : 'text-slate-500 hover:text-slate-800 bg-transparent hover:bg-transparent'}`}
-                                    >
-                                        {status === 'ALL' ? 'All Status' : EquipmentOperationalStatus[status as number].replace(/([A-Z])/g, ' $1').trim()}
-                                    </Button>
-                                );
-                            })}
-                        </div>
-
-
-                    </div>
+            <div className="flex flex-col lg:flex-row gap-4">
+                <div className="relative flex-1 min-w-[320px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                        type="text"
+                        placeholder="Search by Unit #, VIN, or Make..."
+                        className="w-full pl-10 h-10 bg-white border-slate-200 rounded-lg text-sm font-medium focus-visible:ring-2 focus-visible:ring-blue-500 transition-all"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
                 </div>
 
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center bg-slate-100/50 p-1 rounded-lg">
+                        <Button
+                            variant={typeFilter === 'ALL' ? 'default' : 'ghost'}
+                            onClick={() => setTypeFilter('ALL')}
+                            className={`h-8 px-3 text-xs font-bold rounded-md transition-all ${typeFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                            All
+                        </Button>
+                        {categories.map(cat => {
+                            const displayName = cat.name === 'School Bus' ? 'Bus' : cat.name;
+                            return (
+                                <Button
+                                    key={cat.id}
+                                    variant={typeFilter === cat.id ? 'default' : 'ghost'}
+                                    onClick={() => setTypeFilter(cat.id)}
+                                    className={`h-8 px-3 text-xs font-bold rounded-md transition-all ${typeFilter === cat.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                >
+                                    {displayName}
+                                </Button>
+                            );
+                        })}
+                    </div>
 
-                {
-                    filteredEquipment.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {filteredEquipment.map((e) => {
-                                return (
-                                    <div
-                                        key={e.id}
-                                        className="group relative bg-white rounded-[2rem] border transition-all cursor-pointer flex flex-col overflow-hidden border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300"
-                                        onClick={() => onSelect(e)}
-                                    >
+                    <div className="flex items-center bg-slate-100/50 p-1 rounded-lg">
+                        {(['ALL', ...Object.values(EquipmentOperationalStatus).filter(v => typeof v === 'number')] as const).map(status => {
+                            let activeClass = 'bg-white text-emerald-600 shadow-sm';
+                            // Simplified active state for cleaner look, sticking to "white card" feel for active tabs
+                            if (status === EquipmentOperationalStatus.InShop) activeClass = 'bg-white text-amber-600 shadow-sm';
+                            if (status === EquipmentOperationalStatus.OutOfService) activeClass = 'bg-white text-rose-600 shadow-sm';
+                            if (status === 'ALL') activeClass = 'bg-white text-slate-900 shadow-sm';
 
-                                        <div className="p-6 pb-2 flex justify-between items-start">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`p-2.5 rounded-xl border border-slate-100 group-hover:bg-blue-50 transition-colors ${e.fleetCategoryId === 4 ? 'bg-amber-50' : 'bg-slate-50'}`}>
-                                                    {e.fleetCategoryId === 1 ? <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
-                                                        e.fleetCategoryId === 2 ? <Container className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
-                                                            e.fleetCategoryId === 4 ? <Hammer className="w-5 h-5 text-amber-500 group-hover:text-amber-600" /> :
-                                                                e.fleetCategoryId === 3 ? <Bus className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
-                                                                    <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />}
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-black text-xl text-slate-900 tracking-tight">{e.unitNumber}</h3>
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1">
-                                                        {categories.find(c => c.id === e.fleetCategoryId)?.name === 'School Bus' ? 'Bus' :
-                                                            categories.find(c => c.id === e.fleetCategoryId)?.name || 'Unknown'}
-                                                    </p>
-                                                </div>
+                            return (
+                                <Button
+                                    key={status}
+                                    onClick={() => setStatusFilter(status as any)}
+                                    className={`h-8 px-3 text-xs font-bold rounded-md transition-all ${statusFilter === status ? activeClass : 'text-slate-500 hover:text-slate-800'}`}
+                                >
+                                    {status === 'ALL' ? 'All' : EquipmentOperationalStatus[status as number].replace(/([A-Z])/g, ' $1').trim()}
+                                </Button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+
+
+            {
+                filteredEquipment.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {filteredEquipment.map((e) => {
+                            return (
+                                <div
+                                    key={e.id}
+                                    className="group relative bg-white rounded-[2rem] border transition-all cursor-pointer flex flex-col overflow-hidden border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300"
+                                    onClick={() => onSelect(e)}
+                                >
+
+                                    <div className="p-6 pb-2 flex justify-between items-start">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2.5 rounded-xl border border-slate-100 group-hover:bg-blue-50 transition-colors ${e.fleetCategoryId === 4 ? 'bg-amber-50' : 'bg-slate-50'}`}>
+                                                {e.fleetCategoryId === 1 ? <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
+                                                    e.fleetCategoryId === 2 ? <Container className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
+                                                        e.fleetCategoryId === 4 ? <Hammer className="w-5 h-5 text-amber-500 group-hover:text-amber-600" /> :
+                                                            e.fleetCategoryId === 3 ? <Bus className="w-5 h-5 text-slate-400 group-hover:text-blue-600" /> :
+                                                                <TruckIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />}
                                             </div>
-                                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase border tracking-widest flex items-center gap-1.5 ${getStatusColor(e.status)}`}>
-                                                {e.status === EquipmentOperationalStatus.OutOfService && <AlertCircle className="w-3 h-3" />}
-                                                {EquipmentOperationalStatus[e.status].replace(/([A-Z])/g, ' $1').trim()}
-                                            </span>
-                                        </div>
-
-                                        <div className="px-6 py-2 flex-1 space-y-4">
                                             <div>
-                                                <p className="text-sm font-black text-slate-800 line-clamp-1">{e.year} {e.make} {e.model}</p>
-                                                <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
-                                                    <span className="font-mono">VIN: {e.vin.slice(-8)}</span>
-                                                </div>
+                                                <h3 className="font-black text-xl text-slate-900 tracking-tight">{e.unitNumber}</h3>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1">
+                                                    {categories.find(c => c.id === e.fleetCategoryId)?.name === 'School Bus' ? 'Bus' :
+                                                        categories.find(c => c.id === e.fleetCategoryId)?.name || 'Unknown'}
+                                                </p>
                                             </div>
+                                        </div>
+                                        <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase border tracking-widest flex items-center gap-1.5 ${getStatusColor(e.status)}`}>
+                                            {e.status === EquipmentOperationalStatus.OutOfService && <AlertCircle className="w-3 h-3" />}
+                                            {EquipmentOperationalStatus[e.status].replace(/([A-Z])/g, ' $1').trim()}
+                                        </span>
+                                    </div>
 
-                                            <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 flex flex-col gap-1.5">
-                                                <div className="flex items-center justify-between text-[10px] text-slate-400 font-black uppercase tracking-widest">
-                                                    <span>Last Service</span>
-                                                    <span className="text-slate-600">{e.lastServiceDate?.split('T')[0] || 'N/A'}</span>
-                                                </div>
+                                    <div className="px-6 py-2 flex-1 space-y-4">
+                                        <div>
+                                            <p className="text-sm font-black text-slate-800 line-clamp-1">{e.year} {e.make} {e.model}</p>
+                                            <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
+                                                <span className="font-mono">VIN: {e.vin.slice(-8)}</span>
                                             </div>
                                         </div>
 
-                                        <div className="mt-auto p-3 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-2">
-                                            <Button
-                                                variant="outline"
-                                                disabled={e.status === EquipmentOperationalStatus.OutOfService || e.status === EquipmentOperationalStatus.Sold}
-                                                onClick={(evt) => {
-                                                    evt.stopPropagation();
-                                                    if (e.status !== EquipmentOperationalStatus.OutOfService && e.status !== EquipmentOperationalStatus.Sold) {
-                                                        handleOpenWOModal(e);
-                                                    }
-                                                }}
-                                                className={`flex flex-col items-center gap-1 p-2 h-auto rounded-xl transition-all group/btn border border-transparent ${e.status === EquipmentOperationalStatus.OutOfService || e.status === EquipmentOperationalStatus.Sold
-                                                    ? 'opacity-40 cursor-not-allowed text-slate-300'
-                                                    : 'hover:bg-white hover:text-amber-600 text-slate-400 hover:border-amber-100 hover:shadow-sm'
-                                                    }`}
-                                            >
-                                                {e.status === EquipmentOperationalStatus.OutOfService || e.status === EquipmentOperationalStatus.Sold ? (
-                                                    <Lock className="w-4 h-4" />
-                                                ) : (
-                                                    <ClipboardList className="w-4 h-4" />
-                                                )}
-                                                <span className="text-[9px] font-black uppercase tracking-widest">New WO</span>
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                onClick={(evt) => { evt.stopPropagation(); onSelect(e, true); }}
-                                                className="flex flex-col items-center gap-1 p-2 h-auto rounded-xl hover:bg-white hover:text-blue-600 text-slate-400 transition-all group/btn border border-transparent hover:border-blue-100 hover:shadow-sm"
-                                            >
-                                                <Sparkles className="w-4 h-4" />
-                                                <span className="text-[9px] font-black uppercase tracking-widest">AI Audit</span>
-                                            </Button>
+                                        <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 flex flex-col gap-1.5">
+                                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-black uppercase tracking-widest">
+                                                <span>Last Service</span>
+                                                <span className="text-slate-600">{e.lastServiceDate?.split('T')[0] || 'N/A'}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <div className="bg-white p-20 rounded-[3rem] border border-slate-200 shadow-sm text-center">
-                            <div className="bg-slate-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                                <Layers className="w-12 h-12 text-slate-200" />
-                            </div>
-                            <h3 className="text-xl font-black text-slate-900 mb-2">No assets found</h3>
-                            <p className="text-slate-500 font-medium">Try adjusting your filters or search query.</p>
-                        </div>
-                    )
-                }
 
-                < EquipmentFormModal
-                    isOpen={isAddModalOpen}
-                    onClose={() => setIsAddModalOpen(false)}
-                    onSave={handleAddSubmit}
-                    mode="create"
-                />
+                                    <div className="mt-auto p-3 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-2">
+                                        <Button
+                                            variant="outline"
+                                            disabled={e.status === EquipmentOperationalStatus.OutOfService || e.status === EquipmentOperationalStatus.Sold}
+                                            onClick={(evt) => {
+                                                evt.stopPropagation();
+                                                if (e.status !== EquipmentOperationalStatus.OutOfService && e.status !== EquipmentOperationalStatus.Sold) {
+                                                    handleOpenWOModal(e);
+                                                }
+                                            }}
+                                            className={`flex flex-col items-center gap-1 p-2 h-auto rounded-xl transition-all group/btn border border-transparent ${e.status === EquipmentOperationalStatus.OutOfService || e.status === EquipmentOperationalStatus.Sold
+                                                ? 'opacity-40 cursor-not-allowed text-slate-300'
+                                                : 'hover:bg-white hover:text-amber-600 text-slate-400 hover:border-amber-100 hover:shadow-sm'
+                                                }`}
+                                        >
+                                            {e.status === EquipmentOperationalStatus.OutOfService || e.status === EquipmentOperationalStatus.Sold ? (
+                                                <Lock className="w-4 h-4" />
+                                            ) : (
+                                                <ClipboardList className="w-4 h-4" />
+                                            )}
+                                            <span className="text-[9px] font-black uppercase tracking-widest">New WO</span>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            onClick={(evt) => { evt.stopPropagation(); onSelect(e, true); }}
+                                            className="flex flex-col items-center gap-1 p-2 h-auto rounded-xl hover:bg-white hover:text-blue-600 text-slate-400 transition-all group/btn border border-transparent hover:border-blue-100 hover:shadow-sm"
+                                        >
+                                            <Sparkles className="w-4 h-4" />
+                                            <span className="text-[9px] font-black uppercase tracking-widest">AI Audit</span>
+                                        </Button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="bg-white p-20 rounded-[3rem] border border-slate-200 shadow-sm text-center">
+                        <div className="bg-slate-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                            <Layers className="w-12 h-12 text-slate-200" />
+                        </div>
+                        <h3 className="text-xl font-black text-slate-900 mb-2">No assets found</h3>
+                        <p className="text-slate-500 font-medium">Try adjusting your filters or search query.</p>
+                    </div>
+                )
+            }
 
-                <WorkOrderDialog
-                    open={createWoDialogState.open}
-                    onOpenChange={(isOpen) => setCreateWoDialogState(prev => ({ ...prev, open: isOpen }))}
-                    initialCompanyName={companyName}
-                    initialVehicleId={createWoDialogState.initialVehicleId}
-                    initialVehicleType={createWoDialogState.initialVehicleType}
-                    initialUnitNumber={createWoDialogState.initialUnitNumber}
-                    onAfterCreated={() => {
-                        // refresh equipment list ? nothing needed unless status changes
-                    }}
-                />
-            </div >
+            < EquipmentFormModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onSave={handleAddSubmit}
+                mode="create"
+            />
+
+            <WorkOrderDialog
+                open={createWoDialogState.open}
+                onOpenChange={(isOpen) => setCreateWoDialogState(prev => ({ ...prev, open: isOpen }))}
+                initialCompanyName={companyName}
+                initialVehicleId={createWoDialogState.initialVehicleId}
+                initialVehicleType={createWoDialogState.initialVehicleType}
+                initialUnitNumber={createWoDialogState.initialUnitNumber}
+                onAfterCreated={() => {
+                    // refresh equipment list ? nothing needed unless status changes
+                }}
+            />
         </div>
     );
 };

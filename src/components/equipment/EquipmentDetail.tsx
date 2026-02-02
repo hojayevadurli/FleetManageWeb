@@ -573,7 +573,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             <div className="divide-y divide-slate-100 max-h-[800px] overflow-y-auto custom-scrollbar">
                                 {equipmentHistory.length > 0 ? (
                                     equipmentHistory.map(wo => (
-                                        <div key={wo.id} className="p-10 flex items-start justify-between hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/app/maintenance/service-history/${wo.id}`)}>
+                                        <div key={wo.id} className="p-10 flex items-start justify-between hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/app/service/${wo.id}`)}>
                                             <div className="space-y-3 flex-1 pr-12">
                                                 <div className="flex items-center gap-4">
                                                     <div className="text-base font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">{wo.woNumber || 'Draft'}</div>

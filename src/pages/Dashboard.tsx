@@ -84,8 +84,8 @@ const Dashboard = () => {
   }, [fetchData]);
 
   const handleTabChange = (tab: string, status?: string, recordId?: string) => {
-    if (recordId && tab.includes('service-history')) {
-      navigate(`/app/maintenance/service-history/${recordId}`);
+    if (recordId && (tab.includes('service') || tab.includes('service-history'))) {
+      navigate(`/app/service/${recordId}`);
       return;
     }
     const params = new URLSearchParams();
