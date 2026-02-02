@@ -112,7 +112,7 @@ const ServiceRecordDetailPage = () => {
                 return {
                     url: doc.fileUrl,
                     type,
-                    name: doc.fileName || doc.role?.toString() || 'Attachment',
+                    name: (doc as any).fileName || doc.role?.toString() || 'Attachment',
                     role: doc.role
                 };
             }).sort((a, b) => {
@@ -573,7 +573,7 @@ const ServiceRecordDetailPage = () => {
                     onOpenChange={setIsEditDialogOpen}
                     onAfterCreated={fetchDetail}
                 />
-                />
+
             )}
 
             {/* Fullscreen Preview Modal */}
