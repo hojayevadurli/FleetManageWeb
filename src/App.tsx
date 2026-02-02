@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Link, useNavigate } from "react-router-dom";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { ShieldCheck, Bell, User as UserIcon } from "lucide-react";
 import { AuthProvider, useAuth } from "./components/auth/AuthContext";
@@ -12,6 +12,15 @@ import { AppSidebar } from "./components/AppSidebar";
 import { tenantsApi } from "@/lib/tenantsApi";
 import { useState, useEffect } from "react";
 import { differenceInDays, parseISO } from "date-fns";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LogOut, Settings, CreditCard, Users } from "lucide-react"; // Additional icons
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
@@ -90,8 +99,9 @@ const RootRoute = () => {
 };
 
 const DashboardHeader = () => {
-  const { user: authUser } = useAuth();
+  const { user: authUser, signOut } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [trialDays, setTrialDays] = useState<number | null>(null);
 
   useEffect(() => {
@@ -156,28 +166,80 @@ const DashboardHeader = () => {
 
         <div className="h-8 w-px bg-slate-200" />
 
-        <div className="flex items-center gap-4 group cursor-pointer">
-          <div className="text-right hidden sm:block">
-            <div className="text-sm font-black text-slate-900 group-hover:text-blue-600 transition-colors">
-              {user?.fullName || user?.FullName ||
-                user?.displayName || user?.DisplayName ||
-                (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : null) ||
-                (user?.FirstName && user?.LastName ? `${user.FirstName} ${user.LastName}` : null) ||
-                user?.name || user?.Name ||
-                user?.email || 'User'}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <div className="flex items-center gap-4 group cursor-pointer outline-none">
+              <div className="text-right hidden sm:block">
+                <div className="text-sm font-black text-slate-900 group-hover:text-blue-600 transition-colors">
+                  {user?.fullName || user?.FullName ||
+                    user?.displayName || user?.DisplayName ||
+                    (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : null) ||
+                    (user?.FirstName && user?.LastName ? `${user.FirstName} ${user.LastName}` : null) ||
+                    user?.name || user?.Name ||
+                    user?.email || 'User'}
+                </div>
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                  {user?.tenant?.name || user?.Tenant?.Name ||
+                    user?.tenantName || user?.TenantName ||
+                    user?.companyName || user?.CompanyName ||
+                    user?.company || user?.Company ||
+                    'Operations'}
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center border-2 border-white shadow-lg overflow-hidden group-hover:ring-2 group-hover:ring-blue-500 transition-all">
+                {user?.photoUrl ? (
+                  <img src={user.photoUrl} alt="User" className="w-full h-full object-cover" />
+                ) : (
+                  <UserIcon className="w-5 h-5 text-white" />
+                )}
+              </div>
             </div>
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-              {user?.tenant?.name || user?.Tenant?.Name ||
-                user?.tenantName || user?.TenantName ||
-                user?.companyName || user?.CompanyName ||
-                user?.company || user?.Company ||
-                'Operations'}
-            </div>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center border-2 border-white shadow-lg overflow-hidden group-hover:ring-2 group-hover:ring-blue-500 transition-all">
-            <UserIcon className="w-5 h-5 text-white" />
-          </div>
-        </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2 border-slate-100 shadow-xl bg-white/95 backdrop-blur-sm">
+            <DropdownMenuLabel className="font-normal px-2 py-1.5">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-bold text-slate-900 leading-none">{user?.fullName || 'User'}</p>
+                <p className="text-xs leading-none text-slate-500 truncate">{user?.email}</p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-slate-100 my-1" />
+            <DropdownMenuItem asChild>
+              <Link to="/app/settings/account" className="flex items-center gap-2 cursor-pointer rounded-xl px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors">
+                <UserIcon className="w-4 h-4 ml-1" />
+                Account
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/app/settings/billing" className="flex items-center gap-2 cursor-pointer rounded-xl px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors">
+                <CreditCard className="w-4 h-4 ml-1" />
+                Billing
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/app/settings/preferences" className="flex items-center gap-2 cursor-pointer rounded-xl px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors">
+                <Settings className="w-4 h-4 ml-1" />
+                Preferences
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/app/settings/team" className="flex items-center gap-2 cursor-pointer rounded-xl px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors">
+                <Users className="w-4 h-4 ml-1" />
+                Team
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-slate-100 my-1" />
+            <DropdownMenuItem
+              onClick={() => {
+                signOut();
+                navigate("/login");
+              }}
+              className="text-rose-600 focus:text-rose-600 cursor-pointer flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-bold hover:bg-rose-50 transition-colors"
+            >
+              <LogOut className="w-4 h-4 ml-1" />
+              Sign Out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
