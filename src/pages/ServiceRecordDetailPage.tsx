@@ -40,7 +40,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 import { InfoItem, ServiceItemsList, EmptyState } from "@/components/workorder/detail/WorkOrderDetailComponents";
 import CreateWorkOrderDialog from '@/components/workorder/CreateWorkOrderDialog';
-import EditWorkOrderDialog from '@/components/workorder/EditWorkOrderDialog';
+
 
 const ServiceRecordDetailPage = () => {
     const { id } = useParams<{ id: string }>();
@@ -128,6 +128,13 @@ const ServiceRecordDetailPage = () => {
                 return 0;
             });
 
+            // Find best service date from attachments (receipt/invoice date)
+            const receiptDoc = attachments.find(d =>
+                (d.role === DocumentRole.Invoice || d.role === DocumentRole.Receipt ||
+                    (d.docKind && ['invoice', 'receipt'].includes(d.docKind.toLowerCase()))) &&
+                d.startDate
+            );
+
             // Map WorkOrderDto to WorkOrder
             const mapped: WorkOrder = {
                 id: wo.id,
@@ -137,7 +144,7 @@ const ServiceRecordDetailPage = () => {
                 vendor: fetchedVendorName, // Use the reliably fetched name
                 status: (wo.status as any),
                 priority: (wo.priority as any),
-                date: wo.closedAt || wo.openedAt || new Date().toISOString(),
+                date: receiptDoc?.startDate || wo.openedAt || wo.closedAt || new Date().toISOString(),
                 technician: "",
                 title: wo.title,
                 complaint: wo.complaint,
@@ -162,7 +169,10 @@ const ServiceRecordDetailPage = () => {
                 odometer: wo.odometerAtService || 0,
                 hours: 0,
                 attachmentUrl: mappedAttachments.length > 0 ? mappedAttachments[0].url : ((wo as any).previewUrl || (wo as any).attachmentUrl),
-                attachmentFileName: mappedAttachments.length > 0 ? mappedAttachments[0].name : (wo as any).fileName
+                attachmentFileName: mappedAttachments.length > 0 ? mappedAttachments[0].name : (wo as any).fileName,
+                createdAt: wo.createdAt,
+                updatedAt: wo.updatedAt,
+                openedAt: wo.openedAt
             };
 
             setRecord(mapped);
@@ -226,7 +236,7 @@ const ServiceRecordDetailPage = () => {
         try {
             await workOrdersApi.delete(id!);
             toast({ title: "Deleted", description: "Work Order deleted successfully." });
-            navigate('/app/maintenance'); // Back to list
+            navigate('/app/service'); // Back to list
         } catch (e) {
             toast({ title: "Error", description: "Failed to delete work order.", variant: "destructive" });
         }
@@ -336,6 +346,10 @@ const ServiceRecordDetailPage = () => {
 
                                 <InfoItem icon={<Calendar className="w-4 h-4" />} label="Service Date">
                                     {new Date(record.date).toLocaleDateString()}
+                                </InfoItem>
+
+                                <InfoItem icon={<Clock className="w-4 h-4" />} label="Created On">
+                                    {record.createdAt ? new Date(record.createdAt).toLocaleDateString() + ' ' + new Date(record.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-slate-400">Unknown</span>}
                                 </InfoItem>
 
                                 <InfoItem icon={<MapPin className="w-4 h-4" />} label="Odometer">
@@ -552,13 +566,16 @@ const ServiceRecordDetailPage = () => {
                 </div>
             </div>
 
-            {/* Edit Dialog */}
+            {/* Edit Dialog (Unified) */}
             {rawDto && (
-                <EditWorkOrderDialog
-                    workOrder={rawDto}
+                <CreateWorkOrderDialog
+                    existingWorkOrder={rawDto}
                     open={isEditDialogOpen}
                     onOpenChange={setIsEditDialogOpen}
-                    onWorkOrderUpdated={fetchDetail}
+                    onAfterCreated={async () => {
+                        await fetchDetail();
+                    }}
+                    initialCompanyName="My Fleet" // Default/Placeholder as it might not be critical for edits
                 />
             )}
 

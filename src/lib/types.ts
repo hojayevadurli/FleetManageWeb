@@ -317,6 +317,9 @@ export interface WorkOrder {
   odometer?: number;
   hours?: number;
   payer?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  openedAt?: string;
 }
 
 export interface ServiceHistoryLine {
@@ -423,6 +426,8 @@ export interface WorkOrderDto {
   documents: WorkOrderDocumentDto[];
   vendorName?: string;
   vendorAddress?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ChatMessage {

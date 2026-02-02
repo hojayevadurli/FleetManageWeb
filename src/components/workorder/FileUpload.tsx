@@ -26,6 +26,9 @@ type FileUploadProps =
 
     onUploaded?: (workOrderId: string) => void;
     onUploadingChange?: (uploading: boolean) => void;
+    uploadDisabled?: boolean;
+    uploadDisabledReason?: string;
+    uploadedFiles?: Array<{ name: string; url: string }>;
   }
   | {
     files: File[];
@@ -37,6 +40,9 @@ type FileUploadProps =
 
     onUploaded?: (workOrderId: string) => void;
     onUploadingChange?: (uploading: boolean) => void;
+    uploadDisabled?: boolean;
+    uploadDisabledReason?: string;
+    uploadedFiles?: Array<{ name: string; url: string }>;
   };
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -193,9 +199,18 @@ export default function FileUpload(props: FileUploadProps) {
           <div className="flex justify-between items-center mb-2">
             <Label className="text-sm">Selected ({files.length})</Label>
 
-            <Button size="sm" onClick={uploadFiles} disabled={uploading}>
-              {uploading ? "Uploading…" : "Upload Files"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {props.uploadDisabled && props.uploadDisabledReason && (
+                <span className="text-xs text-rose-500 font-medium">{props.uploadDisabledReason}</span>
+              )}
+              <Button
+                size="sm"
+                onClick={uploadFiles}
+                disabled={uploading || props.uploadDisabled}
+              >
+                {uploading ? "Uploading…" : "Upload Files"}
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -222,6 +237,24 @@ export default function FileUpload(props: FileUploadProps) {
                 >
                   <X className="h-3 w-3" />
                 </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {props.uploadedFiles && props.uploadedFiles.length > 0 && (
+        <div className="mt-4 border-t pt-4">
+          <Label className="text-sm text-emerald-600 font-bold mb-2 block">Saved Attachments ({props.uploadedFiles.length})</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {props.uploadedFiles.map((f, i) => (
+              <div key={i} className="bg-emerald-50 border border-emerald-100 rounded p-2 flex items-center gap-2">
+                <span className="text-emerald-500">
+                  {f.name.endsWith('.pdf') ? <FileText className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
+                </span>
+                <a href={f.url} target="_blank" rel="noreferrer" className="truncate flex-1 text-sm text-emerald-700 hover:underline">
+                  {f.name}
+                </a>
               </div>
             ))}
           </div>

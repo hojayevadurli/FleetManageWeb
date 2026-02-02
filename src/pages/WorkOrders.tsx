@@ -247,11 +247,12 @@ const WorkOrders = () => {
         onAfterCreated={loadData}
       />
 
-      <EditWorkOrderDialog
-        workOrder={selectedWorkOrder}
+      <CreateWorkOrderDialog
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
-        onWorkOrderUpdated={loadData}
+        initialCompanyName={companyName || "Fleet Company"}
+        onAfterCreated={loadData}
+        existingWorkOrder={selectedWorkOrder}
       />
 
       <ServiceMetrics workOrders={workOrders} />

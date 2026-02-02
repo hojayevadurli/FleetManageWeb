@@ -44,6 +44,7 @@ import FileUpload from "./FileUpload";
 
 
 import { workOrdersApi, WorkOrderUpsertDto } from "@/lib/workOrdersApi";
+import { WorkOrderDto } from "@/lib/types";
 
 type Priority = "low" | "normal" | "high" | "critical";
 type VehicleType = string;
@@ -57,7 +58,14 @@ type NewWorkOrderState = {
   company_name: string;
   description: string;
   vendor_id: string | null;
+  vendor_id: string | null;
   vendor_name: string;
+  vendor_name: string;
+  service_date: string;
+  vendor_name: string;
+  service_date: string;
+  odometer: string;
+  created_at: string;
 };
 
 interface CreateWorkOrderDialogProps {
@@ -68,6 +76,7 @@ interface CreateWorkOrderDialogProps {
   initialVehicleType?: string;
   initialUnitNumber?: string;
   onAfterCreated?: () => Promise<void> | void;
+  existingWorkOrder?: WorkOrderDto | null;
 }
 
 export default function CreateWorkOrderDialog({
@@ -77,10 +86,12 @@ export default function CreateWorkOrderDialog({
   initialVehicleId,
   initialVehicleType,
   initialUnitNumber,
-  onAfterCreated
+  onAfterCreated,
+  existingWorkOrder
 }: CreateWorkOrderDialogProps) {
   const [workOrderItems, setWorkOrderItems] = useState<WorkOrderItemData[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadedFileList, setUploadedFileList] = useState<Array<{ name: string, url: string }>>([]); // Track uploaded files
   const [isParsingReceipt, setIsParsingReceipt] = useState(false);
   const receiptInputRef = useRef<HTMLInputElement>(null);
   const [draftWorkOrderId, setDraftWorkOrderId] = useState<string | null>(null);
@@ -120,8 +131,16 @@ export default function CreateWorkOrderDialog({
     company_name: initialCompanyName,
     description: "",
     vendor_id: null,
-    vendor_name: ""
+    vendor_id: null,
+    vendor_name: "",
+    vendor_name: "",
+    vendor_name: "",
+    service_date: new Date().toISOString().split('T')[0], // Default to today YYYY-MM-DD
+    odometer: "",
+    created_at: new Date().toISOString().split('T')[0]
   });
+
+  const [activePreviewDoc, setActivePreviewDoc] = useState<{ url: string, type: 'image' | 'pdf' } | null>(null);
 
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorOpen, setVendorOpen] = useState(false);
@@ -176,25 +195,101 @@ export default function CreateWorkOrderDialog({
   // Effect to reset/init form when props change or modal opens
   useEffect(() => {
     if (open) {
-      setNewWorkOrder(prev => ({
-        ...prev,
-        vehicle_id: initialVehicleId || "",
-        vehicle_type: initialVehicleType || "truck",
-        company_name: initialCompanyName
-      }));
-      setWorkOrderType("upcoming");
-      setRatingData({
-        mainRating: 0,
-        qualityRating: 0,
-        timelinessRating: 0,
-        communicationRating: 0,
-        valueRating: 0,
-        wouldRecommend: null,
-        comment: ""
-      });
-      setStatus(WorkOrderStatus.Draft);
+      if (existingWorkOrder) {
+        // EDIT MODE INITIALIZATION
+        setNewWorkOrder(prev => ({
+          ...prev,
+          vehicle_id: existingWorkOrder.equipmentId,
+          vehicle_type: "truck", // Default, or infer?
+          company_name: initialCompanyName, // Or keep?
+          service_date: existingWorkOrder.openedAt ? new Date(existingWorkOrder.openedAt).toISOString().split('T')[0] : "",
+          odometer: existingWorkOrder.odometerAtService?.toString() || "",
+          created_at: existingWorkOrder.createdAt ? new Date(existingWorkOrder.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          description: existingWorkOrder.title === "New Work Order" ? (existingWorkOrder.complaint || "") : (existingWorkOrder.title + "\n" + existingWorkOrder.complaint), // Combine back?
+          priority: (existingWorkOrder.priority === "Normal" || existingWorkOrder.priority === 1) ? "normal" : "high", // simplified mapping, can be better
+          vendor_id: existingWorkOrder.vendorId || null,
+          vendor_name: existingWorkOrder.vendorName || ""
+        }));
+
+        // Map string status to enum
+        let statusEnum = WorkOrderStatus.Open;
+        if (existingWorkOrder.status) {
+          const s = existingWorkOrder.status.toString().toLowerCase();
+          if (s === 'draft') statusEnum = WorkOrderStatus.Draft;
+          else if (s === 'open') statusEnum = WorkOrderStatus.Open;
+          else if (s === 'inprocess' || s === 'in process') statusEnum = WorkOrderStatus.InProcess;
+          else if (s === 'completed') statusEnum = WorkOrderStatus.Completed;
+          else if (s === 'closed') statusEnum = WorkOrderStatus.Closed;
+          else if (s === 'cancelled' || s === 'canceled') statusEnum = WorkOrderStatus.Cancelled;
+          else if (s === 'paid') statusEnum = WorkOrderStatus.Paid;
+          // Fallback or keep as open
+        }
+
+        setWorkOrderType((statusEnum === WorkOrderStatus.Completed || statusEnum === WorkOrderStatus.Closed) ? 'completed' : 'upcoming');
+        setStatus(statusEnum);
+
+        const itemsFromLines = (existingWorkOrder.lines ?? []).map((l) => ({
+          description: l.description,
+          price: l.unitPrice,
+          quantity: l.qty
+        }));
+        setWorkOrderItems(itemsFromLines);
+
+        // Map existing docs to uploadedFileList for display
+        const existingDocs = (existingWorkOrder.documents || []).map(d => ({
+          name: d.fileUrl.split('/').pop() || "Attachment",
+          url: d.fileUrl
+        }));
+        setUploadedFileList(existingDocs);
+
+        // Auto-select first doc for preview if available
+        if (existingDocs.length > 0) {
+          const first = existingDocs[0];
+          setActivePreviewDoc({
+            url: first.url,
+            type: first.url.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image'
+          });
+        }
+
+        setDraftWorkOrderId(existingWorkOrder.id); // It's not a draft, but we use this ID for uploads
+        setCustomWorkOrderNumber(existingWorkOrder.workOrderNumber || null);
+
+      } else {
+        // CREATE MODE INITIALIZATION
+        setNewWorkOrder(prev => ({
+          ...prev,
+          vehicle_id: initialVehicleId || "",
+          vehicle_type: initialVehicleType || "truck",
+          vehicle_type: initialVehicleType || "truck",
+          company_name: initialCompanyName,
+          company_name: initialCompanyName,
+          company_name: initialCompanyName,
+          service_date: new Date().toISOString().split('T')[0],
+          odometer: "",
+          created_at: new Date().toISOString().split('T')[0],
+          description: "",
+          vendor_id: null,
+          vendor_name: ""
+        }));
+        setWorkOrderType("upcoming");
+        setRatingData({
+          mainRating: 0,
+          qualityRating: 0,
+          timelinessRating: 0,
+          communicationRating: 0,
+          valueRating: 0,
+          wouldRecommend: null,
+          comment: ""
+        });
+        setStatus(WorkOrderStatus.Draft);
+        setWorkOrderItems([]);
+        setSelectedFiles([]);
+        setUploadedFileList([]);
+        setDraftWorkOrderId(null);
+        setCustomWorkOrderNumber(null);
+      }
     }
-  }, [open, initialVehicleId, initialVehicleType, initialUnitNumber, initialCompanyName]);
+  }, [open, initialVehicleId, initialVehicleType, initialUnitNumber, initialCompanyName, existingWorkOrder]);
 
   // Smart default for status based on type
   useEffect(() => {
@@ -311,7 +406,12 @@ export default function CreateWorkOrderDialog({
       company_name: initialCompanyName,
       description: "",
       vendor_id: null,
-      vendor_name: ""
+      vendor_id: null,
+      vendor_name: "",
+      vendor_name: "",
+      service_date: new Date().toISOString().split('T')[0],
+      odometer: "",
+      created_at: new Date().toISOString().split('T')[0]
     });
     setWorkOrderType("upcoming");
     setRatingData({
@@ -325,6 +425,7 @@ export default function CreateWorkOrderDialog({
     });
     setWorkOrderItems([]);
     setSelectedFiles([]);
+    setUploadedFileList([]);
     setDraftWorkOrderId(null);
     setIsUploading(false);
     setShowOptionalFields({ eta: false, attachments: false });
@@ -348,19 +449,19 @@ export default function CreateWorkOrderDialog({
     const priorityNote = newWorkOrder.priority ? `Priority: ${newWorkOrder.priority}` : "";
     const extraNotes = [priorityNote, etaNote].filter(Boolean).join(" | ");
 
-    const mergedDescription =
-      extraNotes && newWorkOrder.description
-        ? `${extraNotes}\n\n${newWorkOrder.description}`
-        : extraNotes
-          ? extraNotes
-          : newWorkOrder.description;
+    const mergedDescription = newWorkOrder.description;
+    // extraNotes && newWorkOrder.description
+    //   ? `${extraNotes}\n\n${newWorkOrder.description}`
+    //   : extraNotes
+    //     ? extraNotes
+    //     : newWorkOrder.description;
 
     try {
       setIsSubmitting(true);
 
       // ✅ If user uploaded files first, draft already exists.
-      // ✅ If not, we still create draft now then update it to "open".
-      const id = await ensureDraftExists();
+      // If editing, use existing ID. If creating, ensure draft.
+      const id = existingWorkOrder ? existingWorkOrder.id : await ensureDraftExists();
 
       // 🚨 Auto-upload any pending files that weren't manually uploaded via the UI component
       if (selectedFiles.length > 0) {
@@ -388,8 +489,9 @@ export default function CreateWorkOrderDialog({
         equipmentId: newWorkOrder.vehicle_id,
         vendorId: newWorkOrder.vendor_id,
         workOrderNumber: customWorkOrderNumber,
-        odometerAtService: null,
-        openedAt: new Date().toISOString(),
+        odometerAtService: (newWorkOrder.odometer && !isNaN(parseInt(newWorkOrder.odometer))) ? parseInt(newWorkOrder.odometer) : null,
+        openedAt: newWorkOrder.service_date ? new Date(newWorkOrder.service_date).toISOString() : new Date().toISOString(),
+        createdAt: newWorkOrder.created_at ? new Date(newWorkOrder.created_at).toISOString() : new Date().toISOString(),
         closedAt: workOrderType === "completed" ? new Date().toISOString() : null,
         title: mergedDescription?.trim() ? mergedDescription.split("\n")[0].slice(0, 100) : "New Work Order",
         complaint: mergedDescription?.trim() || "Manual Entry",
@@ -400,11 +502,24 @@ export default function CreateWorkOrderDialog({
         costSource: WorkOrderCostSource.Estimated,
         estimatedTotal: computedLines.reduce((acc, l) => acc + l.amount, 0),
         manualActualTotal: workOrderType === "completed" ? computedLines.reduce((acc, l) => acc + l.amount, 0) : 0,
-        lines: computedLines,
+        lines: computedLines.map(l => ({
+          type: l.type,
+          description: l.description,
+          qty: l.qty,
+          unitPrice: l.unitPrice,
+          partNumber: l.partNumber
+        })),
         documentIds: []
       };
 
+      console.log("Submitting payload:", JSON.stringify(dto, null, 2));
       await workOrdersApi.update(id, dto);
+
+      if (existingWorkOrder) {
+        toast.success("Work Order Updated");
+      } else {
+        toast.success("Work order created.");
+      }
 
       // Handle Rating Submission
       if (workOrderType === "completed" && newWorkOrder.vendor_id && ratingData.mainRating > 0) {
@@ -427,14 +542,20 @@ export default function CreateWorkOrderDialog({
         }
       }
 
-      toast.success("Work order created.");
       await onAfterCreated?.();
       resetForm();
       onOpenChange(false);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
-      console.error(e);
-      toast.error(e?.message ?? "Failed to create work order.");
+      console.error("Create/Update Failed:", e);
+      if (e.response && e.response.data) {
+        console.error("Server Error Details:", e.response.data);
+        const serverMsg = typeof e.response.data === 'string' ? e.response.data :
+          (e.response.data.title || e.response.data.message || JSON.stringify(e.response.data));
+        toast.error(`Failed: ${serverMsg}`);
+      } else {
+        toast.error(e?.message ?? "Failed to create work order.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -522,6 +643,18 @@ export default function CreateWorkOrderDialog({
           toast.success(`AI Scan: List populated with ${newItems.length} items from receipt.`);
         }
 
+        // Auto-fill Service Date if found
+        if (result.date) {
+          setNewWorkOrder(prev => ({ ...prev, service_date: result.date })); // Ensure format matches input type="date"
+          toast.info(`Service Date updated to ${result.date}`);
+        }
+
+        // Auto-fill Odometer if found (Less common on receipts, but possbile)
+        if (result.odometer) {
+          setNewWorkOrder(prev => ({ ...prev, odometer: result.odometer.toString() }));
+          toast.info(`Odometer detected: ${result.odometer}`);
+        }
+
         // Auto-fill Vendor Name & Shop Matching Logic
         if (result.businessName) {
           const match = vendors.find(v => {
@@ -584,6 +717,7 @@ export default function CreateWorkOrderDialog({
       // Set preview
       setPreviewUrl(dataUrl);
       setPreviewType(file.type.includes('pdf') ? 'pdf' : 'image');
+      setActivePreviewDoc({ url: dataUrl, type: file.type.includes('pdf') ? 'pdf' : 'image' });
 
       if (file.type.includes('image') || file.type.includes('pdf')) {
         await processAIParsing(file, base64);
@@ -604,17 +738,17 @@ export default function CreateWorkOrderDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-7xl w-full h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem]">
         <DialogHeader className="px-10 py-8 border-b border-slate-100 bg-white sticky top-0 z-10">
-          <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight">Create New Work Order</DialogTitle>
-          <DialogDescription className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Create a new maintenance work order for your fleet</DialogDescription>
+          <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight">{existingWorkOrder ? "Edit Work Order" : "Create New Work Order"}</DialogTitle>
+          <DialogDescription className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{existingWorkOrder ? "Update work order details" : "Create a new maintenance work order for your fleet"}</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 flex overflow-hidden">
           {/* LEFT: Form */}
-          <div className={`flex-1 overflow-y-auto p-10 space-y-6 ${previewUrl ? 'md:w-1/2 border-r border-slate-100' : 'max-w-4xl mx-auto w-full'}`}>
+          <div className={`flex-1 overflow-y-auto p-10 space-y-6 ${activePreviewDoc ? 'md:w-1/2 border-r border-slate-100' : 'max-w-4xl mx-auto w-full'}`}>
             <div className="space-y-6">
 
               {/* 1. QUICK ACTIONS (Upload or Success) */}
-              {previewUrl ? (
+              {(isParsingReceipt || (activePreviewDoc && isParsingReceipt)) ? ( // Show loading state strongly if parsing
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 relative overflow-hidden animate-in fade-in slide-in-from-top-2">
                   <div className="flex items-start justify-between relative z-10">
                     <div className="flex gap-4">
@@ -746,27 +880,57 @@ export default function CreateWorkOrderDialog({
                     </div>
                     <div>
                       <Label className="text-xs font-bold text-slate-500 mb-1 block">Service Date</Label>
-                      <Input value={new Date().toLocaleDateString()} disabled className="h-9 bg-slate-50 font-medium text-slate-500" />
+                      <Input
+                        type="date"
+                        value={newWorkOrder.service_date}
+                        onChange={(e) => setNewWorkOrder(prev => ({ ...prev, service_date: e.target.value }))}
+                        className="h-9 font-medium text-slate-900"
+                      />
                     </div>
                   </div>
 
-                  <VehicleSelector
-                    selectedVehicleId={newWorkOrder.vehicle_id}
-                    selectedVehicleType={newWorkOrder.vehicle_type}
-                    onVehicleSelect={(vehicleId: string, vehicleType: string, unitNumber: string) => {
-                      setNewWorkOrder((p) => ({
-                        ...p,
-                        vehicle_id: vehicleId,
-                        vehicle_type: vehicleType
-                      }));
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs font-bold text-slate-500 mb-1 block">Created On</Label>
+                      <Input
+                        type="date"
+                        value={newWorkOrder.created_at}
+                        onChange={(e) => setNewWorkOrder(prev => ({ ...prev, created_at: e.target.value }))}
+                        className="h-9 font-medium text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="odometer" className="text-xs font-bold text-slate-500 mb-1 block">Odometer (Optional)</Label>
+                      <Input
+                        id="odometer"
+                        type="number"
+                        placeholder="e.g. 154000"
+                        value={newWorkOrder.odometer}
+                        onChange={(e) => setNewWorkOrder(prev => ({ ...prev, odometer: e.target.value }))}
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
 
-                      setDraftWorkOrderId(null);
-                      // Don't clear selected files here, keeps specific receipt for new vehicle
-                      setIsUploading(false);
+                  <div>
+                    <VehicleSelector
+                      selectedVehicleId={newWorkOrder.vehicle_id}
+                      selectedVehicleType={newWorkOrder.vehicle_type}
+                      onVehicleSelect={(vehicleId: string, vehicleType: string, unitNumber: string) => {
+                        setNewWorkOrder((p) => ({
+                          ...p,
+                          vehicle_id: vehicleId,
+                          vehicle_type: vehicleType
+                        }));
 
-                      generateNextWorkOrderNumber(vehicleId, unitNumber);
-                    }}
-                  />
+                        setDraftWorkOrderId(null);
+                        // Don't clear selected files here, keeps specific receipt for new vehicle
+                        setIsUploading(false);
+
+                        generateNextWorkOrderNumber(vehicleId, unitNumber);
+                      }}
+                    />
+                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -1009,7 +1173,7 @@ export default function CreateWorkOrderDialog({
                         className="h-8 text-xs font-bold text-slate-500"
                         onClick={() => setShowOptionalFields((prev) => ({ ...prev, attachments: !prev.attachments }))}
                       >
-                        {showOptionalFields.attachments ? "Hide" : "Manage"} Attachments ({selectedFiles.length})
+                        {showOptionalFields.attachments ? "Hide" : "Manage"} Attachments ({selectedFiles.length + uploadedFileList.length})
                       </Button>
                     </div>
 
@@ -1020,7 +1184,36 @@ export default function CreateWorkOrderDialog({
                           onFilesChange={setSelectedFiles}
                           ensureWorkOrderId={ensureDraftExists}
                           onUploadingChange={setIsUploading}
-                          onUploaded={(id) => setDraftWorkOrderId(id)}
+                          onUploaded={(id) => {
+                            setDraftWorkOrderId(id);
+                            // Optimistically add files to the list
+                            const newFiles = selectedFiles.map(f => ({
+                              name: f.name,
+                              url: URL.createObjectURL(f) // Temp URL for immediate feedback
+                            }));
+                            const updatedList = [...uploadedFileList, ...newFiles];
+                            setUploadedFileList(updatedList);
+
+                            // Immediately preview the first new file
+                            if (newFiles.length > 0) {
+                              setActivePreviewDoc({
+                                url: newFiles[0].url,
+                                type: newFiles[0].name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image'
+                              });
+                            }
+
+                            setSelectedFiles([]); // Clear pending
+                          }}
+                          uploadDisabled={!newWorkOrder.vehicle_id}
+                          uploadDisabledReason="Select a vehicle to upload"
+                          uploadedFiles={uploadedFileList}
+                          onUploadSuccess={(file, url) => {
+                            // Switch preview to the newly uploaded file
+                            setActivePreviewDoc({
+                              url: url, // Note: FileUpload needs to return a usable URL (blob or remote)
+                              type: file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image'
+                            });
+                          }}
                         />
                       </div>
                     )}
@@ -1074,13 +1267,13 @@ export default function CreateWorkOrderDialog({
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {workOrderType === 'completed' ? 'Logging...' : 'Creating...'}
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {existingWorkOrder ? 'Updating...' : (workOrderType === 'completed' ? 'Logging...' : 'Creating...')}
                     </>
                   ) : (
                     workOrderType === 'completed' && ratingData.mainRating > 0 ? (
-                      <span className="flex items-center">Log Work & Submit Review <Check className="ml-2 w-4 h-4" /></span>
+                      <span className="flex items-center">{existingWorkOrder ? "Update & Submit Review" : "Log Work & Submit Review"} <Check className="ml-2 w-4 h-4" /></span>
                     ) : (
-                      "Create Work Order"
+                      existingWorkOrder ? "Save Changes" : "Create Work Order"
                     )
                   )}
                 </Button>
@@ -1089,14 +1282,33 @@ export default function CreateWorkOrderDialog({
           </div>
 
           {/* RIGHT: Preview */}
-          {previewUrl && (
+          {activePreviewDoc && (
             <div className="hidden md:flex w-1/2 bg-slate-100/50 border-l border-slate-200 flex-col items-center justify-center p-6 relative">
               <div className="absolute top-4 right-4 z-10 flex gap-2">
-                <a href={previewUrl} target="_blank" rel="noreferrer" className="bg-white/80 backdrop-blur p-2 rounded-lg shadow-sm text-slate-500 hover:text-blue-600 border border-slate-200 transition-all" title="Open in new tab">
+                <div className="bg-slate-900/80 backdrop-blur rounded-lg shadow-sm border border-slate-700/50 flex items-center p-1">
+                  {/* Pagination / Selection if multiple */}
+                  <span className="text-xs font-bold text-white px-3">{uploadedFileList.findIndex(f => f.url === activePreviewDoc.url) + 1} / {uploadedFileList.length || 1}</span>
+                  {uploadedFileList.length > 1 && (
+                    <div className="flex border-l border-white/10 ml-1 pl-1">
+                      <button onClick={() => {
+                        const idx = uploadedFileList.findIndex(f => f.url === activePreviewDoc.url);
+                        const prev = uploadedFileList[idx - 1];
+                        if (prev) setActivePreviewDoc({ url: prev.url, type: prev.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image' });
+                      }} className="p-1 hover:bg-white/10 rounded"><ChevronDown className="w-3 h-3 rotate-90 text-white" /></button>
+                      <button onClick={() => {
+                        const idx = uploadedFileList.findIndex(f => f.url === activePreviewDoc.url);
+                        const next = uploadedFileList[idx + 1];
+                        if (next) setActivePreviewDoc({ url: next.url, type: next.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image' });
+                      }} className="p-1 hover:bg-white/10 rounded"><ChevronDown className="w-3 h-3 -rotate-90 text-white" /></button>
+                    </div>
+                  )}
+                </div>
+
+                <a href={activePreviewDoc.url} target="_blank" rel="noreferrer" className="bg-white/80 backdrop-blur p-2 rounded-lg shadow-sm text-slate-500 hover:text-blue-600 border border-slate-200 transition-all" title="Open in new tab">
                   <Upload className="w-4 h-4" />
                 </a>
                 <button
-                  onClick={() => setPreviewUrl(null)}
+                  onClick={() => setActivePreviewDoc(null)}
                   className="bg-white/80 backdrop-blur p-2 rounded-lg shadow-sm text-slate-500 hover:text-rose-500 border border-slate-200 transition-all"
                   title="Close Preview"
                 >
@@ -1104,27 +1316,44 @@ export default function CreateWorkOrderDialog({
                 </button>
               </div>
 
-              <div className="w-full h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative group">
-                {previewType === 'image' ? (
+              <div className="w-full h-full bg-slate-800 rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative group flex items-center justify-center">
+                {activePreviewDoc.type === 'image' ? (
                   <img
-                    src={previewUrl}
+                    src={activePreviewDoc.url}
                     alt="Receipt Preview"
                     className="w-full h-full object-contain"
                   />
                 ) : (
                   <iframe
-                    src={previewUrl}
-                    className="w-full h-full border-0"
+                    src={activePreviewDoc.url}
+                    className="w-full h-full border-0 bg-white"
                     title="PDF Preview"
                   />
                 )}
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                  <p className="text-white text-xs font-medium truncate">Previewing Uploaded Document</p>
-                </div>
+
+                {/* Overlay for quick actions can go here */}
               </div>
-              <p className="mt-3 text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> AI Analysis Active
-              </p>
+
+              <div className="mt-3 flex items-center justify-between w-full px-1">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> AI Analysis Active
+                </p>
+
+                {/* Thumbnails of other files */}
+                {uploadedFileList.length > 1 && (
+                  <div className="flex gap-1 overflow-x-auto max-w-[200px]">
+                    {uploadedFileList.map((f, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setActivePreviewDoc({ url: f.url, type: f.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image' })}
+                        className={`w-8 h-8 rounded border overflow-hidden flex-shrink-0 ${f.url === activePreviewDoc.url ? 'border-blue-500 ring-1 ring-blue-500' : 'border-slate-200 opacity-60 hover:opacity-100'}`}
+                      >
+                        {f.name.toLowerCase().endsWith('.pdf') ? <div className="bg-white w-full h-full flex items-center justify-center"><Truck className="w-3 h-3" /></div> : <img src={f.url} className="w-full h-full object-cover" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

@@ -40,6 +40,7 @@ export interface WorkOrderUpsertDto {
   }[];
   replaceDocuments?: boolean;
   documentIds?: string[];
+  createdAt?: string; // Optional override
 }
 
 /**
