@@ -186,7 +186,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                                     statusLower === 'open' || statusLower === 'inprocess' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600';
 
                                 return (
-                                    <div key={sr.id} onClick={() => onTabChange('maintenance/service-history', undefined, sr.id)} className="flex items-center gap-4 p-4 rounded-2xl bg-[#f8fafc] border border-transparent hover:border-blue-200 hover:bg-white hover:shadow-md transition-all duration-300 cursor-pointer group">
+                                    <div key={sr.id} onClick={() => onTabChange('service', undefined, sr.id)} className="flex items-center gap-4 p-4 rounded-2xl bg-[#f8fafc] border border-transparent hover:border-blue-200 hover:bg-white hover:shadow-md transition-all duration-300 cursor-pointer group">
                                         <div className="bg-white p-3 rounded-xl border border-slate-100 group-hover:bg-blue-600 group-hover:border-blue-600 transition-all duration-300">
                                             <ClipboardList className="w-5 h-5 text-slate-400 group-hover:text-white" />
                                         </div>
@@ -205,7 +205,7 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                             })}
                         </div>
                         <button
-                            onClick={() => onTabChange('maintenance/service-history')}
+                            onClick={() => onTabChange('service')}
                             className="w-full mt-8 py-4 border border-slate-100 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] hover:bg-slate-50 hover:text-slate-900 transition-all duration-300"
                         >
                             View All Audits

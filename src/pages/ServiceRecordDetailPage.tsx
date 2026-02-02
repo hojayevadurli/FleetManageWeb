@@ -156,7 +156,7 @@ const ServiceRecordDetailPage = () => {
                 description: "Could not load service record details.",
                 variant: "destructive"
             });
-            navigate('/app/maintenance/service-history'); // Fix path
+            navigate('/app/service'); // Fix path
         } finally {
             setLoading(false);
         }
