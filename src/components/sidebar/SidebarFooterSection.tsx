@@ -1,8 +1,5 @@
 
-import { useNavigate } from "react-router-dom";
-import { LogOut } from "lucide-react";
-import { useAuth } from "@/components/auth/AuthContext";
-import { toast } from "sonner";
+import { LifeBuoy } from "lucide-react";
 import { SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
@@ -29,10 +26,10 @@ export function SidebarFooterSection() {
             Signed in as: {user.email}
           </div>
         )}
-        <Button 
-          onClick={handleSignOut} 
-          variant="outline" 
-          size="sm" 
+        <Button
+          onClick={handleSignOut}
+          variant="outline"
+          size="sm"
           className="w-full justify-start"
         >
           <LogOut className="h-4 w-4 mr-2" />
