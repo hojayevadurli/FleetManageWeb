@@ -4,36 +4,21 @@ import { SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
 export function SidebarFooterSection() {
-  const { signOut, user } = useAuth();
-  const navigate = useNavigate();
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast.success("Signed out successfully!");
-      navigate("/");
-    } catch (error) {
-      console.error("Error signing out:", error);
-      toast.error("Error signing out. Please try again.");
-    }
+  const handleSupportClick = () => {
+    window.location.href = "mailto:support@fleetmanage.ai";
   };
 
   return (
-    <SidebarFooter className="p-4 border-t">
+    <SidebarFooter className="p-4 border-t border-white/5">
       <div className="space-y-2">
-        {user && (
-          <div className="text-sm text-gray-600 mb-2">
-            Signed in as: {user.email}
-          </div>
-        )}
         <Button
-          onClick={handleSignOut}
-          variant="outline"
+          onClick={handleSupportClick}
+          variant="ghost"
           size="sm"
-          className="w-full justify-start"
+          className="w-full justify-start text-slate-400 hover:text-white hover:bg-white/5"
         >
-          <LogOut className="h-4 w-4 mr-2" />
-          Sign Out
+          <LifeBuoy className="h-4 w-4 mr-3" />
+          Help & Support
         </Button>
       </div>
     </SidebarFooter>
