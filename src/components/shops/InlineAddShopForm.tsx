@@ -13,6 +13,87 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
+// Helper to parse address
+const parseAddressComponents = (addressString: string) => {
+    if (!addressString) return { city: '', state: '', zip: '' };
+
+    // Pattern 1: "435 W US-6 Valparaiso IN 46385"
+    const pattern1 = /([A-Za-z\s]+?)\s+([A-Z]{2})\s*(\d{5})?$/;
+
+    // Pattern 2: "435 W US-6 Valparaiso IN" (no zip)
+    const pattern2 = /([A-Za-z\s]+?)\s+([A-Z]{2})$/;
+
+    let match = addressString.match(pattern1);
+    if (match) {
+        return {
+            city: match[1].trim(),
+            state: match[2].trim(),
+            zip: match[3] || ''
+        };
+    }
+
+    match = addressString.match(pattern2);
+    if (match) {
+        return {
+            city: match[1].trim(),
+            state: match[2].trim(),
+            zip: ''
+        };
+    }
+
+    // Try to find state abbreviation and work backwards
+    const stateMatch = addressString.match(/\b([A-Z]{2})\b/);
+    if (stateMatch) {
+        const state = stateMatch[1];
+        const beforeState = addressString.substring(0, stateMatch.index).trim();
+        const words = beforeState.split(/\s+/);
+        const city = words.slice(-2).join(' '); // Take last 1-2 words as city
+
+        return {
+            city: city,
+            state: state,
+            zip: ''
+        };
+    }
+
+    return { city: '', state: '', zip: '' };
+};
+
+const geocodeAddress = async (address: string) => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI"; // Use fallback
+
+    try {
+        const response = await fetch(
+            `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
+        );
+
+        const data = await response.json();
+
+        if (data.status === 'OK' && data.results.length > 0) {
+            const result = data.results[0];
+            const location = result.geometry.location;
+
+            // Extract city, state, zip from address components
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const components = result.address_components as any[];
+            const city = components.find(c => c.types.includes('locality'))?.long_name || '';
+            const state = components.find(c => c.types.includes('administrative_area_level_1'))?.short_name || '';
+            const zip = components.find(c => c.types.includes('postal_code'))?.long_name || '';
+
+            return {
+                lat: location.lat,
+                lng: location.lng,
+                city,
+                state,
+                zip
+            };
+        }
+    } catch (error) {
+        console.error('Geocoding error:', error);
+    }
+    return null;
+};
+
 interface InlineAddShopFormProps {
     initialData?: Partial<ShopFormData>;
     onSuccess: (shop: Shop) => void;
@@ -58,6 +139,8 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
     // Refs for Google Maps
     const addressInputRef = useRef<HTMLInputElement>(null);
     const addressAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+    const shopNameInputRef = useRef<HTMLInputElement>(null);
+    const shopNameAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<google.maps.Map | null>(null);
     const markerRef = useRef<google.maps.Marker | null>(null);
@@ -65,18 +148,36 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
     // Initialize with Props
     useEffect(() => {
         if (initialData) {
+            const parsed = parseAddressComponents(initialData.address || "");
+
             setFormData(prev => ({
                 ...prev,
                 shop_name: initialData.shop_name || "",
                 address: initialData.address || "",
-                city: initialData.city || "",
-                state: initialData.state || "",
-                zip: initialData.zip || "",
+                city: initialData.city || parsed.city || "",
+                state: initialData.state || parsed.state || "",
+                zip: initialData.zip || parsed.zip || "",
                 phone: initialData.phone || "",
                 latitude: initialData.latitude || "",
                 longitude: initialData.longitude || "",
                 vendor_preference: "NEW"
             }));
+
+            // If we have address but no coords, geocode
+            if (initialData.address && (!initialData.latitude || !initialData.longitude)) {
+                geocodeAddress(initialData.address).then(result => {
+                    if (result) {
+                        setFormData(prev => ({
+                            ...prev,
+                            latitude: result.lat.toString(),
+                            longitude: result.lng.toString(),
+                            city: prev.city || result.city || "",
+                            state: prev.state || result.state || "",
+                            zip: prev.zip || result.zip || ""
+                        }));
+                    }
+                });
+            }
         }
     }, [initialData]);
 
@@ -103,13 +204,21 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
         mapInstanceRef.current.panTo(pos);
         mapInstanceRef.current.setZoom(15);
 
-        if (!markerRef.current) {
-            markerRef.current = new window.google.maps.Marker({
-                map: mapInstanceRef.current,
-                position: pos
-            });
+        if (window.google.maps.Marker) {
+            try {
+                if (!markerRef.current) {
+                    markerRef.current = new window.google.maps.Marker({
+                        map: mapInstanceRef.current,
+                        position: pos
+                    });
+                } else {
+                    markerRef.current.setPosition(pos);
+                }
+            } catch (err) {
+                console.error("Error updating map marker:", err);
+            }
         } else {
-            markerRef.current.setPosition(pos);
+            console.warn("Google Maps Marker not available yet");
         }
     }, [formData.latitude, formData.longitude]);
 
@@ -118,18 +227,33 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
             const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
             if (!apiKey) return;
 
-            const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
+            const loader = new Loader({ apiKey, version: "weekly", libraries: ["places", "marker"] });
             await loader.load();
 
-            // Autocomplete
+
+            // Address Autocomplete
             if (addressInputRef.current && !addressAutocompleteRef.current) {
                 addressAutocompleteRef.current = new window.google.maps.places.Autocomplete(addressInputRef.current, {
                     types: ["address"],
+                    componentRestrictions: { country: 'us' },
                     fields: ["address_components", "geometry", "formatted_address"],
                 });
                 addressAutocompleteRef.current.addListener("place_changed", () => {
                     const place = addressAutocompleteRef.current?.getPlace();
                     if (place) handlePlaceSelect(place);
+                });
+            }
+
+            // Shop Name Autocomplete
+            if (shopNameInputRef.current && !shopNameAutocompleteRef.current) {
+                shopNameAutocompleteRef.current = new window.google.maps.places.Autocomplete(shopNameInputRef.current, {
+                    types: ["establishment"],
+                    componentRestrictions: { country: 'us' },
+                    fields: ["name", "formatted_address", "address_components", "geometry", "formatted_phone_number", "website"],
+                });
+                shopNameAutocompleteRef.current.addListener("place_changed", () => {
+                    const place = shopNameAutocompleteRef.current?.getPlace();
+                    if (place) handleShopSelect(place);
                 });
             }
 
@@ -155,27 +279,76 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
     }, [updateMap]);
 
     const handlePlaceSelect = (place: google.maps.places.PlaceResult) => {
-        let streetNumber = "", route = "", city = "", state = "", zip = "";
-        if (place.address_components) {
-            for (const component of place.address_components) {
-                if (component.types.includes("street_number")) streetNumber = component.long_name;
-                if (component.types.includes("route")) route = component.long_name;
-                if (component.types.includes("locality")) city = component.long_name;
-                if (component.types.includes("administrative_area_level_1")) state = component.short_name;
-                if (component.types.includes("postal_code")) zip = component.long_name;
-            }
-        }
+        if (!place.address_components) return;
+
+        const { address, city, state, zip } = parsePlaceComponents(place);
 
         const lat = place.geometry?.location?.lat()?.toString() || "";
         const lng = place.geometry?.location?.lng()?.toString() || "";
 
         setFormData(prev => ({
             ...prev,
-            address: `${streetNumber} ${route}`.trim() || place.formatted_address || "",
-            city, state, zip,
+            address: address || place.formatted_address || "",
+            city,
+            state,
+            zip,
             latitude: lat,
             longitude: lng
         }));
+    };
+
+    const handleShopSelect = (place: google.maps.places.PlaceResult) => {
+        if (!place.name) return;
+
+        const { address, city, state, zip } = parsePlaceComponents(place);
+        const lat = place.geometry?.location?.lat()?.toString() || "";
+        const lng = place.geometry?.location?.lng()?.toString() || "";
+
+        setFormData(prev => ({
+            ...prev,
+            shop_name: place.name || prev.shop_name,
+            address: address || place.formatted_address || prev.address,
+            city: city || prev.city,
+            state: state || prev.state,
+            zip: zip || prev.zip,
+            phone: place.formatted_phone_number || prev.phone,
+            website: place.website || prev.website,
+            latitude: lat || prev.latitude,
+            longitude: lng || prev.longitude
+        }));
+
+        toast({
+            title: "Shop Found",
+            description: "Auto-filled shop details from Google Maps.",
+            duration: 3000
+        });
+    };
+
+    const parsePlaceComponents = (place: google.maps.places.PlaceResult) => {
+        if (!place.address_components) return { address: "", city: "", state: "", zip: "" };
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const components = place.address_components as any[];
+
+        const getComponent = (type: string) => {
+            const comp = components.find(c => c.types.includes(type));
+            return comp?.long_name || '';
+        };
+
+        const getShortComponent = (type: string) => {
+            const comp = components.find(c => c.types.includes(type));
+            return comp?.short_name || '';
+        };
+
+        const streetNumber = getComponent('street_number');
+        const route = getComponent('route');
+        const city = getComponent('locality') || getComponent('sublocality');
+        const state = getShortComponent('administrative_area_level_1');
+        const zip = getComponent('postal_code');
+
+        const address = `${streetNumber} ${route}`.trim();
+
+        return { address, city, state, zip };
     };
 
     const handleSubmit = async () => {
@@ -258,10 +431,11 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
                         {initialData?.shop_name && <Badge className="h-5 px-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0 text-[9px]"><CheckCircle2 className="w-3 h-3 mr-1" /> Auto-filled</Badge>}
                     </Label>
                     <Input
+                        ref={shopNameInputRef}
                         value={formData.shop_name}
                         onChange={e => setFormData(p => ({ ...p, shop_name: e.target.value }))}
                         className={cn("font-bold", errors.shop_name && touched.shop_name && "border-red-300")}
-                        placeholder="Shop Name"
+                        placeholder="Shop Name (Start typing to search...)"
                     />
                 </div>
 
@@ -302,8 +476,13 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
                 {/* Map Preview */}
                 <div>
                     <Label className="text-[10px] font-black uppercase text-slate-500 mb-1.5">Location Preview</Label>
-                    <div ref={mapRef} className="w-full h-32 bg-slate-100 rounded-lg border border-slate-200 overflow-hidden relative">
-                        {!formData.latitude && <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-xs font-medium">Enter address to preview</div>}
+                    <div className="w-full h-32 bg-slate-100 rounded-lg border border-slate-200 overflow-hidden relative">
+                        <div ref={mapRef} className="absolute inset-0 w-full h-full" />
+                        {!formData.latitude && (
+                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-xs font-medium bg-slate-100 z-10 pointer-events-none">
+                                Enter address to preview
+                            </div>
+                        )}
                     </div>
                 </div>
 

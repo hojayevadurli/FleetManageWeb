@@ -227,9 +227,9 @@ const ShopReviewsList = ({ shopId }: { shopId: string }) => {
 };
 
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyAeI6_E9c4EMx9T4t_FjyVUGSTN38GV69c";
 // Helper to check if using default/demo key
-const IS_DEMO_KEY = GOOGLE_MAPS_API_KEY === "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
+const IS_DEMO_KEY = GOOGLE_MAPS_API_KEY === "AIzaSyAeI6_E9c4EMx9T4t_FjyVUGSTN38GV69c";
 
 const ShopDetailView = () => {
     const { id } = useParams<{ id: string }>();

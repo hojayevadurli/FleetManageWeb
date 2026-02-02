@@ -10,7 +10,10 @@ import { Shield, CheckCircle2 } from "lucide-react";
 export default function Login() {
   const { signIn, signUp } = useAuth();
 
-  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
+  // Initialize mode from URL query parameter
+  const searchParams = new URLSearchParams(window.location.search);
+  const initialMode = searchParams.get("mode") === "signup" ? "signup" : "login";
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">(initialMode);
 
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");

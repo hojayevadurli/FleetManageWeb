@@ -166,6 +166,8 @@ const App = () => (
             {/* Backend sends /confirm-email link */}
             <Route path="/confirm-email" element={<ConfirmEmail />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/contact" element={<Contact />} />
             <Route path="/app/*" element={
               <ProtectedRoute>
                 <SidebarProvider>

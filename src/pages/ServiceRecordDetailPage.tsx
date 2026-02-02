@@ -39,8 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 import { InfoItem, ServiceItemsList, EmptyState } from "@/components/workorder/detail/WorkOrderDetailComponents";
-import CreateWorkOrderDialog from '@/components/workorder/CreateWorkOrderDialog';
-import EditWorkOrderDialog from '@/components/workorder/EditWorkOrderDialog';
+import WorkOrderDialog from '@/components/workorder/WorkOrderDialog';
 
 const ServiceRecordDetailPage = () => {
     const { id } = useParams<{ id: string }>();
@@ -235,7 +234,7 @@ const ServiceRecordDetailPage = () => {
                                     {record.woNumber}
                                 </h1>
                                 <Badge className={`uppercase tracking-widest text-[10px] font-black border-0
-                                    ${(record.status as string)?.toLowerCase() === 'completed'
+                                    ${(record.status as unknown as string)?.toLowerCase() === 'completed'
                                         ? 'bg-emerald-50 text-emerald-600'
                                         : 'bg-blue-50 text-blue-600'
                                     }`}>
@@ -269,7 +268,7 @@ const ServiceRecordDetailPage = () => {
                                 <DropdownMenuItem onClick={() => toast({ title: "Email", description: "Emailing Vendor..." })}>
                                     <Mail className="w-4 h-4 mr-2" /> Email Shop
                                 </DropdownMenuItem>
-                                {record.status === 'Completed' && (
+                                {((record.status as unknown as string) === 'Completed' || (record.status as unknown as string) === 'Closed') && (
                                     <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>
                                         {/* Setup Rating inside Edit Dialog */}
                                         <Star className="w-4 h-4 mr-2" /> Rate Service
@@ -520,11 +519,11 @@ const ServiceRecordDetailPage = () => {
 
             {/* Edit Dialog */}
             {rawDto && (
-                <EditWorkOrderDialog
-                    workOrder={rawDto}
+                <WorkOrderDialog
+                    editWoId={rawDto.id}
                     open={isEditDialogOpen}
                     onOpenChange={setIsEditDialogOpen}
-                    onWorkOrderUpdated={fetchDetail}
+                    onAfterCreated={fetchDetail}
                 />
             )}
 

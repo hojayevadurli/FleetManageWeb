@@ -3,6 +3,7 @@ import { Star } from 'lucide-react';
 import { Textarea } from "@/components/ui/textarea";
 
 export interface ShopRatingData {
+    id?: string;
     mainRating: number;
     qualityRating: number;
     timelinessRating: number;

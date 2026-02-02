@@ -51,9 +51,9 @@ export interface WorkOrderItem {
   id: string;
   serviceType: string;
   description: string;
-  quantity?: number;
-  unitPrice?: number;
-  cost?: number;
+  quantity: number;
+  unitPrice: number;
+  cost: number;
   type?: 'parts' | 'labor' | 'fee' | 'tax' | 'discount';
   partNumber?: string;
 }
@@ -317,6 +317,9 @@ export interface WorkOrder {
   odometer?: number;
   hours?: number;
   payer?: string;
+  attachmentUrl?: string; // Mapped from document or preview
+  attachmentFileName?: string;
+  assetNumber?: string; // Mapped for display
 }
 
 export interface ServiceHistoryLine {

@@ -78,7 +78,7 @@ const PrivacyPolicy = () => {
           <div className="p-6 bg-[#1E2536] rounded-xl border border-white/5">
             <div className="space-y-2">
               <p><strong className="text-white">Email:</strong> privacy@fleetmanage.ai</p>
-              <p><strong className="text-white">Address:</strong> Fleet Management Services, 123 Business Ave, Suite 456, Austin, TX 78701</p>
+              <p><strong className="text-white">Address:</strong> Fleet Management Services, Chicago, IL</p>
             </div>
           </div>
         </section>
