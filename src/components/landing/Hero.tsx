@@ -41,7 +41,7 @@ const Hero = () => {
                         <Button
                             size="lg"
                             className="w-full sm:w-auto h-12 px-8 bg-[#4F7CFF] hover:bg-[#4F7CFF]/90 text-white font-bold text-base shadow-[0_0_25px_rgba(79,124,255,0.4)] transition-all hover:scale-105"
-                            onClick={() => navigate("/login")}
+                            onClick={() => navigate("/login?mode=signup")}
                         >
                             Start Free Month
                             <ArrowRight className="ml-2 w-5 h-5" />
@@ -50,14 +50,14 @@ const Hero = () => {
                             size="lg"
                             variant="outline"
                             className="w-full sm:w-auto h-12 px-8 border-white/20 text-white hover:bg-white/10 hover:text-white bg-transparent"
-                            onClick={() => (window as any).Calendly?.initPopupWidget({ url: 'https://calendly.com/suleyman-durdiyev/30min' })}
+                            onClick={() => (window as any).Calendly?.initPopupWidget({ url: 'https://calendly.com/fleetmanageai/30min' })}
                         >
                             Book a Demo
                         </Button>
                     </div>
 
                     <p className="mt-6 text-sm text-slate-500 font-medium">
-                        1 Month Free • $6/truck/month after
+                        1 Month Free • <span className="line-through opacity-70 mr-1">$12</span>$6/fleet/month after
                     </p>
                 </div>
 

@@ -37,7 +37,7 @@ const Navbar = () => {
                 <div className="hidden md:flex items-center gap-4">
                     <Button
                         variant="ghost"
-                        onClick={() => (window as any).Calendly?.initPopupWidget({ url: 'https://calendly.com/suleyman-durdiyev/30min' })}
+                        onClick={() => (window as any).Calendly?.initPopupWidget({ url: 'https://calendly.com/fleetmanageai/30min' })}
                         className="text-slate-300 hover:text-white hover:bg-white/10"
                     >
                         Book Demo
@@ -50,7 +50,7 @@ const Navbar = () => {
                         Login
                     </Button>
                     <Button
-                        onClick={() => navigate("/login")}
+                        onClick={() => navigate("/login?mode=signup")}
                         className="bg-[#4F7CFF] hover:bg-[#4F7CFF]/90 text-white font-semibold shadow-[0_0_20px_rgba(79,124,255,0.3)]"
                     >
                         Start Free Month
@@ -83,7 +83,7 @@ const Navbar = () => {
                                         variant="ghost"
                                         onClick={() => {
                                             setIsOpen(false);
-                                            (window as any).Calendly?.initPopupWidget({ url: 'https://calendly.com/suleyman-durdiyev/30min' });
+                                            (window as any).Calendly?.initPopupWidget({ url: 'https://calendly.com/fleetmanageai/30min' });
                                         }}
                                         className="justify-start text-slate-300 hover:text-white hover:bg-white/10 px-0"
                                     >
@@ -97,7 +97,7 @@ const Navbar = () => {
                                         Login
                                     </Button>
                                     <Button
-                                        onClick={() => handleNav("/login")}
+                                        onClick={() => handleNav("/login?mode=signup")}
                                         className="bg-[#4F7CFF] hover:bg-[#4F7CFF]/90 text-white font-semibold w-full"
                                     >
                                         Start Free Month

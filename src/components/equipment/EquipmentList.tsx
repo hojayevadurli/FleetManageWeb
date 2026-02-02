@@ -37,7 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EquipmentFormModal from './EquipmentFormModal';
-import CreateWorkOrderDialog from "@/components/workorder/CreateWorkOrderDialog";
+import WorkOrderDialog from "@/components/workorder/WorkOrderDialog";
 
 
 interface EquipmentListProps {
@@ -427,7 +427,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                     mode="create"
                 />
 
-                <CreateWorkOrderDialog
+                <WorkOrderDialog
                     open={createWoDialogState.open}
                     onOpenChange={(isOpen) => setCreateWoDialogState(prev => ({ ...prev, open: isOpen }))}
                     initialCompanyName={companyName}

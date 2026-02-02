@@ -6,8 +6,8 @@ import { toast } from "sonner";
 
 import WorkOrderFilters from "@/components/workorder/WorkOrderFilters";
 import WorkOrderList, { VendorData } from "@/components/workorder/WorkOrderList";
-import CreateWorkOrderDialog from "@/components/workorder/CreateWorkOrderDialog";
-import EditWorkOrderDialog from "@/components/workorder/EditWorkOrderDialog";
+import WorkOrderDialog from "@/components/workorder/WorkOrderDialog";
+
 import ServiceMetrics from "@/components/workorder/ServiceMetrics";
 
 import { WorkOrderDto, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
@@ -240,18 +240,21 @@ const WorkOrders = () => {
         </Button>
       </div>
 
-      <CreateWorkOrderDialog
+      <WorkOrderDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         initialCompanyName={companyName || "Fleet Company"}
         onAfterCreated={loadData}
       />
 
-      <EditWorkOrderDialog
-        workOrder={selectedWorkOrder}
+      <WorkOrderDialog
+        editWoId={selectedWorkOrder?.id}
         open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-        onWorkOrderUpdated={loadData}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) setSelectedWorkOrder(null);
+        }}
+        onAfterCreated={loadData}
       />
 
       <ServiceMetrics workOrders={workOrders} />

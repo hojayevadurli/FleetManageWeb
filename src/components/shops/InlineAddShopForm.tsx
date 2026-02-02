@@ -204,13 +204,21 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
         mapInstanceRef.current.panTo(pos);
         mapInstanceRef.current.setZoom(15);
 
-        if (!markerRef.current) {
-            markerRef.current = new window.google.maps.Marker({
-                map: mapInstanceRef.current,
-                position: pos
-            });
+        if (window.google.maps.Marker) {
+            try {
+                if (!markerRef.current) {
+                    markerRef.current = new window.google.maps.Marker({
+                        map: mapInstanceRef.current,
+                        position: pos
+                    });
+                } else {
+                    markerRef.current.setPosition(pos);
+                }
+            } catch (err) {
+                console.error("Error updating map marker:", err);
+            }
         } else {
-            markerRef.current.setPosition(pos);
+            console.warn("Google Maps Marker not available yet");
         }
     }, [formData.latitude, formData.longitude]);
 
@@ -219,7 +227,7 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
             const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
             if (!apiKey) return;
 
-            const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
+            const loader = new Loader({ apiKey, version: "weekly", libraries: ["places", "marker"] });
             await loader.load();
 
 
@@ -468,8 +476,13 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
                 {/* Map Preview */}
                 <div>
                     <Label className="text-[10px] font-black uppercase text-slate-500 mb-1.5">Location Preview</Label>
-                    <div ref={mapRef} className="w-full h-32 bg-slate-100 rounded-lg border border-slate-200 overflow-hidden relative">
-                        {!formData.latitude && <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-xs font-medium">Enter address to preview</div>}
+                    <div className="w-full h-32 bg-slate-100 rounded-lg border border-slate-200 overflow-hidden relative">
+                        <div ref={mapRef} className="absolute inset-0 w-full h-full" />
+                        {!formData.latitude && (
+                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-xs font-medium bg-slate-100 z-10 pointer-events-none">
+                                Enter address to preview
+                            </div>
+                        )}
                     </div>
                 </div>
 

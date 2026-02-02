@@ -493,7 +493,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
       setTimeout(() => {
         if (!mapRef.current || mapInstanceRef.current) return;
 
-        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyAeI6_E9c4EMx9T4t_FjyVUGSTN38GV69c";
+        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
         if (!apiKey) return;
 
         const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
@@ -569,7 +569,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
     console.log("AddShopDialog: shopNameInputRef.current:", shopNameInputRef.current);
     console.log("AddShopDialog: addressInputRef.current:", addressInputRef.current);
 
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyAeI6_E9c4EMx9T4t_FjyVUGSTN38GV69c";
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
     if (!apiKey) {
       console.error("AddShopDialog: No API key!");
       return;

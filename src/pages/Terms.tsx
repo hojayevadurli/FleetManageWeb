@@ -39,7 +39,9 @@ const Terms = () => {
                         <strong>Free Trial:</strong> We offer a 1-month free trial for new users. No credit card is required to start the trial.
                     </p>
                     <p className="leading-relaxed">
-                        <strong>Pricing:</strong> After the trial period, the Service costs $6.00 per month per fleet account. You may cancel your subscription at any time.
+                        <strong>Pricing:</strong> After the trial period, the Service costs <strong>$12.00 per month per fleet</strong> (Standard Rate).
+                        We offer a discounted "Early Access" rate of <strong>$6.00 per month per fleet</strong> for a limited time.
+                        This is a flat rate regardless of fleet size. You may cancel your subscription at any time.
                         Cancellation will take effect at the end of the current billing cycle.
                     </p>
                 </section>
@@ -74,7 +76,7 @@ const Terms = () => {
                         For any questions about these Terms, please contact us:
                     </p>
                     <div className="p-6 bg-[#1E2536] rounded-xl border border-white/5">
-                        <p><strong className="text-white">Email:</strong> support@fleetmanage.ai</p>
+                        <p><strong className="text-white">Email:</strong> info@fleetmanage.ai</p>
                     </div>
                 </section>
             </div>

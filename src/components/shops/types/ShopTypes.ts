@@ -103,6 +103,7 @@ export interface ShopRating {
   value_rating?: number;
   would_recommend?: boolean;
   review_text?: string;
+  comment?: string; // Backend alias
   service_date?: string;
   work_order_id?: string;
   created_at: string;

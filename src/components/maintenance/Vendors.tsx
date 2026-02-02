@@ -131,7 +131,7 @@ const Vendors: React.FC<VendorsProps> = ({ vendors, workOrders, onUpdateVendors,
 
     const initMap = async () => {
         const loader = new Loader({
-            apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
+            apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI",
             version: "weekly",
         });
 
