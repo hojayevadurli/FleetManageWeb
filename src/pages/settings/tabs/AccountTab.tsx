@@ -25,7 +25,10 @@ const AccountTab = () => {
             try {
                 // Load User Data
                 if (user) {
-                    setName(user.fullName || user.firstName + " " + user.lastName || "");
+                    const firstName = user.firstName || "";
+                    const lastName = user.lastName || "";
+                    const fullName = user.fullName || (firstName || lastName ? `${firstName} ${lastName}`.trim() : "");
+                    setName(fullName);
                     // Email is usually read-only for identity, but we can display it
                     setEmail(user.email || "");
                 }

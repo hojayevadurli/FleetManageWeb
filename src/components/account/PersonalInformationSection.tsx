@@ -96,7 +96,7 @@ const PersonalInformationSection = ({
               type="tel"
               value={phone}
               onChange={handlePhoneChange}
-              placeholder="(555) 555-5555"
+              placeholder="Enter phone number"
               maxLength={14}
               className="rounded-2xl border-slate-200 py-6 font-bold text-slate-700 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
             />
