@@ -36,6 +36,7 @@ export type User = {
   TenantName?: string;
   CompanyName?: string;
   Company?: string;
+  lastPasswordChange?: string;
 };
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
