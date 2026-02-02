@@ -179,11 +179,11 @@ const DashboardHeader = () => {
                     user?.email || 'User'}
                 </div>
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                  {user?.tenant?.name || user?.Tenant?.Name ||
+                  {user?.companyName || user?.CompanyName ||
+                    user?.tenant?.name || user?.Tenant?.Name ||
                     user?.tenantName || user?.TenantName ||
-                    user?.companyName || user?.CompanyName ||
                     user?.company || user?.Company ||
-                    'Operations'}
+                    'Freightcab Inc'}
                 </div>
               </div>
               <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center border-2 border-white shadow-lg overflow-hidden group-hover:ring-2 group-hover:ring-blue-500 transition-all">
