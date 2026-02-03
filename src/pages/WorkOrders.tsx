@@ -88,7 +88,8 @@ const WorkOrders = () => {
         vMap[s.id] = {
           name: s.shop_name || s.name || "Unknown Vendor",
           rating: s.average_rating || 0,
-          reviews: s.total_reviews || 0
+          reviews: s.total_reviews || 0,
+          hourlyRate: s.labor_rate || 0
         };
       });
       setVendorMap(vMap);
@@ -194,6 +195,58 @@ const WorkOrders = () => {
     setIsEditDialogOpen(true);
   };
 
+  // Rating Logic
+  const [isRateDialogOpen, setIsRateDialogOpen] = useState(false);
+  const [workOrderToRate, setWorkOrderToRate] = useState<WorkOrderDto | null>(null);
+
+  const handleRateWorkOrder = (wo: WorkOrderDto) => {
+    setWorkOrderToRate(wo);
+    setIsRateDialogOpen(true);
+  };
+
+  const submitRating = async (rating: number, comment: string) => {
+    if (!workOrderToRate) return;
+    try {
+      const body: WorkOrderUpsertDto = {
+        equipmentId: workOrderToRate.equipmentId,
+        vendorId: workOrderToRate.vendorId ?? null,
+        workOrderNumber: workOrderToRate.workOrderNumber ?? null,
+        odometerAtService: workOrderToRate.odometerAtService ?? null,
+        hoursAtService: workOrderToRate.hoursAtService ?? null,
+        openedAt: workOrderToRate.openedAt,
+        closedAt: workOrderToRate.closedAt ?? null,
+        title: workOrderToRate.title,
+        complaint: workOrderToRate.complaint,
+        diagnosis: workOrderToRate.diagnosis ?? null,
+        resolution: workOrderToRate.resolution ?? null,
+        notes: workOrderToRate.notes ?? null,
+        status: (WorkOrderStatus as any)[workOrderToRate.status] ?? (typeof workOrderToRate.status === 'number' ? workOrderToRate.status : WorkOrderStatus.Completed),
+        priority: (WorkOrderPriority as any)[workOrderToRate.priority] ?? (typeof workOrderToRate.priority === 'number' ? workOrderToRate.priority : WorkOrderPriority.Normal),
+        costSource: (WorkOrderCostSource as any)[workOrderToRate.costSource] ?? (typeof workOrderToRate.costSource === 'number' ? workOrderToRate.costSource : WorkOrderCostSource.Estimated),
+        estimatedTotal: workOrderToRate.estimatedTotal,
+        manualActualTotal: workOrderToRate.manualActualTotal,
+        lines: (workOrderToRate.lines ?? []).map((l) => ({
+          type: l.type,
+          description: l.description,
+          qty: l.qty,
+          unitPrice: l.unitPrice,
+          partNumber: l.partNumber ?? null
+        })),
+        replaceDocuments: false,
+        documentIds: [],
+        rating: rating,
+        ratingComment: comment
+      };
+      await workOrdersApi.update(workOrderToRate.id, body);
+      toast.success("Service rated successfully");
+      setIsRateDialogOpen(false);
+      await loadData();
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to submit rating");
+    }
+  };
+
   const handleDeleteWorkOrder = async () => {
     if (!workOrderToDelete) return;
     try {
@@ -275,7 +328,7 @@ const WorkOrders = () => {
         onCreateClick={() => setIsCreateDialogOpen(true)}
         onViewDetails={(id) => navigate(`/app/service/${id}`)}
         onDelete={(wo) => setWorkOrderToDelete(wo)}
-        onRateService={handleEditWorkOrder}
+        onRateService={undefined}
       />
 
       <AlertDialog open={!!workOrderToDelete} onOpenChange={(open) => !open && setWorkOrderToDelete(null)}>
