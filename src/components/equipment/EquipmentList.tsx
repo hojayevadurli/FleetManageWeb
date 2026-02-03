@@ -271,23 +271,31 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                     />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center bg-slate-100/50 p-1 rounded-lg">
+                <div className="flex flex-wrap items-center gap-4">
+                    {/* Type Filters */}
+                    <div className="flex items-center gap-2">
                         <Button
-                            variant={typeFilter === 'ALL' ? 'default' : 'ghost'}
+                            variant="ghost"
                             onClick={() => setTypeFilter('ALL')}
-                            className={`h-8 px-3 text-xs font-bold rounded-md transition-all ${typeFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${typeFilter === 'ALL'
+                                ? "bg-blue-600 text-white border-blue-600 shadow-sm hover:bg-blue-700 hover:text-white"
+                                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                                }`}
                         >
-                            All
+                            All Types
                         </Button>
                         {categories.map(cat => {
                             const displayName = cat.name === 'School Bus' ? 'Bus' : cat.name;
+                            const isActive = typeFilter === cat.id;
                             return (
                                 <Button
                                     key={cat.id}
-                                    variant={typeFilter === cat.id ? 'default' : 'ghost'}
+                                    variant="ghost"
                                     onClick={() => setTypeFilter(cat.id)}
-                                    className={`h-8 px-3 text-xs font-bold rounded-md transition-all ${typeFilter === cat.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${isActive
+                                        ? "bg-blue-600 text-white border-blue-600 shadow-sm hover:bg-blue-700 hover:text-white"
+                                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                                        }`}
                                 >
                                     {displayName}
                                 </Button>
@@ -295,21 +303,27 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                         })}
                     </div>
 
-                    <div className="flex items-center bg-slate-100/50 p-1 rounded-lg">
+                    <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
+
+                    {/* Status Filters */}
+                    <div className="flex items-center gap-2">
                         {(['ALL', ...Object.values(EquipmentOperationalStatus).filter(v => typeof v === 'number')] as const).map(status => {
-                            let activeClass = 'bg-white text-emerald-600 shadow-sm';
-                            // Simplified active state for cleaner look, sticking to "white card" feel for active tabs
-                            if (status === EquipmentOperationalStatus.InShop) activeClass = 'bg-white text-amber-600 shadow-sm';
-                            if (status === EquipmentOperationalStatus.OutOfService) activeClass = 'bg-white text-rose-600 shadow-sm';
-                            if (status === 'ALL') activeClass = 'bg-white text-slate-900 shadow-sm';
+                            const isActive = statusFilter === status;
+
+                            // Status Display Name logic
+                            const label = status === 'ALL' ? 'All Status' : EquipmentOperationalStatus[status as number].replace(/([A-Z])/g, ' $1').trim();
 
                             return (
                                 <Button
                                     key={status}
+                                    variant="ghost"
                                     onClick={() => setStatusFilter(status as any)}
-                                    className={`h-8 px-3 text-xs font-bold rounded-md transition-all ${statusFilter === status ? activeClass : 'text-slate-500 hover:text-slate-800'}`}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${isActive
+                                        ? "bg-blue-600 text-white border-blue-600 shadow-sm hover:bg-blue-700 hover:text-white"
+                                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                                        }`}
                                 >
-                                    {status === 'ALL' ? 'All' : EquipmentOperationalStatus[status as number].replace(/([A-Z])/g, ' $1').trim()}
+                                    {label}
                                 </Button>
                             );
                         })}

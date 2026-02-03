@@ -40,6 +40,8 @@ export interface WorkOrderUpsertDto {
   }[];
   replaceDocuments?: boolean;
   documentIds?: string[];
+  rating?: number;
+  ratingComment?: string;
 }
 
 /**
@@ -147,6 +149,9 @@ function normalizeWorkOrder(data: any): WorkOrderDto {
     priority: data.priority || data.Priority,
     costSource: data.costSource || data.CostSource,
     estimatedTotal: data.estimatedTotal ?? data.EstimatedTotal ?? 0,
+    rating: data.rating ?? data.Rating,
+    ratingComment: data.ratingComment ?? data.RatingComment,
+    ratedAt: data.ratedAt ?? data.RatedAt,
     manualActualTotal: data.manualActualTotal ?? data.ManualActualTotal ?? 0,
     lines: (data.lines || data.Lines || []).map((l: any) => ({
       ...l,

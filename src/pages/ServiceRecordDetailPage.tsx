@@ -27,9 +27,9 @@ import {
     PlayCircle,
     Image as ImageIcon
 } from 'lucide-react';
-import { workOrdersApi } from '@/lib/workOrdersApi';
+import { workOrdersApi, WorkOrderUpsertDto } from '@/lib/workOrdersApi';
 import { shopsApi } from '@/lib/shopsApi';
-import { WorkOrderDto, Equipment, WorkOrder } from '@/lib/types';
+import { WorkOrderDto, Equipment, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from '@/lib/types';
 import { equipmentApi } from '@/lib/equipmentApi';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -142,7 +142,10 @@ const ServiceRecordDetailPage = () => {
                 odometer: wo.odometerAtService || 0,
                 hours: 0,
                 attachmentUrl: mappedAttachments.length > 0 ? mappedAttachments[0].url : ((wo as any).previewUrl || (wo as any).attachmentUrl),
-                attachmentFileName: mappedAttachments.length > 0 ? mappedAttachments[0].name : (wo as any).fileName
+                attachmentFileName: mappedAttachments.length > 0 ? mappedAttachments[0].name : (wo as any).fileName,
+                rating: wo.rating,
+                ratingComment: wo.ratingComment,
+                ratedAt: wo.ratedAt
             };
 
             setRecord(mapped);
@@ -153,12 +156,59 @@ const ServiceRecordDetailPage = () => {
             console.error("Error loading record:", err);
             toast({
                 title: "Error",
-                description: "Could not load service record details.",
+                description: "Could not load service record details. " + err, // Improved error log
                 variant: "destructive"
             });
-            navigate('/app/service'); // Fix path
+            navigate('/app/service');
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Rating Logic
+    const [isRateDialogOpen, setIsRateDialogOpen] = useState(false);
+
+    const handleSubmitRating = async (rating: number, comment: string) => {
+        if (!rawDto) return;
+        try {
+            const body: WorkOrderUpsertDto = {
+                equipmentId: rawDto.equipmentId,
+                vendorId: rawDto.vendorId ?? null,
+                workOrderNumber: rawDto.workOrderNumber ?? null,
+                odometerAtService: rawDto.odometerAtService ?? null,
+                hoursAtService: rawDto.hoursAtService ?? null,
+                openedAt: rawDto.openedAt,
+                closedAt: rawDto.closedAt ?? null,
+                title: rawDto.title,
+                complaint: rawDto.complaint,
+                diagnosis: rawDto.diagnosis ?? null,
+                resolution: rawDto.resolution ?? null,
+                notes: rawDto.notes ?? null,
+                status: (WorkOrderStatus as any)[rawDto.status] ?? (typeof rawDto.status === 'number' ? rawDto.status : WorkOrderStatus.Completed),
+                priority: (WorkOrderPriority as any)[rawDto.priority] ?? (typeof rawDto.priority === 'number' ? rawDto.priority : WorkOrderPriority.Normal),
+                costSource: (WorkOrderCostSource as any)[rawDto.costSource] ?? (typeof rawDto.costSource === 'number' ? rawDto.costSource : WorkOrderCostSource.Estimated),
+                estimatedTotal: rawDto.estimatedTotal,
+                manualActualTotal: rawDto.manualActualTotal,
+                lines: (rawDto.lines ?? []).map((l) => ({
+                    type: l.type,
+                    description: l.description,
+                    qty: l.qty,
+                    unitPrice: l.unitPrice,
+                    partNumber: l.partNumber ?? null
+                })),
+                replaceDocuments: false,
+                documentIds: [],
+                rating: rating,
+                ratingComment: comment
+            };
+
+            await workOrdersApi.update(rawDto.id, body);
+            toast({ title: "Rated", description: "Service rating submitted successfully." });
+            setIsRateDialogOpen(false);
+            fetchDetail(); // Refresh
+        } catch (e) {
+            console.error(e);
+            toast({ title: "Error", description: "Failed to submit rating.", variant: "destructive" });
         }
     };
 
@@ -240,6 +290,13 @@ const ServiceRecordDetailPage = () => {
                                     }`}>
                                     {record.status}
                                 </Badge>
+
+                                {/* Rating Stars */}
+                                {record.rating && record.rating > 0 && (
+                                    <div className="hidden sm:block">
+                                        <StarRating rating={record.rating} />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -474,10 +531,6 @@ const ServiceRecordDetailPage = () => {
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="divide-y divide-slate-50">
-                                <button className="w-full text-left px-6 py-4 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3"
-                                    onClick={() => setIsEditDialogOpen(true)}>
-                                    <Edit className="w-4 h-4 text-slate-400" /> Rate This Service
-                                </button>
                                 <button className="w-full text-left px-6 py-4 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3"
                                     onClick={() => toast({ title: "Shop Profile", description: "Navigating to shop..." })}>
                                     <Store className="w-4 h-4 text-slate-400" /> View Shop Profile

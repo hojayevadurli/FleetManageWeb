@@ -320,6 +320,9 @@ export interface WorkOrder {
   attachmentUrl?: string; // Mapped from document or preview
   attachmentFileName?: string;
   assetNumber?: string; // Mapped for display
+  rating?: number;
+  ratingComment?: string;
+  ratedAt?: string;
 }
 
 export interface ServiceHistoryLine {
@@ -426,6 +429,9 @@ export interface WorkOrderDto {
   documents: WorkOrderDocumentDto[];
   vendorName?: string;
   vendorAddress?: string;
+  rating?: number;
+  ratingComment?: string;
+  ratedAt?: string;
 }
 
 export interface ChatMessage {
