@@ -464,6 +464,7 @@ export interface ReceiptParsedData {
   total: number;
   notes?: string;
   unitNumber?: string;
+  odometer?: number;
 }
 
 export interface FuelParsedData {

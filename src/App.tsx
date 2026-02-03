@@ -104,32 +104,30 @@ const DashboardHeader = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [trialDays, setTrialDays] = useState<number | null>(null);
+  const [companyName, setCompanyName] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchTrialData = async () => {
+    const fetchTenantData = async () => {
       try {
         const tenant = await tenantsApi.getCurrent();
+
+        if (tenant?.name) {
+          setCompanyName(tenant.name);
+        }
+
         if (tenant?.trialEndsAt) {
           const end = parseISO(tenant.trialEndsAt);
           const days = differenceInDays(end, new Date());
           setTrialDays(days > 0 ? days : 0);
         } else {
-          // Fallback logic if API doesn't return trial data yet (Mock for MVP display)
-          // For now, we can default to 29 days if no data, or just hide it.
-          // User specifically asked for this display, so let's try to mock it if missing or rely on backend.
-          // Let's assume for MVP we might not have it, so we'll mock it if missing to satisfy the "Active Trial" request visually if needed,
-          // OR better, purely rely on the API if we trust it. 
-          // Given previous context of mocking, let's play it safe: if no date, show nothing? 
-          // Actually, let's mock it to "29 days" if the API returns nothing helpful, to match the "Active Trial" prompt request exactly for the demo.
           setTrialDays(29);
         }
       } catch (e) {
-        console.error("Failed to fetch trial status", e);
-        // Fallback mock
+        console.error("Failed to fetch tenant data", e);
         setTrialDays(29);
       }
     };
-    fetchTrialData();
+    fetchTenantData();
   }, []);
 
   // Handle potential nested user object from backend
@@ -180,7 +178,8 @@ const DashboardHeader = () => {
                     user?.email || 'User'}
                 </div>
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                  {user?.companyName || user?.CompanyName ||
+                  {companyName ||
+                    user?.companyName || user?.CompanyName ||
                     user?.tenant?.name || user?.Tenant?.Name ||
                     user?.tenantName || user?.TenantName ||
                     user?.company || user?.Company ||

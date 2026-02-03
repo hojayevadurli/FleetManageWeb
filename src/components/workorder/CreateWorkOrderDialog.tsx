@@ -8,7 +8,6 @@ import { toast } from "sonner";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { useRef } from "react";
 import { Loader2, Sparkles, Upload, Trash2, Check, ChevronsUpDown, Plus, CheckCircle2 } from "lucide-react";
 import { parseReceipt } from "@/lib/gemini";
 import { ReceiptParsedData, Vendor, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
@@ -45,6 +44,7 @@ import UploadAndScan from "./UploadAndScan";
 
 
 import { workOrdersApi, WorkOrderUpsertDto } from "@/lib/workOrdersApi";
+import { tenantsApi } from "@/lib/tenantsApi";
 import { WorkOrderDto } from "@/lib/types";
 
 type Priority = "low" | "normal" | "high" | "critical";
@@ -59,10 +59,6 @@ type NewWorkOrderState = {
   company_name: string;
   description: string;
   vendor_id: string | null;
-  vendor_id: string | null;
-  vendor_name: string;
-  vendor_name: string;
-  service_date: string;
   vendor_name: string;
   service_date: string;
   odometer: string;
@@ -132,9 +128,6 @@ export default function CreateWorkOrderDialog({
     company_name: initialCompanyName,
     description: "",
     vendor_id: null,
-    vendor_id: null,
-    vendor_name: "",
-    vendor_name: "",
     vendor_name: "",
     service_date: new Date().toISOString().split('T')[0], // Default to today YYYY-MM-DD
     odometer: "",
@@ -161,6 +154,9 @@ export default function CreateWorkOrderDialog({
     website?: string;
   } | null>(null);
 
+  // Fetch company name like App.tsx
+  const [fetchedCompanyName, setFetchedCompanyName] = useState<string | null>(null);
+
   const refreshVendors = async () => {
     try {
       const data = await shopsApi.list();
@@ -182,6 +178,23 @@ export default function CreateWorkOrderDialog({
     refreshVendors();
   }, []);
 
+  // 1. Fetch Tenant Name (Exact method from App.tsx)
+  useEffect(() => {
+    const fetchTenantData = async () => {
+      try {
+        const tenant = await tenantsApi.getCurrent();
+        if (tenant?.name) {
+          setFetchedCompanyName(tenant.name);
+        }
+      } catch (e) {
+        console.error("Failed to fetch tenant data", e);
+      }
+    };
+    if (open) {
+      fetchTenantData();
+    }
+  }, [open]);
+
   const handleShopAdded = async () => {
     const updatedVendors = await refreshVendors();
     // Auto-select the most recent one if we have a name match or just created one
@@ -193,24 +206,37 @@ export default function CreateWorkOrderDialog({
     }
   };
 
-  // Effect to reset/init form when props change or modal opens
+  // Combined Initialization Effect
   useEffect(() => {
     if (open) {
+      console.log("Dialog Data Initialization Started");
+
+      // Note: We deliberately do NOT overwrite company_name here with initialCompanyName or fetchedCompanyName to avoid race conditions resetting data.
+      // The separate effect below handles dynamic company name injection.
+
+
       if (existingWorkOrder) {
+        console.log("Initializing Edit Mode for:", existingWorkOrder.id);
         // EDIT MODE INITIALIZATION
-        setNewWorkOrder(prev => ({
-          ...prev,
-          vehicle_id: existingWorkOrder.equipmentId,
-          vehicle_type: "truck", // Default, or infer?
-          company_name: initialCompanyName, // Or keep?
-          service_date: existingWorkOrder.openedAt ? new Date(existingWorkOrder.openedAt).toISOString().split('T')[0] : "",
-          odometer: existingWorkOrder.odometerAtService?.toString() || "",
-          created_at: existingWorkOrder.createdAt ? new Date(existingWorkOrder.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          description: existingWorkOrder.title === "New Work Order" ? (existingWorkOrder.complaint || "") : (existingWorkOrder.title + "\n" + existingWorkOrder.complaint), // Combine back?
-          priority: (existingWorkOrder.priority === "Normal" || existingWorkOrder.priority === 1) ? "normal" : "high", // simplified mapping, can be better
-          vendor_id: existingWorkOrder.vendorId || null,
-          vendor_name: existingWorkOrder.vendorName || ""
-        }));
+        setNewWorkOrder(prev => {
+          console.log("Setting Work Order State from Existing");
+          return {
+            ...prev,
+            vehicle_id: existingWorkOrder.equipmentId,
+            vehicle_type: "truck", // Default, or infer?
+            // Note: We deliberately do NOT overwrite company_name here with initialCompanyName
+            // to allow the async fetch above to populate it.
+            // Unless we wanted to support 'existingWorkOrder.companyName' if it existed (it doesn't currently).
+
+            service_date: existingWorkOrder.openedAt ? new Date(existingWorkOrder.openedAt).toISOString().split('T')[0] : "",
+            odometer: existingWorkOrder.odometerAtService?.toString() || "",
+            created_at: existingWorkOrder.createdAt ? new Date(existingWorkOrder.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            description: existingWorkOrder.title === "New Work Order" ? (existingWorkOrder.complaint || "") : (existingWorkOrder.title + "\n" + existingWorkOrder.complaint),
+            priority: (existingWorkOrder.priority === "Normal" || String(existingWorkOrder.priority) === "1") ? "normal" : "high",
+            vendor_id: existingWorkOrder.vendorId || null,
+            vendor_name: existingWorkOrder.vendorName || ""
+          }
+        });
 
         // Map string status to enum
         let statusEnum = WorkOrderStatus.Open;
@@ -223,7 +249,6 @@ export default function CreateWorkOrderDialog({
           else if (s === 'closed') statusEnum = WorkOrderStatus.Closed;
           else if (s === 'cancelled' || s === 'canceled') statusEnum = WorkOrderStatus.Cancelled;
           else if (s === 'paid') statusEnum = WorkOrderStatus.Paid;
-          // Fallback or keep as open
         }
 
         setWorkOrderType((statusEnum === WorkOrderStatus.Completed || statusEnum === WorkOrderStatus.Closed) ? 'completed' : 'upcoming');
@@ -252,19 +277,19 @@ export default function CreateWorkOrderDialog({
           });
         }
 
-        setDraftWorkOrderId(existingWorkOrder.id); // It's not a draft, but we use this ID for uploads
+        setDraftWorkOrderId(existingWorkOrder.id);
         setCustomWorkOrderNumber(existingWorkOrder.workOrderNumber || null);
 
       } else {
+        console.log("Initializing Create Mode");
         // CREATE MODE INITIALIZATION
         setNewWorkOrder(prev => ({
           ...prev,
           vehicle_id: initialVehicleId || "",
           vehicle_type: initialVehicleType || "truck",
-          vehicle_type: initialVehicleType || "truck",
-          company_name: initialCompanyName,
-          company_name: initialCompanyName,
-          company_name: initialCompanyName,
+          // company_name: initialCompanyName || "", // Don't set here if we want dynamic fetch to take precedence without overwrite risks. or set to initial and let dynamic overwrite.
+          company_name: initialCompanyName || "",
+
           service_date: new Date().toISOString().split('T')[0],
           odometer: "",
           created_at: new Date().toISOString().split('T')[0],
@@ -272,6 +297,7 @@ export default function CreateWorkOrderDialog({
           vendor_id: null,
           vendor_name: ""
         }));
+
         setWorkOrderType("upcoming");
         setRatingData({
           mainRating: 0,
@@ -291,6 +317,20 @@ export default function CreateWorkOrderDialog({
       }
     }
   }, [open, initialVehicleId, initialVehicleType, initialUnitNumber, initialCompanyName, existingWorkOrder]);
+
+  // Dedicated effect to apply fetched company name
+  useEffect(() => {
+    if (open && fetchedCompanyName) {
+      setNewWorkOrder(prev => {
+        // Only update if it's currently empty, matches initial prop, or we want to force it (usually safe for company name which is global)
+        // For safety, let's only update if it's effectively "pristine" or empty.
+        if (!prev.company_name || prev.company_name === initialCompanyName) {
+          return { ...prev, company_name: fetchedCompanyName };
+        }
+        return prev;
+      });
+    }
+  }, [open, fetchedCompanyName, initialCompanyName]);
 
   // Smart default for status based on type
   useEffect(() => {
@@ -404,11 +444,9 @@ export default function CreateWorkOrderDialog({
       priority: "normal",
       eta_date: "",
       eta_hours: "",
-      company_name: initialCompanyName,
+      company_name: fetchedCompanyName || initialCompanyName || "",
       description: "",
       vendor_id: null,
-      vendor_id: null,
-      vendor_name: "",
       vendor_name: "",
       service_date: new Date().toISOString().split('T')[0],
       odometer: "",

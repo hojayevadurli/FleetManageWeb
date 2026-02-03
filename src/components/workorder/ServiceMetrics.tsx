@@ -10,14 +10,14 @@ const ServiceMetrics = ({ workOrders }: ServiceMetricsProps) => {
     // 1. Open Orders
     const openOrders = workOrders.filter(w =>
         [WorkOrderStatus.Draft, WorkOrderStatus.Open, WorkOrderStatus.InProcess].includes((w.status as any))
-        || ["draft", "open", "inprocess"].includes((w.status || "").toLowerCase())
+        || ["draft", "open", "inprocess"].includes(String(w.status || "").toLowerCase())
     ).length;
 
     // 2. Completed This Month (Simple Logic: Completed status)
     // For "This Month", we'd filter by closedAt/openedAt, but for now let's just count ALL Completed/Closed/Paid
     const completedOrders = workOrders.filter(w =>
         [WorkOrderStatus.Completed, WorkOrderStatus.Closed, WorkOrderStatus.Paid].includes((w.status as any))
-        || ["completed", "closed", "paid"].includes((w.status || "").toLowerCase())
+        || ["completed", "closed", "paid"].includes(String(w.status || "").toLowerCase())
     ).length;
 
     // 3. Total Spent
@@ -27,7 +27,8 @@ const ServiceMetrics = ({ workOrders }: ServiceMetricsProps) => {
 
     // 4. Overdue (Placeholder logic: Open status > 7 days old)
     const overdueOrders = workOrders.filter(w => {
-        const isOpen = ["open", "inprocess"].includes((w.status || "").toLowerCase());
+        const isOpen = [WorkOrderStatus.Open, WorkOrderStatus.InProcess].includes(w.status as any)
+            || ["open", "inprocess"].includes(String(w.status || "").toLowerCase());
         if (!isOpen) return false;
         const opened = new Date(w.openedAt);
         const now = new Date();

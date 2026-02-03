@@ -29,6 +29,7 @@ type FileUploadProps =
     uploadDisabled?: boolean;
     uploadDisabledReason?: string;
     uploadedFiles?: Array<{ name: string; url: string }>;
+    onUploadSuccess?: (file: File, url: string) => void;
   }
   | {
     files: File[];
@@ -43,6 +44,7 @@ type FileUploadProps =
     uploadDisabled?: boolean;
     uploadDisabledReason?: string;
     uploadedFiles?: Array<{ name: string; url: string }>;
+    onUploadSuccess?: (file: File, url: string) => void;
   };
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -52,7 +54,7 @@ const isImageFile = (file: File) => file.type.startsWith("image/");
 const isPdfFile = (file: File) => file.type === "application/pdf";
 
 export default function FileUpload(props: FileUploadProps) {
-  const { files, onFilesChange, onUploaded, onUploadingChange } = props;
+  const { files, onFilesChange, onUploaded, onUploadingChange, onUploadSuccess } = props;
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -142,6 +144,8 @@ export default function FileUpload(props: FileUploadProps) {
             startDate: new Date().toISOString().split('T')[0], // Today's date YYYY-MM-DD
             notes: file.name
           });
+
+          onUploadSuccess?.(file, url);
 
           successCount++;
         } catch (err: any) {
