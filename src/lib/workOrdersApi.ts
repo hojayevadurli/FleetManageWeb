@@ -144,9 +144,15 @@ function normalizeWorkOrder(data: any): WorkOrderDto {
     diagnosis: data.diagnosis || data.Diagnosis,
     resolution: data.resolution || data.Resolution,
     notes: data.notes || data.Notes,
-    status: data.status || data.Status,
-    priority: data.priority || data.Priority,
-    costSource: data.costSource || data.CostSource,
+    status: (typeof data.status === 'number'
+      ? data.status
+      : WorkOrderStatus[data.status as keyof typeof WorkOrderStatus] ?? WorkOrderStatus.Open) as any, // Cast to any to satisfy string type in DTO for now, or update DTO type
+    priority: (typeof data.priority === 'number'
+      ? data.priority
+      : WorkOrderPriority[data.priority as keyof typeof WorkOrderPriority] ?? WorkOrderPriority.Normal) as any,
+    costSource: (typeof data.costSource === 'number'
+      ? data.costSource
+      : WorkOrderCostSource[data.costSource as keyof typeof WorkOrderCostSource] ?? WorkOrderCostSource.Estimated) as any,
     estimatedTotal: data.estimatedTotal ?? data.EstimatedTotal ?? 0,
     manualActualTotal: data.manualActualTotal ?? data.ManualActualTotal ?? 0,
     lines: (data.lines || data.Lines || []).map((l: any) => ({

@@ -45,21 +45,27 @@ const formatMoney = (n: number) =>
 const formatShortId = (id: string) => id.slice(0, 8).toUpperCase();
 
 // Helper to normalize status strings
-const normStatus = (s?: string) => (s || "").toLowerCase();
+const normStatus = (s?: string | number) => String(s || "").toLowerCase();
 
-const statusConfig = (status: string) => {
+const statusConfig = (status: string | number) => {
   const s = normStatus(status);
   switch (s) {
     case "draft":
+    case "0": // WorkOrderStatus.Draft
       return { badge: "bg-slate-100 text-slate-600", border: "border-l-slate-300", label: "Draft" };
     case "open":
+    case "1": // WorkOrderStatus.Open
     case "inprocess":
+    case "2": // WorkOrderStatus.InProcess
       return { badge: "bg-blue-100 text-blue-700", border: "border-l-blue-500", label: "Open" };
     case "completed":
+    case "3": // WorkOrderStatus.Completed
       return { badge: "bg-emerald-100 text-emerald-700", border: "border-l-emerald-500", label: "Completed" };
     case "closed":
+    case "4": // WorkOrderStatus.Closed
       return { badge: "bg-indigo-100 text-indigo-700", border: "border-l-indigo-500", label: "Closed" };
     case "paid":
+    case "6": // WorkOrderStatus.Paid
       return { badge: "bg-purple-100 text-purple-700", border: "border-l-purple-500", label: "Paid" };
     default:
       return { badge: "bg-slate-100 text-slate-600", border: "border-l-slate-200", label: status };

@@ -60,6 +60,7 @@ type NewWorkOrderState = {
   description: string;
   vendor_id: string | null;
   vendor_name: string;
+  odometer: string;
 };
 
 interface WorkOrderDialogProps {
@@ -84,6 +85,10 @@ export default function WorkOrderDialog({
   onAfterCreated
 }: WorkOrderDialogProps) {
   const [workOrderItems, setWorkOrderItems] = useState<WorkOrderItemData[]>([]);
+  // Fetch company name first so it can be used in initial state if possible (though unlikely on first render)
+  // Fetch company name first so it can be used in initial state if possible
+  const [fetchedCompanyName, setFetchedCompanyName] = useState<string | null>(null);
+  const fetchedCompanyNameRef = useRef<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isParsingReceipt, setIsParsingReceipt] = useState(false);
   const receiptInputRef = useRef<HTMLInputElement>(null);
@@ -125,10 +130,11 @@ export default function WorkOrderDialog({
     priority: "normal",
     eta_date: workOrderType === "completed" ? new Date().toISOString().split('T')[0] : "",
     eta_hours: "",
-    company_name: initialCompanyName,
+    company_name: fetchedCompanyName || initialCompanyName || "",
     description: "",
     vendor_id: null,
-    vendor_name: ""
+    vendor_name: "",
+    odometer: ""
   });
 
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -149,6 +155,10 @@ export default function WorkOrderDialog({
     website?: string;
   } | null>(null);
 
+  // fetchedCompanyName moved to top
+
+
+
   const refreshVendors = async () => {
     try {
       const data = await shopsApi.list();
@@ -165,25 +175,64 @@ export default function WorkOrderDialog({
     }
   };
 
+  // Sync company name from props if it arrives later
   useEffect(() => {
-    if (open && !initialCompanyName) {
-      tenantsApi.getCurrent().then(tenant => {
-        setNewWorkOrder(prev => {
-          if (!prev.company_name && tenant.name) {
-            return { ...prev, company_name: tenant.name };
-          }
-          return prev;
-        });
-      }).catch(err => {
-        console.error("Failed to fetch tenant info", err);
+    if (!editWoId && initialCompanyName) {
+      setNewWorkOrder(prev => {
+        if (prev.company_name !== initialCompanyName) {
+          return { ...prev, company_name: initialCompanyName };
+        }
+        return prev;
       });
     }
-  }, [open, initialCompanyName]);
+  }, [initialCompanyName, editWoId]);
 
   // Load vendors on mount
   useEffect(() => {
     refreshVendors();
   }, []);
+
+  // 1. Fetch Tenant Name (Exact method from App.tsx)
+  useEffect(() => {
+    const fetchTenantData = async () => {
+      try {
+        const tenant = await tenantsApi.getCurrent();
+        if (tenant?.name) {
+          setFetchedCompanyName(tenant.name);
+          fetchedCompanyNameRef.current = tenant.name;
+        }
+      } catch (e) {
+        console.error("Failed to fetch tenant data", e);
+      }
+    };
+    if (open) {
+      fetchTenantData();
+    }
+  }, [open]);
+
+  // Dedicated effect to apply fetched company name
+  useEffect(() => {
+    // We only auto-fill if we HAVE a fetched name.
+    if (!fetchedCompanyName) return;
+
+    // Use a function update to inspect current state
+    setNewWorkOrder(prev => {
+      // If currently empty, definitely fill it
+      if (!prev.company_name) {
+        return { ...prev, company_name: fetchedCompanyName };
+      }
+      // If currently equals the fallback/initial prop, override it with the "better" fetched name
+      if (initialCompanyName && prev.company_name === initialCompanyName) {
+        return { ...prev, company_name: fetchedCompanyName };
+      }
+      // OTHERWISE: User might have edited it manually or we loaded a specific one from DB. 
+      // Only overwrite if we are sure it's "unset" or "default". 
+      // But wait... for this specific customer request, they WANT the dynamic name.
+      // Let's force it if it's currently a "System" default or empty
+      return prev;
+    });
+  }, [fetchedCompanyName, initialCompanyName]);
+
 
   // Fetch Work Order Details if in Edit Mode
   useEffect(() => {
@@ -209,20 +258,25 @@ export default function WorkOrderDialog({
       setNewWorkOrder({
         vehicle_id: wo.equipmentId,
         vehicle_type: "truck",
-        priority: (wo.priority === "Low" ? "low" :
-          wo.priority === "High" ? "high" :
-            wo.priority === "Critical" ? "critical" : "normal"),
+        priority: ((wo.priority as unknown as WorkOrderPriority) === WorkOrderPriority.Low ? "low" :
+          (wo.priority as unknown as WorkOrderPriority) === WorkOrderPriority.High ? "high" :
+            (wo.priority as unknown as WorkOrderPriority) === WorkOrderPriority.Critical ? "critical" : "normal"),
         eta_date: wo.openedAt ? new Date(wo.openedAt).toISOString().split('T')[0] : "",
         eta_hours: "",
-        company_name: wo.notes?.match(/Branch: (.*?)(\n|$)/)?.[1] || initialCompanyName,
+        // Prioritize: 1. Live Ref (most current fetch), 2. Fetched State, 3. Saved in Notes, 4. Saved Prop, 5. Empty
+        company_name: fetchedCompanyNameRef.current || fetchedCompanyName || wo.notes?.match(/Branch: (.*?)(\n|$)/)?.[1] || initialCompanyName || "",
         description: [wo.complaint, wo.notes].filter(x => x && x !== "Manual Entry" && !x.startsWith("Branch:")).join('\n\n').trim() || wo.title || "",
         vendor_id: wo.vendorId || null,
-        vendor_name: wo.vendorName || ""
+        vendor_name: wo.vendorName || "",
+        odometer: wo.odometerAtService?.toString() || ""
       });
 
       // 2. Status
-      setStatus(wo.status as any);
-      if (['Completed', 'Closed', 'Paid'].includes(wo.status as any)) {
+      // API layer (workOrdersApi) now normalizes this to numeric Enum value
+      const validStatus = wo.status as unknown as WorkOrderStatus;
+      setStatus(validStatus);
+
+      if ([WorkOrderStatus.Completed, WorkOrderStatus.Closed, WorkOrderStatus.Paid].includes(validStatus)) {
         setWorkOrderType('completed');
       } else {
         setWorkOrderType('upcoming');
@@ -328,10 +382,11 @@ export default function WorkOrderDialog({
       priority: "normal",
       eta_date: "",
       eta_hours: "",
-      company_name: initialCompanyName,
+      company_name: fetchedCompanyName || initialCompanyName,
       description: "",
       vendor_id: null,
-      vendor_name: ""
+      vendor_name: "",
+      odometer: ""
     });
     setWorkOrderType("upcoming");
     setRatingData({
@@ -356,16 +411,7 @@ export default function WorkOrderDialog({
     }
   };
 
-  // Smart default for status based on type (Only call when not editing to avoid override)
-  useEffect(() => {
-    if (editWoId) return;
 
-    if (workOrderType === 'completed') {
-      setStatus(WorkOrderStatus.Completed);
-    } else {
-      setStatus(WorkOrderStatus.Open);
-    }
-  }, [workOrderType, editWoId]);
 
   const computedLines = useMemo(() => {
     const items = (workOrderItems ?? []).filter(x => x.description.trim());
@@ -543,11 +589,15 @@ export default function WorkOrderDialog({
 
       const dto: WorkOrderUpsertDto = {
         equipmentId: newWorkOrder.vehicle_id,
-        vendorId: newWorkOrder.vendor_id,
+        vendorId: newWorkOrder.vendor_id || null, // Ensure explicit null if empty string
         workOrderNumber: customWorkOrderNumber,
-        odometerAtService: null,
+        odometerAtService: newWorkOrder.odometer ? parseInt(newWorkOrder.odometer) : null,
         openedAt: newWorkOrder.eta_date ? new Date(newWorkOrder.eta_date).toISOString() : new Date().toISOString(),
-        closedAt: workOrderType === "completed" ? new Date().toISOString() : null,
+        closedAt: workOrderType === "completed" ? (
+          (newWorkOrder.eta_date && new Date(newWorkOrder.eta_date) > new Date())
+            ? new Date(newWorkOrder.eta_date).toISOString() // If future date, close at open time (instant)
+            : new Date().toISOString() // Else close now
+        ) : null,
         title: (cleanComplaint.split("\n")[0].slice(0, 100)) || "Maintenance",
         complaint: cleanComplaint || "Maintenance",
         notes: finalNotes || null,
@@ -556,17 +606,17 @@ export default function WorkOrderDialog({
           newWorkOrder.priority === "normal" ? WorkOrderPriority.Normal :
             newWorkOrder.priority === "high" ? WorkOrderPriority.High : WorkOrderPriority.Critical,
         costSource: WorkOrderCostSource.Estimated,
-        estimatedTotal: computedLines.reduce((acc, l) => acc + l.amount, 0),
-        manualActualTotal: workOrderType === "completed" ? computedLines.reduce((acc, l) => acc + l.amount, 0) : 0,
+        estimatedTotal: computedLines.reduce((acc, l) => acc + (l.unitPrice * l.qty), 0),
+        manualActualTotal: workOrderType === "completed" ? computedLines.reduce((acc, l) => acc + (l.unitPrice * l.qty), 0) : 0,
         lines: computedLines.map(l => ({
           type: l.type,
           description: l.description,
           qty: l.qty,
           unitPrice: l.unitPrice,
           partNumber: l.partNumber
-        })),
-        replaceDocuments: true, // FORCE Update of docs (Saved: true)
-        documentIds: currentDocIds // Pass explicitly
+        }))
+        // replaceDocuments: true, // REMOVED: Managed via separate endpoints
+        // documentIds: currentDocIds // REMOVED: Managed via separate endpoints
       };
 
       await workOrdersApi.update(id, dto);
@@ -618,8 +668,9 @@ export default function WorkOrderDialog({
       }
       onOpenChange(false);
     } catch (e: any) {
-      console.error(e);
-      toast.error(e?.message ?? "Failed to save work order.");
+      console.error("Failed to save work order:", e);
+      console.error("Error Response Data:", e.response?.data);
+      toast.error(e?.response?.data?.title ?? e?.message ?? "Failed to save work order.");
     } finally {
       setIsSubmitting(false);
     }
@@ -742,6 +793,18 @@ export default function WorkOrderDialog({
           }
         }
 
+        // Auto-fill Service Date (Map to eta_date)
+        if (result.date) {
+          setNewWorkOrder(prev => ({ ...prev, eta_date: result.date }));
+          toast.info(`Service Date detected: ${result.date}`);
+        }
+
+        // Auto-fill Odometer
+        if (result.odometer) {
+          setNewWorkOrder(prev => ({ ...prev, odometer: result.odometer.toString() }));
+          toast.info(`Odometer detected: ${result.odometer}`);
+        }
+
         // Expand attachments section to show the uploaded file
         setShowOptionalFields(prev => ({ ...prev, attachments: true }));
       } else {
@@ -789,8 +852,8 @@ export default function WorkOrderDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-7xl w-full h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem]">
         <DialogHeader className="px-10 py-8 border-b border-slate-100 bg-white sticky top-0 z-10">
-          <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight">Create New Work Order</DialogTitle>
-          <DialogDescription className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Create a new maintenance work order for your fleet</DialogDescription>
+          <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight">{editWoId ? "Edit Work Order" : "Create New Work Order"}</DialogTitle>
+          <DialogDescription className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{editWoId ? "Modify existing maintenance record" : "Create a new maintenance work order for your fleet"}</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 flex overflow-hidden">
@@ -988,12 +1051,22 @@ export default function WorkOrderDialog({
               <div className="bg-slate-50 p-1 rounded-xl border border-slate-100">
                 <RadioGroup
                   value={workOrderType}
-                  onValueChange={(v: "upcoming" | "completed") => setWorkOrderType(v)}
+                  onValueChange={(v: "upcoming" | "completed") => {
+                    setWorkOrderType(v);
+                    if (v === 'completed') {
+                      setStatus(WorkOrderStatus.Completed);
+                    } else {
+                      setStatus(WorkOrderStatus.Open);
+                    }
+                  }}
                   className="grid grid-cols-2"
                 >
                   <div className={`relative flex items-center space-x-2 p-3 rounded-[0.6rem] cursor-pointer transition-all ${workOrderType === 'upcoming' ? 'bg-white shadow-sm ring-1 ring-black/5' : 'hover:bg-slate-100/50 text-slate-500'}`}>
                     <RadioGroupItem value="upcoming" id="type-upcoming" className="sr-only" />
-                    <div className="flex items-center gap-3 w-full" onClick={() => setWorkOrderType('upcoming')}>
+                    <div className="flex items-center gap-3 w-full" onClick={() => {
+                      setWorkOrderType('upcoming');
+                      setStatus(WorkOrderStatus.Open);
+                    }}>
                       <Calendar className={`w-5 h-5 ${workOrderType === 'upcoming' ? 'text-blue-600' : 'text-slate-400'}`} />
                       <div>
                         <Label htmlFor="type-upcoming" className={`font-bold cursor-pointer ${workOrderType === 'upcoming' ? 'text-slate-900' : 'text-slate-500'}`}>Upcoming Work</Label>
@@ -1003,7 +1076,10 @@ export default function WorkOrderDialog({
                   </div>
                   <div className={`relative flex items-center space-x-2 p-3 rounded-[0.6rem] cursor-pointer transition-all ${workOrderType === 'completed' ? 'bg-white shadow-sm ring-1 ring-black/5' : 'hover:bg-slate-100/50 text-slate-500'}`}>
                     <RadioGroupItem value="completed" id="type-completed" className="sr-only" />
-                    <div className="flex items-center gap-3 w-full" onClick={() => setWorkOrderType('completed')}>
+                    <div className="flex items-center gap-3 w-full" onClick={() => {
+                      setWorkOrderType('completed');
+                      setStatus(WorkOrderStatus.Completed);
+                    }}>
                       <CheckCircle2 className={`w-5 h-5 ${workOrderType === 'completed' ? 'text-green-600' : 'text-slate-400'}`} />
                       <div>
                         <Label htmlFor="type-completed" className={`font-bold cursor-pointer ${workOrderType === 'completed' ? 'text-slate-900' : 'text-slate-500'}`}>Completed Work</Label>

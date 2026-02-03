@@ -71,6 +71,7 @@ function normalizeReceiptResult(parsed: any): ReceiptParsedData | null {
     total: Number(parsed.total || 0),
     notes: parsed.notes ? String(parsed.notes) : undefined,
     unitNumber: parsed.unitNumber ? String(parsed.unitNumber) : undefined,
+    odometer: parsed.odometer ? Number(parsed.odometer) : undefined,
   };
 
   const hasAnything =
@@ -124,7 +125,8 @@ OUTPUT RULES:
   "items": [ { "description": "", "cost": 0, "type": "parts|labor|fee|tax" } ],
   "total": 0,
   "notes": "",
-  "unitNumber": ""
+  "unitNumber": "",
+  "odometer": 0
 }`;
 
   try {
