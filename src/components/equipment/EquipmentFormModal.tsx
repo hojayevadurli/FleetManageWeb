@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     X,
     Truck as TruckIcon,
@@ -42,7 +42,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
     mode,
     initialData
 }) => {
-    const [formData, setFormData] = useState<Partial<EquipmentCreatePayload> & { specificType?: string; licenseState?: string; operationalStatus?: EquipmentOperationalStatus }>(() => {
+    const [formData, setFormData] = useState<Partial<EquipmentCreatePayload> & { specificType?: string; licenseState?: string; operationalStatus?: EquipmentOperationalStatus; inServiceDate?: string; outOfServiceDate?: string }>(() => {
         if (initialData) {
             return {
                 unitNumber: initialData.unitNumber || '',
@@ -64,7 +64,9 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                 equipmentTypeId: initialData.equipmentTypeId || '',
                 hours: initialData.hours || 0,
                 initialOdometer: 0,
-                initialHours: 0
+                initialHours: 0,
+                inServiceDate: initialData.inServiceDate || (mode === 'create' ? new Date().toISOString().split('T')[0] : ''),
+                outOfServiceDate: initialData.outOfServiceDate || ''
             };
         }
 
@@ -88,23 +90,31 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
             weightCapacity: 45000,
             fleetCategoryId: undefined,
             initialOdometer: 0,
-            initialHours: 0
+            initialHours: 0,
+            inServiceDate: new Date().toISOString().split('T')[0],
+            outOfServiceDate: ''
         };
     });
 
     // Reset when mode changes effectively, or if initialData updates while open (though we remount usually)
+    const lastInitId = useRef<string | null>(null);
+
     useEffect(() => {
         if (isOpen && initialData) {
-            // Optional: If we want to support switching data without remounting. 
-            // But for now lazy init covers the main case.
-            // We can keep a simplified effect just in case props update.
-            setFormData(prev => ({
-                ...prev,
-                ...initialData,
-                unitNumber: initialData.unitNumber || prev.unitNumber // Ensure precedence
-            }));
+            const currentId = initialData.id || 'new';
+            if (currentId !== lastInitId.current) {
+                // Optional: If we want to support switching data without remounting. 
+                // But for now lazy init covers the main case. 
+                // We can keep a simplified effect just in case props update.
+                setFormData(prev => ({
+                    ...prev,
+                    ...initialData,
+                    unitNumber: initialData.unitNumber || prev.unitNumber // Ensure precedence
+                }));
+                lastInitId.current = currentId;
+            }
         }
-    }, [initialData, isOpen]); // Only re-run if DATA changes or modal opens
+    }, [isOpen, initialData]);
 
     const [isDecoding, setIsDecoding] = useState(false);
     const [decodeError, setDecodeError] = useState<string | null>(null);
@@ -192,8 +202,13 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
         setSubmitError(null);
         setIsSubmitting(true);
 
+        const payload = { ...formData };
+        // Sanitize dates: empty string should be undefined/null for backend DateOnly?
+        if (payload.inServiceDate === '') payload.inServiceDate = undefined;
+        if (payload.outOfServiceDate === '') payload.outOfServiceDate = undefined;
+
         try {
-            await onSave(formData);
+            await onSave(payload);
             onClose();
         } catch (err: any) {
             console.error(err);
@@ -376,13 +391,22 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             {/* 5. Status, Model, Year */}
                             <div className="grid grid-cols-3 gap-6">
                                 <div className="space-y-1.5">
-                                    <div className="min-h-[15px] px-1">
+                                    <div className="flex justify-between items-center min-h-[15px] px-1">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Status</label>
                                     </div>
                                     <select
                                         className={`w-full px-5 py-4 border rounded-2xl text-sm font-black outline-none appearance-none cursor-pointer transition-all bg-slate-50 ${getStatusColor(formData.operationalStatus || EquipmentOperationalStatus.Active)}`}
                                         value={formData.status}
-                                        onChange={e => setFormData({ ...formData, status: Number(e.target.value) })}
+                                        onChange={e => {
+                                            const newStatus = Number(e.target.value);
+                                            const isOut = newStatus === EquipmentOperationalStatus.OutOfService || newStatus === EquipmentOperationalStatus.Sold;
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                status: newStatus,
+                                                operationalStatus: newStatus,
+                                                outOfServiceDate: isOut ? (prev.outOfServiceDate || new Date().toISOString().split('T')[0]) : ''
+                                            }));
+                                        }}
                                     >
                                         {Object.entries(EquipmentOperationalStatus)
                                             .filter(([k, v]) => typeof v === 'number')
@@ -436,6 +460,33 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                         />
                                         {autoFilledFields.includes('year') && <Lock className="w-3 h-3 text-indigo-400 absolute right-3 top-1/2 -translate-y-1/2 opacity-50" />}
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* Service Dates - Added */}
+                            <div className="grid grid-cols-2 gap-6 pt-2">
+                                <div className="space-y-1.5">
+                                    <div className="min-h-[15px] px-1 flex items-center">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Start Date</label>
+                                    </div>
+                                    <input
+                                        type="date"
+                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                        value={formData.inServiceDate ? formData.inServiceDate.split('T')[0] : ''}
+                                        disabled={mode === 'edit' && !!initialData?.inServiceDate && initialData.inServiceDate !== '0001-01-01'}
+                                        onChange={e => setFormData({ ...formData, inServiceDate: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <div className="min-h-[15px] px-1 flex items-center">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">End Date</label>
+                                    </div>
+                                    <input
+                                        type="date"
+                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={formData.outOfServiceDate ? formData.outOfServiceDate.split('T')[0] : ''}
+                                        onChange={e => setFormData({ ...formData, outOfServiceDate: e.target.value })}
+                                    />
                                 </div>
                             </div>
 

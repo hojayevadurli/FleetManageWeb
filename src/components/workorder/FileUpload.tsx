@@ -5,6 +5,10 @@ import { Label } from "@/components/ui/label";
 import { X, Upload, Image as ImageIcon, Video, FileText } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/Api";
+import { uploadsApi } from "@/lib/uploadsApi";
+import { documentsApi } from "@/lib/documentsApi";
+import { workOrdersApi } from "@/lib/workOrdersApi";
+import { DocumentRole } from "@/lib/types";
 
 /**
  * ✅ Enforce correct usage:
@@ -13,27 +17,35 @@ import api from "@/lib/Api";
  */
 type FileUploadProps =
   | {
-      files: File[];
-      onFilesChange: (files: File[]) => void;
+    files: File[];
+    onFilesChange: (files: File[]) => void;
 
-      /** Edit dialog */
-      workOrderId: string;
-      ensureWorkOrderId?: never;
+    /** Edit dialog */
+    workOrderId: string;
+    ensureWorkOrderId?: never;
 
-      onUploaded?: (workOrderId: string) => void;
-      onUploadingChange?: (uploading: boolean) => void;
-    }
+    onUploaded?: (workOrderId: string) => void;
+    onUploadingChange?: (uploading: boolean) => void;
+    uploadDisabled?: boolean;
+    uploadDisabledReason?: string;
+    uploadedFiles?: Array<{ name: string; url: string }>;
+    onUploadSuccess?: (file: File, url: string) => void;
+  }
   | {
-      files: File[];
-      onFilesChange: (files: File[]) => void;
+    files: File[];
+    onFilesChange: (files: File[]) => void;
 
-      /** Create dialog (id not known yet) */
-      workOrderId?: undefined;
-      ensureWorkOrderId: () => Promise<string>;
+    /** Create dialog (id not known yet) */
+    workOrderId?: undefined;
+    ensureWorkOrderId: () => Promise<string>;
 
-      onUploaded?: (workOrderId: string) => void;
-      onUploadingChange?: (uploading: boolean) => void;
-    };
+    onUploaded?: (workOrderId: string) => void;
+    onUploadingChange?: (uploading: boolean) => void;
+    uploadDisabled?: boolean;
+    uploadDisabledReason?: string;
+    uploadedFiles?: Array<{ name: string; url: string }>;
+    onUploadSuccess?: (file: File, url: string) => void;
+  };
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
@@ -42,7 +54,7 @@ const isImageFile = (file: File) => file.type.startsWith("image/");
 const isPdfFile = (file: File) => file.type === "application/pdf";
 
 export default function FileUpload(props: FileUploadProps) {
-  const { files, onFilesChange, onUploaded, onUploadingChange } = props;
+  const { files, onFilesChange, onUploaded, onUploadingChange, onUploadSuccess } = props;
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -99,6 +111,9 @@ export default function FileUpload(props: FileUploadProps) {
     }
 
     setUploading(true);
+    let successCount = 0;
+    const errors: string[] = [];
+
     try {
       const id = await resolveWorkOrderId();
 
@@ -108,26 +123,51 @@ export default function FileUpload(props: FileUploadProps) {
         return;
       }
 
-      const form = new FormData();
-      files.forEach((f) => form.append("files", f));
+      // Process files one by one (or in parallel) to follow the 3-step flow
+      for (const file of files) {
+        try {
+          // 1. Upload
+          const url = await uploadsApi.uploadDocument(file);
 
-      // ✅ Ensure your axios instance baseURL includes `/api`
-      // Example final URL: https://localhost:7297/api/workorders/{id}/attachments
-      await api.post(`/workorders/${id}/attachments`, form, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+          // 2. Create Document Entity
+          const doc = await documentsApi.create({
+            fileUrl: url,
+            fileType: file.type,
+            docKind: 'work_order', // Default kind
+            vendorNameRaw: null
+          });
 
-      onFilesChange([]);
-      toast.success("Attachments uploaded");
-      onUploaded?.(id);
+          // 3. Link to WorkOrder
+          await workOrdersApi.attachDocument(id, {
+            documentId: doc.id,
+            role: DocumentRole.WorkOrder, // Default role
+            startDate: new Date().toISOString().split('T')[0], // Today's date YYYY-MM-DD
+            notes: file.name
+          });
+
+          onUploadSuccess?.(file, url);
+
+          successCount++;
+        } catch (err: any) {
+          console.error(`Failed to upload/attach ${file.name}:`, err);
+          errors.push(`${file.name}: ${err.message || "Unknown error"}`);
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Successfully uploaded ${successCount} attachments`);
+        onFilesChange([]); // Clear successfully uploaded
+        onUploaded?.(id);
+      }
+
+      if (errors.length > 0) {
+        toast.error(`Failed to upload ${errors.length} files`);
+        console.error("Upload errors:", errors);
+      }
+
     } catch (err: any) {
       console.error(err);
-      const msg =
-        err?.response?.data?.message ||
-        err?.response?.data ||
-        err?.message ||
-        "Upload failed";
-      toast.error(String(msg));
+      toast.error("Critical upload error");
     } finally {
       setUploading(false);
     }
@@ -163,9 +203,18 @@ export default function FileUpload(props: FileUploadProps) {
           <div className="flex justify-between items-center mb-2">
             <Label className="text-sm">Selected ({files.length})</Label>
 
-            <Button size="sm" onClick={uploadFiles} disabled={uploading}>
-              {uploading ? "Uploading…" : "Upload Files"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {props.uploadDisabled && props.uploadDisabledReason && (
+                <span className="text-xs text-rose-500 font-medium">{props.uploadDisabledReason}</span>
+              )}
+              <Button
+                size="sm"
+                onClick={uploadFiles}
+                disabled={uploading || props.uploadDisabled}
+              >
+                {uploading ? "Uploading…" : "Upload Files"}
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -192,6 +241,24 @@ export default function FileUpload(props: FileUploadProps) {
                 >
                   <X className="h-3 w-3" />
                 </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {props.uploadedFiles && props.uploadedFiles.length > 0 && (
+        <div className="mt-4 border-t pt-4">
+          <Label className="text-sm text-emerald-600 font-bold mb-2 block">Saved Attachments ({props.uploadedFiles.length})</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {props.uploadedFiles.map((f, i) => (
+              <div key={i} className="bg-emerald-50 border border-emerald-100 rounded p-2 flex items-center gap-2">
+                <span className="text-emerald-500">
+                  {f.name.endsWith('.pdf') ? <FileText className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
+                </span>
+                <a href={f.url} target="_blank" rel="noreferrer" className="truncate flex-1 text-sm text-emerald-700 hover:underline">
+                  {f.name}
+                </a>
               </div>
             ))}
           </div>

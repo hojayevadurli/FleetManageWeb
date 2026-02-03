@@ -309,6 +309,7 @@ const WorkOrders = () => {
         onAfterCreated={loadData}
       />
 
+
       <ServiceMetrics workOrders={workOrders} />
 
       <WorkOrderFilters

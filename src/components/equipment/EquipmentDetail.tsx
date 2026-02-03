@@ -450,7 +450,9 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                             };
 
                                             // Calculate Last Service Date
+                                            // Calculate Last Service Date
                                             let lastServiceDate = equipment.lastServiceDate;
+
                                             if (!lastServiceDate && equipmentHistory.length > 0) {
                                                 const completedOrders = equipmentHistory
                                                     .filter(wo => wo.status === 3 || wo.status === 4 || wo.status === 6) // Completed, Closed, Paid

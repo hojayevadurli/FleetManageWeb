@@ -42,6 +42,7 @@ export interface WorkOrderUpsertDto {
   documentIds?: string[];
   rating?: number;
   ratingComment?: string;
+  createdAt?: string; // Optional override
 }
 
 /**
@@ -145,9 +146,15 @@ function normalizeWorkOrder(data: any): WorkOrderDto {
     diagnosis: data.diagnosis || data.Diagnosis,
     resolution: data.resolution || data.Resolution,
     notes: data.notes || data.Notes,
-    status: data.status || data.Status,
-    priority: data.priority || data.Priority,
-    costSource: data.costSource || data.CostSource,
+    status: (typeof data.status === 'number'
+      ? data.status
+      : WorkOrderStatus[data.status as keyof typeof WorkOrderStatus] ?? WorkOrderStatus.Open) as any, // Cast to any to satisfy string type in DTO for now, or update DTO type
+    priority: (typeof data.priority === 'number'
+      ? data.priority
+      : WorkOrderPriority[data.priority as keyof typeof WorkOrderPriority] ?? WorkOrderPriority.Normal) as any,
+    costSource: (typeof data.costSource === 'number'
+      ? data.costSource
+      : WorkOrderCostSource[data.costSource as keyof typeof WorkOrderCostSource] ?? WorkOrderCostSource.Estimated) as any,
     estimatedTotal: data.estimatedTotal ?? data.EstimatedTotal ?? 0,
     rating: data.rating ?? data.Rating,
     ratingComment: data.ratingComment ?? data.RatingComment,
@@ -307,5 +314,15 @@ export const workOrdersApi = {
    */
   deleteAttachment: async (workOrderId: string, documentId: string): Promise<void> => {
     await api.delete(`/workorders/${workOrderId}/attachments/${documentId}`);
+  },
+
+  /**
+   * Link an existing document to a work order
+   * POST /api/workorders/{id}/attachments
+   * Body: AttachDocumentPayload
+   */
+  attachDocument: async (workOrderId: string, payload: any): Promise<WorkOrderDocumentDto> => {
+    const res = await api.post(`/workorders/${workOrderId}/attachments`, payload);
+    return normalizeDocument(res.data);
   }
 };

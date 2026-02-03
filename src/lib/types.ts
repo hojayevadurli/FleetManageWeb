@@ -317,6 +317,9 @@ export interface WorkOrder {
   odometer?: number;
   hours?: number;
   payer?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  openedAt?: string;
   attachmentUrl?: string; // Mapped from document or preview
   attachmentFileName?: string;
   assetNumber?: string; // Mapped for display
@@ -432,6 +435,8 @@ export interface WorkOrderDto {
   rating?: number;
   ratingComment?: string;
   ratedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ChatMessage {
@@ -465,6 +470,7 @@ export interface ReceiptParsedData {
   total: number;
   notes?: string;
   unitNumber?: string;
+  odometer?: number;
 }
 
 export interface FuelParsedData {
