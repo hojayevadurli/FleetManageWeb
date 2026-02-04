@@ -45,6 +45,8 @@ export interface WorkOrderMedia {
   name: string;
   size?: number;
   uploadedAt?: string;
+  role?: DocumentRole;
+  docKind?: string;
 }
 
 export interface WorkOrderItem {

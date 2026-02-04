@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { parse, isValid, format } from "date-fns";
 import { Equipment, WorkOrder, ReceiptParsedData, FuelParsedData, Warranty } from "./types";
 
 // Vite env only
@@ -62,7 +63,19 @@ function normalizeReceiptResult(parsed: any): ReceiptParsedData | null {
       }
       : undefined,
     businessName: String(parsed.businessName || ""),
-    date: parsed.date ? String(parsed.date) : undefined,
+    date: (() => {
+      if (!parsed.date) return undefined;
+      const raw = String(parsed.date).trim();
+      // Try common formats
+      const formats = ["yyyy-MM-dd", "MM/dd/yyyy", "M/d/yyyy", "MMM d, yyyy", "MM-dd-yyyy"];
+      for (const fmt of formats) {
+        const d = parse(raw, fmt, new Date());
+        if (isValid(d)) {
+          return format(d, "yyyy-MM-dd");
+        }
+      }
+      return undefined; // consistent fallback
+    })(),
     items: items.map((it: any) => ({
       description: String(it.description || ""),
       cost: Number(it.cost || 0),

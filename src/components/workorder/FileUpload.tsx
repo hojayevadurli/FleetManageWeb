@@ -44,7 +44,8 @@ type FileUploadProps =
     uploadDisabled?: boolean;
     uploadDisabledReason?: string;
     uploadedFiles?: Array<{ name: string; url: string }>;
-    onUploadSuccess?: (file: File, url: string) => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onUploadSuccess?: (file: File, document: any) => void;
   };
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -145,7 +146,7 @@ export default function FileUpload(props: FileUploadProps) {
             notes: file.name
           });
 
-          onUploadSuccess?.(file, url);
+          onUploadSuccess?.(file, doc);
 
           successCount++;
         } catch (err: any) {

@@ -113,7 +113,8 @@ const ServiceRecordDetailPage = () => {
                     url: doc.fileUrl,
                     type,
                     name: (doc as any).fileName || doc.role?.toString() || 'Attachment',
-                    role: doc.role
+                    role: doc.role,
+                    docKind: doc.docKind
                 };
             }).sort((a, b) => {
                 // Priority: Role 50 (Invoice) or 51 (Receipt) -> Name contains "Invoice"/"Receipt" -> Date
@@ -208,20 +209,25 @@ const ServiceRecordDetailPage = () => {
     const displayedTotal = hasLines ? totalSum : (record?.totalCost || 0);
 
     // Actions
-    const handleDownloadReceipt = () => {
-        if (!record?.media || record.media.length === 0) {
-            toast({ title: "No Receipt", description: "There is no digital receipt attached to this record." });
-            return;
-        }
-
-        // Try to find a receipt/invoice
-        const receipt = record.media.find(m =>
+    const getReceipt = () => {
+        if (!record?.media) return null;
+        return record.media.find(m =>
+            m.role === DocumentRole.Invoice ||
+            m.role === DocumentRole.Receipt ||
+            m.docKind === 'invoice' ||
+            m.docKind === 'receipt' ||
             m.name.toLowerCase().includes('invoice') ||
             m.name.toLowerCase().includes('receipt')
-        ) || record.media[0];
+        );
+    };
+
+    const handleDownloadReceipt = () => {
+        const receipt = getReceipt();
 
         if (receipt?.url) {
             window.open(receipt.url, '_blank');
+        } else {
+            toast({ title: "No Receipt", description: "This record has no receipt attached." });
         }
     };
 
@@ -283,9 +289,12 @@ const ServiceRecordDetailPage = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <Button variant="ghost" onClick={handleDownloadReceipt} className="hidden sm:flex">
-                            <FileText className="w-4 h-4 mr-2" /> View Receipt
-                        </Button>
+                        {/* Only show if we actually have a receipt */}
+                        {getReceipt() && (
+                            <Button variant="ghost" onClick={handleDownloadReceipt} className="hidden sm:flex">
+                                <FileText className="w-4 h-4 mr-2" /> View Receipt
+                            </Button>
+                        )}
                         <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
                             <Edit className="w-4 h-4 mr-2" /> Edit
                         </Button>

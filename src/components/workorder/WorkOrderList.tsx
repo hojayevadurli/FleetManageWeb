@@ -117,7 +117,7 @@ const WorkOrderList = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-32">
       {workOrders.map((wo) => {
         const config = statusConfig(wo.status);
         const woNumber = wo.workOrderNumber ?? formatShortId(wo.id);
@@ -251,8 +251,8 @@ const WorkOrderList = ({
               {/* Footer: Services Summary & Actions */}
               <div className="bg-slate-50 -mx-5 -mb-5 px-5 py-3 border-t border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 
-                {/* Services List */}
-                <div className="flex-1">
+                {/* Services List - Added min-w-0 to prevent flex blowout */}
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 md:mb-0 md:hidden">
                     <Wrench className="h-3 w-3" /> Services
                   </div>
@@ -291,12 +291,28 @@ const WorkOrderList = ({
                   )}
                 </div>
 
-                {/* Desktop Actions */}
-                <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
-                  <Button variant="outline" size="sm" className="hidden md:flex" onClick={() => onViewDetails?.(wo.id)}>
+                {/* Desktop Actions - Added relative z-10 to ensure clickable */}
+                <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0 relative z-10">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="hidden md:flex"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewDetails?.(wo.id);
+                    }}
+                  >
                     View Details
                   </Button>
-                  <Button variant="outline" size="sm" className="hidden md:flex" onClick={() => onEditWorkOrder(wo)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="hidden md:flex"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditWorkOrder(wo);
+                    }}
+                  >
                     Edit
                   </Button>
                 </div>

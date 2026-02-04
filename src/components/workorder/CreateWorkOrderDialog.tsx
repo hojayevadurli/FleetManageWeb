@@ -36,7 +36,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-import VehicleSelector from "./VehicleSelector";
+import VehicleSelector from "@/components/maintenance/VehicleSelector";
 import WorkOrderItems, { WorkOrderItemData } from "./WorkOrderItems";
 import FileUpload from "./FileUpload";
 import UploadAndScan from "./UploadAndScan";
@@ -314,6 +314,9 @@ export default function CreateWorkOrderDialog({
         setUploadedFileList([]);
         setDraftWorkOrderId(null);
         setCustomWorkOrderNumber(null);
+        if (initialVehicleId && initialUnitNumber) {
+          generateNextWorkOrderNumber(initialVehicleId, initialUnitNumber);
+        }
       }
     }
   }, [open, initialVehicleId, initialVehicleType, initialUnitNumber, initialCompanyName, existingWorkOrder]);
@@ -949,7 +952,11 @@ export default function CreateWorkOrderDialog({
                         // Don't clear selected files here, keeps specific receipt for new vehicle
                         setIsUploading(false);
 
-                        generateNextWorkOrderNumber(vehicleId, unitNumber);
+                        if (vehicleId) {
+                          generateNextWorkOrderNumber(vehicleId, unitNumber);
+                        } else {
+                          setCustomWorkOrderNumber(null);
+                        }
                       }}
                     />
                   </div>
