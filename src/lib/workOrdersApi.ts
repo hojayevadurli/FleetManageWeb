@@ -322,7 +322,60 @@ export const workOrdersApi = {
    * Body: AttachDocumentPayload
    */
   attachDocument: async (workOrderId: string, payload: any): Promise<WorkOrderDocumentDto> => {
-    const res = await api.post(`/workorders/${workOrderId}/attachments`, payload);
-    return normalizeDocument(res.data);
+    // 1. Fetch current to get state + existing docs
+    const wo = await workOrdersApi.get(workOrderId);
+
+    const existingIds = wo.documents?.map(d => d.id) || [];
+    // Avoid duplicates
+    const newIds = existingIds.includes(payload.documentId)
+      ? existingIds
+      : [...existingIds, payload.documentId];
+
+    // 2. Construct full DTO for PUT
+    const dto: WorkOrderUpsertDto = {
+      equipmentId: wo.equipmentId,
+      vendorId: wo.vendorId,
+      vendorName: wo.vendorName,
+      workOrderNumber: wo.workOrderNumber,
+      odometerAtService: wo.odometerAtService,
+      hoursAtService: wo.hoursAtService,
+      openedAt: wo.openedAt,
+      closedAt: wo.closedAt,
+      title: wo.title,
+      complaint: wo.complaint,
+      diagnosis: wo.diagnosis,
+      resolution: wo.resolution,
+      notes: wo.notes,
+      status: wo.status,
+      priority: wo.priority,
+      costSource: wo.costSource,
+      estimatedTotal: wo.estimatedTotal,
+      manualActualTotal: wo.manualActualTotal,
+      // Map lines (strip IDs if strictly needed, but usually safe to re-send or map to DTO shape)
+      lines: (wo.lines || []).map(l => ({
+        type: l.type,
+        description: l.description,
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        partNumber: l.partNumber
+      })),
+      // KEY: Enable replacement
+      replaceDocuments: true,
+      documentIds: newIds
+    };
+
+    await workOrdersApi.update(workOrderId, dto);
+
+    // Return dummy/mock since FileUpload logic only needs success (and technically we have the ID)
+    // The previous FileUpload change passes the 'doc' from create() to the UI, so this return value is largely ignored.
+    return {
+      id: payload.documentId,
+      fileUrl: "",
+      fileName: (payload.notes || "Attachment"),
+      fileType: "application/octet-stream",
+      docKind: "work_order",
+      role: payload.role || "WorkOrder",
+      createdAt: new Date().toISOString()
+    } as any;
   }
 };

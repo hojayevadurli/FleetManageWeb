@@ -11,7 +11,7 @@ type VehicleType = "truck" | "trailer";
 interface VehicleSelectorProps {
   selectedVehicleId: string;
   selectedVehicleType: string; // "truck" | "trailer"
-  onVehicleSelect: (vehicleId: string, vehicleType: VehicleType) => void;
+  onVehicleSelect: (vehicleId: string, vehicleType: VehicleType, unitNumber: string) => void;
 }
 
 type Option = {
@@ -83,7 +83,7 @@ export default function VehicleSelector({
           onValueChange={(val) => {
             const nextType = (val === "trailer" ? "trailer" : "truck") as VehicleType;
             // reset vehicle when switching type
-            onVehicleSelect("", nextType);
+            onVehicleSelect("", nextType, "");
           }}
         >
           <div className="flex items-center space-x-2">
@@ -103,7 +103,10 @@ export default function VehicleSelector({
 
         <Select
           value={selectedVehicleId || ""}
-          onValueChange={(id) => onVehicleSelect(id, entity)}
+          onValueChange={(id) => {
+            const opt = options.find(o => o.id === id);
+            onVehicleSelect(id, entity, opt?.unitNumber || "");
+          }}
           disabled={loading}
         >
           <SelectTrigger>

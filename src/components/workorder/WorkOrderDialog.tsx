@@ -465,39 +465,21 @@ export default function WorkOrderDialog({
       throw new Error("Vehicle required");
     }
 
-    const created = await workOrdersApi.create({
+    console.log("[WorkOrderDialog] Creating draft for upload...");
+
+    const created = await workOrdersApi.createDraft({
       equipmentId: newWorkOrder.vehicle_id,
-      vendorId: newWorkOrder.vendor_id,
-      workOrderNumber: customWorkOrderNumber,
-      odometerAtService: null,
-      openedAt: new Date().toISOString(),
-      title: "Draft",
-      complaint: "Draft",
-      status: WorkOrderStatus.Open, // Or Draft
-      priority: WorkOrderPriority.Normal,
-      costSource: WorkOrderCostSource.Estimated,
-      estimatedTotal: 0,
-      manualActualTotal: 0,
-      lines: [
-        {
-          type: "misc",
-          description: "Draft",
-          qty: 1,
-          unitPrice: 0,
-          partNumber: null
-        }
-      ],
-      documentIds: []
+      title: "Draft for Attachments",
+      openedAt: new Date().toISOString()
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const id = (created as any)?.id || (created as any)?.Id;
-    if (!id) {
+    if (!created?.id) {
       throw new Error("Draft creation failed: backend did not return work order id.");
     }
 
-    setDraftWorkOrderId(id);
-    return id;
+    console.log("[WorkOrderDialog] Draft created:", created.id);
+    setDraftWorkOrderId(created.id);
+    return created.id;
   };
 
   const handleDeleteDocument = async (docId: string) => {
@@ -543,18 +525,28 @@ export default function WorkOrderDialog({
       }
 
       if (selectedFiles.length > 0) {
+        console.log("[WorkOrderDialog] Auto-uploading pending files:", selectedFiles.length);
         try {
           setIsUploading(true);
           const newDocs = await workOrdersApi.uploadAttachments(id, selectedFiles);
+          console.log("[WorkOrderDialog] Upload success, new docs:", newDocs?.length);
           toast.success(`${selectedFiles.length} file(s) uploaded.`);
           setSelectedFiles([]); // Clear pending
 
           // Add new doc IDs to our list
           if (newDocs && Array.isArray(newDocs)) {
             newDocs.forEach(d => currentDocIds.push(d.id));
+
+            // Update UI immediately (for both Create and Edit modes)
+            const mappedNewDocs = newDocs.map(d => ({
+              id: d.id,
+              url: d.fileUrl,
+              name: d.fileName || d.fileUrl.split('/').pop() || "Attachment"
+            }));
+            setExistingDocuments(prev => [...prev, ...mappedNewDocs]);
           }
 
-          // Refresh existing docs UI if we are staying open
+          // Refresh existing docs UI if we are staying open (Double check for Edit Mode)
           if (editWoId) {
             // ... existing UI refresh logic ...
             const updated = await workOrdersApi.get(id);
@@ -1131,7 +1123,8 @@ export default function WorkOrderDialog({
                       }));
 
                       setDraftWorkOrderId(null);
-                      setSelectedFiles([]);
+                      // Don't clear files! Let them persist so user can attach after selecting vehicle.
+                      // setSelectedFiles([]);
                       setIsUploading(false);
 
                       generateNextWorkOrderNumber(vehicleId, unitNumber);
@@ -1457,6 +1450,16 @@ export default function WorkOrderDialog({
                           ensureWorkOrderId={ensureDraftExists}
                           onUploadingChange={setIsUploading}
                           onUploaded={(id) => setDraftWorkOrderId(id)}
+                          uploadDisabled={!newWorkOrder.vehicle_id}
+                          uploadDisabledReason="Select a vehicle to save attachments"
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          onUploadSuccess={(file, doc: any) => {
+                            setExistingDocuments(prev => [...prev, {
+                              id: doc.id,
+                              url: doc.fileUrl,
+                              name: doc.fileName || file.name
+                            }]);
+                          }}
                         />
                       </div>
                     )}
