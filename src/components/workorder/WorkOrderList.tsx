@@ -158,28 +158,31 @@ const WorkOrderList = ({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={() => onViewDetails?.(wo.id)}>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails?.(wo.id); }}>
                       <Eye className="h-4 w-4 mr-2" /> View Details
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onEditWorkOrder(wo)}>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditWorkOrder(wo); }}>
                       <Edit className="h-4 w-4 mr-2" /> Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem>
                       <FileText className="h-4 w-4 mr-2" /> View Receipt
                     </DropdownMenuItem>
                     {normStatus(wo.status) === 'completed' && (
-                      <DropdownMenuItem onClick={() => onRateService?.(wo)}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onRateService?.(wo); }}>
                         <Star className="h-4 w-4 mr-2 text-yellow-500" /> Rate Service
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-500">Change Status</div>
-                    <DropdownMenuItem onClick={() => onUpdateStatus(wo.id, "open")}>Mark as Open</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onUpdateStatus(wo.id, "completed")}>Mark as Completed</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onUpdateStatus(wo.id, "closed")}>Mark as Closed</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdateStatus(wo.id, "open"); }}>Mark as Open</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdateStatus(wo.id, "completed"); }}>Mark as Completed</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdateStatus(wo.id, "closed"); }}>Mark as Closed</DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={() => onDelete?.(wo)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete?.(wo);
+                      }}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
                       <Trash2 className="h-4 w-4 mr-2" /> Delete
