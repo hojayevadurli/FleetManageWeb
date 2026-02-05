@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StarRating } from "@/components/ui/StarRating";
+import { format } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
   Wrench,
@@ -25,6 +27,7 @@ export interface VendorData {
   name: string;
   rating: number;
   reviews: number;
+  hourlyRate?: number;
 }
 
 interface WorkOrderListProps {
@@ -149,6 +152,13 @@ const WorkOrderList = ({
                   <Badge className={`${config.badge} border-0 font-bold uppercase tracking-wider text-[10px]`}>
                     {config.label}
                   </Badge>
+
+                  {/* Rating Stars */}
+                  {wo.rating && wo.rating > 0 && (
+                    <div className="ml-2 hidden sm:block">
+                      <StarRating rating={wo.rating} />
+                    </div>
+                  )}
                 </div>
 
                 <DropdownMenu>
@@ -172,6 +182,7 @@ const WorkOrderList = ({
                         <Star className="h-4 w-4 mr-2 text-yellow-500" /> Rate Service
                       </DropdownMenuItem>
                     )}
+                    {/* Rating removed from menu as per request */}
                     <DropdownMenuSeparator />
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-500">Change Status</div>
                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdateStatus(wo.id, "open"); }}>Mark as Open</DropdownMenuItem>
@@ -217,13 +228,19 @@ const WorkOrderList = ({
                   ) : (
                     <div>
                       <div className="font-bold text-slate-900">{vendorName}</div>
-                      {vendorData && vendorData.rating > 0 && (
-                        <div className="flex items-center gap-1 text-xs text-amber-500">
-                          <Star className="h-3 w-3 fill-current" />
-                          <span className="font-bold">{vendorData.rating.toFixed(1)}</span>
-                          <span className="text-slate-400 font-normal">({vendorData.reviews} reviews)</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {vendorData && vendorData.rating > 0 && (
+                          <div className="flex items-center gap-1 text-xs text-amber-500">
+                            <StarRating rating={vendorData.rating} className="w-3 h-3 gap-0.5" />
+                          </div>
+                        )}
+                        {vendorData && vendorData.hourlyRate > 0 && (
+                          <>
+                            {vendorData.rating > 0 && <span className="text-slate-300">•</span>}
+                            <span className="text-xs font-medium text-slate-500">${vendorData.hourlyRate}/hr</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
