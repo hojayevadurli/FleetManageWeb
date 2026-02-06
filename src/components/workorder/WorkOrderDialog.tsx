@@ -1188,6 +1188,7 @@ export default function WorkOrderDialog({
                           <SelectItem value={WorkOrderStatus.InProcess.toString()}>🟡 In Progress</SelectItem>
                           <SelectItem value={WorkOrderStatus.Completed.toString()}>✅ Completed</SelectItem>
                           <SelectItem value={WorkOrderStatus.Closed.toString()}>🔒 Closed</SelectItem>
+                          <SelectItem value={WorkOrderStatus.Cancelled.toString()}>🚫 Cancelled</SelectItem>
                           <SelectItem value={WorkOrderStatus.Paid.toString()}>💰 Paid</SelectItem>
                         </SelectContent>
                       </Select>

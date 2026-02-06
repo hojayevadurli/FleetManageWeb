@@ -107,9 +107,21 @@ const WorkOrders = () => {
 
     // Status filter
     if (statusFilter !== "all") {
-      filtered = filtered.filter((w) =>
-        (w.status || "").toLowerCase() === statusFilter.toLowerCase()
-      );
+      filtered = filtered.filter((w) => {
+        const s = w.status;
+        const filterKey = statusFilter; // e.g. "Open"
+
+        // 1. Resolve the numeric value from the Enum, e.g. WorkOrderStatus.Open = 1
+        // We cast filterKey because we know it's a key of WorkOrderStatus from the dropdown
+        const filterVal = WorkOrderStatus[filterKey as keyof typeof WorkOrderStatus];
+
+        // 2. Normalize whatever is on the WO (string or number)
+        // If WO has 1, String(1) == "1". String(filterVal) == "1". Match!
+        // If WO has "Open", .toLowerCase() == "open". filterKey.toLowerCase() == "open". Match!
+
+        return (String(s).toLowerCase() === filterKey.toLowerCase()) ||
+          (String(s) === String(filterVal));
+      });
     }
 
     // Search
@@ -152,6 +164,17 @@ const WorkOrders = () => {
       const wo = workOrders.find((w) => w.id === id);
       if (!wo) return;
 
+      // Helper to ensure we send the numeric Enum value, not the string key
+      const toEnumValue = (val: string | number, enumObj: any, defaultVal: number) => {
+        if (typeof val === 'number') return val;
+        const mapped = enumObj[val];
+        // If val is "Open", mapped is 1 (number) -> Good.
+        // If val is "1", mapped is "Open" (string) -> Bad, parse val.
+        if (typeof mapped === 'number') return mapped;
+        const parsed = parseInt(val);
+        return isNaN(parsed) ? defaultVal : parsed;
+      };
+
       const body: WorkOrderUpsertDto = {
         equipmentId: wo.equipmentId,
         vendorId: wo.vendorId ?? null,
@@ -165,9 +188,15 @@ const WorkOrders = () => {
         diagnosis: wo.diagnosis ?? null,
         resolution: wo.resolution ?? null,
         notes: wo.notes ?? null,
-        status: (WorkOrderStatus as any)[status] ?? (typeof status === 'number' ? status : WorkOrderStatus.Open),
-        priority: (WorkOrderPriority as any)[wo.priority] ?? (typeof wo.priority === 'number' ? wo.priority : WorkOrderPriority.Normal),
-        costSource: (WorkOrderCostSource as any)[wo.costSource] ?? (typeof wo.costSource === 'number' ? wo.costSource : WorkOrderCostSource.Estimated),
+
+        // Status is passed as the new specific string key (e.g. "Cancelled") or existing val
+        status: toEnumValue(status, WorkOrderStatus, WorkOrderStatus.Open),
+
+        // Priority/CostSource might be "Normal" (string) or 1 (number) in 'wo'.
+        // We MUST send 1 (number).
+        priority: toEnumValue(wo.priority, WorkOrderPriority, WorkOrderPriority.Normal),
+        costSource: toEnumValue(wo.costSource, WorkOrderCostSource, WorkOrderCostSource.Estimated),
+
         estimatedTotal: wo.estimatedTotal,
         manualActualTotal: wo.manualActualTotal,
         lines: (wo.lines ?? []).map((l) => ({

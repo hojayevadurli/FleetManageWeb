@@ -4,6 +4,7 @@ import { Equipment, EquipmentOperationalStatus, WorkOrder, WorkOrderStatus } fro
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import AIPredictiveForecast from './AIPredictiveForecast';
+import WorkOrderStatusWidget from './WorkOrderStatusWidget';
 
 interface DashboardProps {
     equipment: Equipment[];
@@ -151,6 +152,9 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                             </div>
                         </div>
                     )}
+
+                    {/* Work Order Status Analytics */}
+                    <WorkOrderStatusWidget workOrders={workOrders} />
                 </div>
 
                 <div className="space-y-6">

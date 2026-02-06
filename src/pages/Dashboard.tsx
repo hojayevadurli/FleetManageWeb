@@ -17,7 +17,7 @@ const Dashboard = () => {
     try {
       const [equipData, woData] = await Promise.all([
         equipmentApi.list(),
-        workOrdersApi.list()
+        workOrdersApi.list({ pageSize: 1000 })
       ]);
 
       // Map EquipmentDto to Equipment
