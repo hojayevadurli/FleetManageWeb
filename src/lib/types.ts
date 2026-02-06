@@ -326,7 +326,8 @@ export interface WorkOrder {
   attachmentFileName?: string;
   assetNumber?: string; // Mapped for display
   rating?: number;
-  ratingComment?: string;
+
+  reviewText?: string;
   ratedAt?: string;
 }
 
@@ -436,6 +437,7 @@ export interface WorkOrderDto {
   vendorAddress?: string;
   rating?: number;
   ratingComment?: string;
+  reviewText?: string; // Normalized field
   ratedAt?: string;
   createdAt?: string;
   updatedAt?: string;
