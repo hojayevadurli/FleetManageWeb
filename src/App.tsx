@@ -45,6 +45,10 @@ import ServiceRecordDetailPage from "./pages/ServiceRecordDetailPage";
 import FuelTracking from "./pages/FuelTracking";
 import VendorAnalytics from "./pages/VendorAnalytics";
 import ShopDetailView from "./pages/ShopDetailView";
+import DriversPage from "./pages/DriversPage";
+import DriverDetailPage from "./pages/DriverDetailPage";
+import CreateDriverPage from "./pages/CreateDriverPage";
+import EditDriverPage from "./pages/EditDriverPage";
 import SupportPage from "./pages/support/SupportPage";
 
 import SettingsLayout from "./pages/settings/SettingsLayout";
@@ -281,6 +285,12 @@ const App = () => (
                           <Route path="/service" element={<WorkOrders />} />
                           <Route path="/history/trucks" element={<HistoryTrucks />} />
                           <Route path="/history/repairs" element={<RepairHistoryPage />} />
+
+                          {/* Driver Routes */}
+                          <Route path="/drivers" element={<DriversPage />} />
+                          <Route path="/drivers/new" element={<CreateDriverPage />} />
+                          <Route path="/drivers/:id" element={<DriverDetailPage />} />
+                          <Route path="/drivers/:id/edit" element={<EditDriverPage />} />
 
                           <Route path="/service/:id" element={<ServiceRecordDetailPage />} />
                           <Route path="/maintenance/upcoming" element={<UpcomingMaintenance />} />

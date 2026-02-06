@@ -42,6 +42,11 @@ export const navigationItems: NavigationConfig = [
     icon: Truck,
   },
   {
+    title: "Drivers",
+    url: "/app/drivers",
+    icon: User,
+  },
+  {
     title: "Service",
     url: "/app/service",
     icon: ClipboardList,

@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { parse, isValid, format } from "date-fns";
-import { Equipment, WorkOrder, ReceiptParsedData, FuelParsedData, Warranty } from "./types";
+import { Equipment, WorkOrder, ReceiptParsedData, FuelParsedData, Warranty, DriverLicenseParsedData } from "./types";
 
 // Vite env only
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
@@ -97,6 +97,85 @@ function normalizeReceiptResult(parsed: any): ReceiptParsedData | null {
 
   return hasAnything ? normalized : null;
 }
+
+// -----------------------------
+// Driver License Parsing
+// -----------------------------
+export const parseDriverLicense = async (
+  base64Data: string,
+  mimeType: string
+): Promise<DriverLicenseParsedData | null> => {
+  const prompt = `Analyze this Driver License image and extract the following:
+  1. FIRST NAME
+  2. LAST NAME
+  3. DATE OF BIRTH (YYYY-MM-DD)
+  4. FULL ADDRESS (Street, City, State ZIP)
+  5. LICENSE NUMBER (DL Number)
+  6. ISSUE DATE (YYYY-MM-DD)
+  7. EXPIRATION DATE (YYYY-MM-DD)
+  8. STATE (2-letter code, e.g. IL, CA)
+
+  OUTPUT RULES:
+  - Respond with ONLY valid JSON.
+  - Date format: YYYY-MM-DD.
+  - State: 2-letter uppercase code.
+  - Confidence: Estimate confidence 0.0-1.0 for each field.
+  - JSON Shape:
+  {
+    "firstName": "",
+    "lastName": "",
+    "dob": "YYYY-MM-DD",
+    "address": "Full string fallback",
+    "addressComponents": {
+        "street": "",
+        "city": "",
+        "state": "",
+        "zip": ""
+    },
+    "dlNumber": "",
+    "dlIssueDate": "YYYY-MM-DD",
+    "dlExpireDate": "YYYY-MM-DD",
+    "licenseState": "XX",
+    "confidence": {
+      "firstName": 0.95,
+       ...
+    }
+  }`;
+
+  try {
+    const res = await getAiClient().models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType, data: base64Data } },
+            { text: prompt },
+          ],
+        },
+      ],
+    });
+
+    const parsed = safeJsonParse<any>(res.text || "");
+    if (!parsed) return null;
+
+    return {
+      firstName: parsed.firstName || "",
+      lastName: parsed.lastName || "",
+      dob: parsed.dob,
+      address: parsed.address,
+      addressComponents: parsed.addressComponents,
+      dlNumber: parsed.dlNumber,
+      dlIssueDate: parsed.dlIssueDate,
+      dlExpireDate: parsed.dlExpireDate,
+      licenseState: parsed.licenseState,
+      confidence: parsed.confidence
+    };
+  } catch (error) {
+    console.error("Driver license parsing error:", error);
+    return null;
+  }
+};
 
 // -----------------------------
 // Receipt parsing
