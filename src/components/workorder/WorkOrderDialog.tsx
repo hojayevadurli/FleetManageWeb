@@ -284,6 +284,20 @@ export default function WorkOrderDialog({
 
       setCustomWorkOrderNumber(wo.workOrderNumber || null);
 
+      // Hydrate Rating Data
+      if (wo.rating && wo.rating > 0) {
+        setRatingData({
+          mainRating: wo.rating,
+          qualityRating: 0, // Backend might not return breakdown in main DTO yet, defaulting safe
+          timelinessRating: 0,
+          communicationRating: 0,
+          valueRating: 0,
+          wouldRecommend: true, // Default
+          comment: wo.ratingComment || (wo as any).reviewText || "", // Handle both potential field names
+          id: undefined // We don't need the rating ID anymore since we update via WO
+        });
+      }
+
       // 3. Line Items (Effectively acting as our "Parsed Snapshot")
       if (wo.lines && wo.lines.length > 0) {
         setWorkOrderItems(wo.lines.map(l => ({
@@ -358,6 +372,7 @@ export default function WorkOrderDialog({
     } catch (e) {
       console.error("Failed to load work order details", e);
       toast.error("Failed to load work order details");
+
     } finally {
       setIsLoadingDetails(false);
     }
@@ -577,17 +592,33 @@ export default function WorkOrderDialog({
 
       const finalNotes = [etaNote, branchNote].filter(Boolean).join("\n").trim();
 
-      const finalStatus = status;
+
+      // Force status to "Completed" if in completed type and status is still generic, OR ensure it respects the 'completed' mode.
+      // If workOrderType is 'completed' but status is Open/Pending, force it to Completed.
+      let finalStatus = status;
+      if (workOrderType === 'completed' &&
+        (status === WorkOrderStatus.Open || status === WorkOrderStatus.InProgress || status === WorkOrderStatus.PendingApproval || status === WorkOrderStatus.Scheduled)) {
+        finalStatus = WorkOrderStatus.Completed;
+      }
 
       const dto: WorkOrderUpsertDto = {
         equipmentId: newWorkOrder.vehicle_id,
         vendorId: newWorkOrder.vendor_id || null, // Ensure explicit null if empty string
         workOrderNumber: customWorkOrderNumber,
         odometerAtService: newWorkOrder.odometer ? parseInt(newWorkOrder.odometer) : null,
-        openedAt: newWorkOrder.eta_date ? new Date(newWorkOrder.eta_date).toISOString() : new Date().toISOString(),
+        openedAt: newWorkOrder.eta_date ? (() => {
+          // Fix Timezone off-by-one: Store as Noon UTC to ensure Date string remains stable across US timezones
+          const d = new Date(newWorkOrder.eta_date);
+          d.setUTCHours(12);
+          return d.toISOString();
+        })() : new Date().toISOString(),
         closedAt: workOrderType === "completed" ? (
           (newWorkOrder.eta_date && new Date(newWorkOrder.eta_date) > new Date())
-            ? new Date(newWorkOrder.eta_date).toISOString() // If future date, close at open time (instant)
+            ? (() => {
+              const d = new Date(newWorkOrder.eta_date);
+              d.setUTCHours(12);
+              return d.toISOString();
+            })() // If future date, close at open time
             : new Date().toISOString() // Else close now
         ) : null,
         title: (cleanComplaint.split("\n")[0].slice(0, 100)) || "Maintenance",
@@ -606,50 +637,43 @@ export default function WorkOrderDialog({
           qty: l.qty,
           unitPrice: l.unitPrice,
           partNumber: l.partNumber
-        }))
+        })),
         // replaceDocuments: true, // REMOVED: Managed via separate endpoints
         // documentIds: currentDocIds // REMOVED: Managed via separate endpoints
+
+        // PERSIST RATING IN WORK ORDER
+        // Send rating if it exists, regardless of current local 'type' state, assuming user intent is valid if they filled it.
+        rating: ratingData.mainRating > 0 ? ratingData.mainRating : undefined,
+        reviewText: ratingData.mainRating > 0 ? ratingData.comment : undefined
       };
 
       await workOrdersApi.update(id, dto);
 
-      // Handle Rating Submission
-      if (workOrderType === "completed" && newWorkOrder.vendor_id && ratingData.mainRating > 0) {
+      // Removed separate shopsApi calls for ratings as it handled by WorkOrder update now
+
+      // 3. PERSIST RATING via ShopsAPI (Fallback/Primary if WO endpoint ignores it)
+      if (workOrderType === 'completed' && ratingData.mainRating > 0 && newWorkOrder.vendor_id) {
+        toast.info("Submitting rating to Shop API...");
         try {
-          // If we have an existing rating ID, update it. Otherwise create new.
-          if (ratingData.id) {
-            await shopsApi.updateRating(newWorkOrder.vendor_id, ratingData.id, {
-              rating: ratingData.mainRating,
-              reviewText: ratingData.comment,
-              serviceDate: new Date().toISOString(),
-              workOrderId: id,
-              qualityRating: ratingData.qualityRating,
-              timelinessRating: ratingData.timelinessRating,
-              communicationRating: ratingData.communicationRating,
-              valueRating: ratingData.valueRating,
-              wouldRecommend: ratingData.wouldRecommend === true
-            });
-            toast.success("Review updated successfully");
-          } else {
-            const newRating = await shopsApi.createRating(newWorkOrder.vendor_id, {
-              rating: ratingData.mainRating,
-              reviewText: ratingData.comment,
-              serviceDate: new Date().toISOString(),
-              workOrderId: id,
-              qualityRating: ratingData.qualityRating,
-              timelinessRating: ratingData.timelinessRating,
-              communicationRating: ratingData.communicationRating,
-              valueRating: ratingData.valueRating,
-              wouldRecommend: ratingData.wouldRecommend === true
-            });
-            // Update local state with new ID so subsequent saves are updates
-            setRatingData(prev => ({ ...prev, id: newRating.id }));
-            toast.success("Review submitted successfully");
-          }
+          await shopsApi.createRating(newWorkOrder.vendor_id, {
+            rating: ratingData.mainRating,
+            reviewText: ratingData.comment,
+            workOrderId: savedWo?.id || editWoId,
+            qualityRating: ratingData.qualityRating,
+            timelinessRating: ratingData.timelinessRating,
+            communicationRating: ratingData.communicationRating,
+            valueRating: ratingData.valueRating,
+            wouldRecommend: ratingData.wouldRecommend ?? true,
+            serviceDate: dto.openedAt
+          });
+          console.log("Rating submitted via shopsApi");
+          toast.success("Rating submitted successfully!");
         } catch (ratingErr) {
-          console.error("Failed to submit rating", ratingErr);
-          toast.error("Work order saved, but failed to save rating.");
+          console.error("Failed to submit rating via shopsApi", ratingErr);
+          toast.error("Failed to submit rating: " + (ratingErr as any).message);
         }
+      } else if (ratingData.mainRating > 0 && !newWorkOrder.vendor_id) {
+        toast.warning("Could not submit rating: No Vendor linked.");
       }
 
       toast.success(editWoId ? "Work order updated." : "Work order created.");
@@ -1164,6 +1188,7 @@ export default function WorkOrderDialog({
                           <SelectItem value={WorkOrderStatus.InProcess.toString()}>🟡 In Progress</SelectItem>
                           <SelectItem value={WorkOrderStatus.Completed.toString()}>✅ Completed</SelectItem>
                           <SelectItem value={WorkOrderStatus.Closed.toString()}>🔒 Closed</SelectItem>
+                          <SelectItem value={WorkOrderStatus.Cancelled.toString()}>🚫 Cancelled</SelectItem>
                           <SelectItem value={WorkOrderStatus.Paid.toString()}>💰 Paid</SelectItem>
                         </SelectContent>
                       </Select>

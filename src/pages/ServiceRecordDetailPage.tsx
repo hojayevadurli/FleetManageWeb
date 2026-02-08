@@ -145,7 +145,7 @@ const ServiceRecordDetailPage = () => {
                 vendor: fetchedVendorName, // Use the reliably fetched name
                 status: (wo.status as any),
                 priority: (wo.priority as any),
-                date: receiptDoc?.startDate || wo.openedAt || wo.closedAt || new Date().toISOString(),
+                date: wo.openedAt || receiptDoc?.startDate || wo.closedAt || new Date().toISOString(),
                 technician: "",
                 title: wo.title,
                 complaint: wo.complaint,
@@ -172,7 +172,7 @@ const ServiceRecordDetailPage = () => {
                 attachmentUrl: mappedAttachments.length > 0 ? mappedAttachments[0].url : ((wo as any).previewUrl || (wo as any).attachmentUrl),
                 attachmentFileName: mappedAttachments.length > 0 ? mappedAttachments[0].name : (wo as any).fileName,
                 rating: wo.rating,
-                ratingComment: wo.ratingComment,
+                reviewText: wo.reviewText || wo.ratingComment,
                 ratedAt: wo.ratedAt,
                 createdAt: wo.createdAt,
                 updatedAt: wo.updatedAt,
@@ -182,6 +182,34 @@ const ServiceRecordDetailPage = () => {
             setRecord(mapped);
             setNotes(wo.notes || "");
             setActiveMediaIndex(0);
+
+            setRecord(mapped);
+            setNotes(wo.notes || "");
+            setActiveMediaIndex(0);
+
+            // ALWAYS try to fetch latest rating from ShopsAPI if we have a vendor
+            // This mirrors WorkOrderDialog logic and ensures we get the rating even if WO table is out of sync
+            if (mapped.vendorId) {
+                try {
+                    const shopRatings = await shopsApi.getRatings(mapped.vendorId);
+                    // Match loosely on ID (string vs number)
+                    const match = shopRatings.find(r =>
+                        String(r.work_order_id) === String(mapped.id) ||
+                        String(r.workOrderId) === String(mapped.id)
+                    );
+
+                    if (match) {
+                        console.log("Found fallback rating via ShopsAPI:", match);
+                        setRecord(prev => prev ? ({
+                            ...prev,
+                            rating: match.rating,
+                            reviewText: match.review_text || match.comment || match.ratingComment || prev.reviewText
+                        }) : null);
+                    }
+                } catch (rErr) {
+                    console.warn("Could not fetch fallback ratings", rErr);
+                }
+            }
 
         } catch (err) {
             console.error("Error loading record:", err);
@@ -230,7 +258,7 @@ const ServiceRecordDetailPage = () => {
                 replaceDocuments: false,
                 documentIds: [],
                 rating: rating,
-                ratingComment: comment
+                reviewText: comment
             };
 
             await workOrdersApi.update(rawDto.id, body);
@@ -441,9 +469,53 @@ const ServiceRecordDetailPage = () => {
                                         <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-100 text-[9px]">Verified</Badge>
                                     </div>
                                 </InfoItem>
+
+                                <InfoItem icon={<Star className="w-4 h-4" />} label="My Rating">
+                                    {record.rating && record.rating > 0 ? (
+                                        <div className="flex items-center gap-1">
+                                            <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                                            <span className="font-bold text-slate-900">{record.rating}</span>
+                                            <span className="text-slate-400 text-xs">/ 5</span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-slate-400 italic">Not rated</span>
+                                    )}
+                                </InfoItem>
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Review Display */}
+                    {record.rating && record.rating > 0 && (
+                        <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden bg-white">
+                            <CardHeader className="py-6 border-b border-slate-100 flex flex-row items-center justify-between">
+                                <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
+                                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" /> Your Rating
+                                </CardTitle>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-lg font-black text-slate-900">{record.rating}</span>
+                                    <span className="text-sm text-slate-400">/ 5</span>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-6">
+                                {record.reviewText ? (
+                                    <div className="relative">
+                                        <div className="absolute top-0 left-0 text-3xl text-slate-200 font-serif">"</div>
+                                        <p className="text-slate-600 italic pl-6 pt-2 pb-2 relative z-10">
+                                            {record.reviewText}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <p className="text-slate-400 italic text-sm">No written review provided.</p>
+                                )}
+                                {record.ratedAt && (
+                                    <div className="mt-4 pt-4 border-t border-slate-50 text-xs text-slate-400 text-right">
+                                        Posted on {new Date(record.ratedAt).toLocaleDateString()}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Services Performed Card */}
                     <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden">

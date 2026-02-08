@@ -21,7 +21,7 @@ import {
   ChevronDown,
   ChevronUp
 } from "lucide-react";
-import { WorkOrderDto } from "@/lib/types";
+import { WorkOrderDto, WorkOrderStatus } from "@/lib/types";
 
 export interface VendorData {
   name: string;
@@ -67,6 +67,9 @@ const statusConfig = (status: string | number) => {
     case "closed":
     case "4": // WorkOrderStatus.Closed
       return { badge: "bg-indigo-100 text-indigo-700", border: "border-l-indigo-500", label: "Closed" };
+    case "cancelled":
+    case "5": // WorkOrderStatus.Cancelled
+      return { badge: "bg-red-100 text-red-700", border: "border-l-red-500", label: "Cancelled" };
     case "paid":
     case "6": // WorkOrderStatus.Paid
       return { badge: "bg-purple-100 text-purple-700", border: "border-l-purple-500", label: "Paid" };
@@ -185,9 +188,19 @@ const WorkOrderList = ({
                     {/* Rating removed from menu as per request */}
                     <DropdownMenuSeparator />
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-500">Change Status</div>
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdateStatus(wo.id, "open"); }}>Mark as Open</DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdateStatus(wo.id, "completed"); }}>Mark as Completed</DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdateStatus(wo.id, "closed"); }}>Mark as Closed</DropdownMenuItem>
+                    {Object.keys(WorkOrderStatus)
+                      .filter((key) => isNaN(Number(key))) // Valid string keys
+                      .map((statusKey) => (
+                        <DropdownMenuItem
+                          key={statusKey}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdateStatus(wo.id, statusKey);
+                          }}
+                        >
+                          Mark as {statusKey.replace(/([A-Z])/g, ' $1').trim()}
+                        </DropdownMenuItem>
+                      ))}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={(e) => {

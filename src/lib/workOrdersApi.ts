@@ -41,7 +41,7 @@ export interface WorkOrderUpsertDto {
   replaceDocuments?: boolean;
   documentIds?: string[];
   rating?: number;
-  ratingComment?: string;
+  reviewText?: string;
   createdAt?: string; // Optional override
 }
 
@@ -157,7 +157,7 @@ function normalizeWorkOrder(data: any): WorkOrderDto {
       : WorkOrderCostSource[data.costSource as keyof typeof WorkOrderCostSource] ?? WorkOrderCostSource.Estimated) as any,
     estimatedTotal: data.estimatedTotal ?? data.EstimatedTotal ?? 0,
     rating: data.rating ?? data.Rating,
-    ratingComment: data.ratingComment ?? data.RatingComment,
+    reviewText: data.reviewText ?? data.ReviewText ?? data.ratingComment ?? data.RatingComment,
     ratedAt: data.ratedAt ?? data.RatedAt,
     manualActualTotal: data.manualActualTotal ?? data.ManualActualTotal ?? 0,
     lines: (data.lines || data.Lines || []).map((l: any) => ({
