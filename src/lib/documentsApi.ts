@@ -1,6 +1,6 @@
 import api from "@/lib/Api";
 
-export type DocKind = "invoice" | "receipt" | "work_order" | "unknown";
+export type DocKind = "invoice" | "receipt" | "work_order" | "license" | "unknown";
 
 export interface CreateDocumentDto {
   fileUrl: string;
@@ -9,8 +9,11 @@ export interface CreateDocumentDto {
   vendorNameRaw?: string | null;
   runAiExtract?: boolean; // backend stub ok
   assetType?: "truck" | "trailer";
-  assetId?: string;
-  equipmentId?: string;
+  assetId?: string; // for equipment
+  equipmentId?: string; // alternative
+  driverId?: string; // for driver docs
+  title?: string;
+  expiryDate?: string;
 }
 
 export interface DocumentDto {

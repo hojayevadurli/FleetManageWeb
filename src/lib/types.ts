@@ -490,6 +490,24 @@ export interface FuelParsedData {
   state?: string;
 }
 
+export interface DriverLicenseParsedData {
+  firstName: string;
+  lastName: string;
+  dob?: string;
+  address?: string; // Full address string fallback
+  addressComponents?: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+  };
+  dlNumber?: string;
+  dlIssueDate?: string;
+  dlExpireDate?: string;
+  licenseState?: string;
+  confidence?: Record<string, number>;
+}
+
 export interface FuelRecord {
   id: string;
   assetId: string;
@@ -506,4 +524,106 @@ export interface FuelRecord {
   documentUrl?: string;
   documentFileName?: string;
   notes?: string;
+}
+
+export enum DriverOperatingStatus {
+  Active = 'Active',
+  OnLeave = 'On Leave',
+  InOrientation = 'In Orientation',
+  Suspended = 'Suspended',
+  Terminated = 'Terminated'
+}
+
+export enum DriverHiringStage {
+  Lead = 'Lead',
+  Applied = 'Applied',
+  Screening = 'Screening',
+  Interview = 'Interview',
+  Offer = 'Offer',
+  Checks = 'Checks',
+  Onboarding = 'Onboarding'
+}
+
+export enum DriverComplianceStatus {
+  Good = 'Good',
+  AttentionNeeded = 'AttentionNeeded',
+  NonCompliant = 'NonCompliant'
+}
+
+export interface Driver {
+  id: string;
+  tenantId?: number;
+  publicId?: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+
+  // Revised Status System
+  operatingStatus?: DriverOperatingStatus;
+  hiringStage?: DriverHiringStage;
+  isBlacklisted: boolean;
+
+  complianceStatus: DriverComplianceStatus;
+
+  photoUrl?: string;
+  driverNumber?: string;
+
+  // Personal Info
+  dob?: string;
+  address?: string; // Full string for now, could be structured later
+
+  // License Info
+  licenseNumber?: string;
+  licenseState?: string;
+  dlIssueDate?: string;
+  dlExpireDate?: string;
+  medicalCardExpiration?: string;
+
+  hireDate?: string;
+  terminationDate?: string;
+
+  homeTerminal?: string;
+  currentAssetId?: string;
+  currentAssettNumber?: string;
+
+  rating?: number;
+  totalSpend?: number;
+
+  documents?: DriverDocument[];
+  notes?: DriverNote[];
+}
+
+export interface DriverDocument {
+  id: string;
+  driverId: string;
+  docType: string; // CDL, MedicalCard, etc.
+  fileUrl: string;
+  fileName: string;
+  status: 'Valid' | 'Expiring' | 'Expired';
+  issuedDate?: string;
+  expirationDate?: string;
+  daysUntilExpiration?: number;
+}
+
+export interface DriverNote {
+  id: string;
+  driverId: string;
+  category: 'HR' | 'Safety' | 'Performance' | 'General';
+  content: string;
+  createdBy: string;
+  createdAt: string;
+  isPinned: boolean;
+}
+
+export interface TimeOffRequest {
+  id: string;
+  driverId: string;
+  driverName: string;
+  startDate: string;
+  endDate: string;
+  type: 'HomeTime' | 'Vacation' | 'Sick' | 'Personal';
+  status: 'Pending' | 'Approved' | 'Denied';
+  reason?: string;
+  requestedAt: string;
 }
