@@ -155,6 +155,23 @@ export const driversApi = {
         return MOCK_DOCUMENTS.filter(d => d.driverId === driverId);
     },
 
+    async uploadDocument(driverId: string, file: File, metadata: { docType: string, expirationDate?: string, notes?: string }): Promise<DriverDocument> {
+        return new Promise((resolve) => {
+            const newDoc: DriverDocument = {
+                id: `d${MOCK_DOCUMENTS.length + 1}`,
+                driverId,
+                docType: metadata.docType,
+                fileName: file.name,
+                fileUrl: URL.createObjectURL(file), // Create a local URL for preview
+                status: metadata.expirationDate && new Date(metadata.expirationDate) < new Date() ? 'Expired' : 'Valid',
+                expirationDate: metadata.expirationDate,
+                daysUntilExpiration: metadata.expirationDate ? Math.ceil((new Date(metadata.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : undefined
+            };
+            MOCK_DOCUMENTS.push(newDoc);
+            setTimeout(() => resolve(newDoc), 800);
+        });
+    },
+
     getDriverTimeOffRequests: async (driverId: string): Promise<TimeOffRequest[]> => {
         await new Promise(resolve => setTimeout(resolve, 400));
         // Return mock requests
