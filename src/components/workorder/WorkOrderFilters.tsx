@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, X } from "lucide-react";
-import { WorkOrderDto } from "@/lib/types";
+import { WorkOrderDto, WorkOrderStatus } from "@/lib/types";
 
 type StatusFilter = "all" | WorkOrderDto["status"];
 
@@ -80,10 +80,13 @@ const WorkOrderFilters = ({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All statuses</SelectItem>
-          <SelectItem value="Draft">Draft</SelectItem>
-          <SelectItem value="Open">Open</SelectItem>
-          <SelectItem value="Closed">Closed</SelectItem>
-          <SelectItem value="Paid">Paid</SelectItem>
+          {Object.keys(WorkOrderStatus)
+            .filter((key) => isNaN(Number(key))) // Skip reverse mappings (0, 1, etc)
+            .map((status) => (
+              <SelectItem key={status} value={status}>
+                {status.replace(/([A-Z])/g, ' $1').trim()} {/* "InProcess" -> "In Process" */}
+              </SelectItem>
+            ))}
         </SelectContent>
       </Select>
     </div>

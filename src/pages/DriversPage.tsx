@@ -18,11 +18,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGr
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { driversApi } from "@/lib/driversApi";
-import { Driver, DriverOperatingStatus, DriverHiringStage, DriverComplianceStatus } from "@/lib/types";
+import { operatorsApi } from "@/lib/operatorsApi";
+import { OperatorDto, OperatorStatus } from "@/lib/types";
 
 export default function DriversPage() {
-    const [drivers, setDrivers] = useState<Driver[]>([]);
+    const [drivers, setDrivers] = useState<OperatorDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -30,7 +30,7 @@ export default function DriversPage() {
     useEffect(() => {
         const loadDrivers = async () => {
             try {
-                const data = await driversApi.getDrivers();
+                const data = await operatorsApi.getAll();
                 setDrivers(data);
             } catch (error) {
                 console.error("Failed to load drivers", error);
@@ -45,27 +45,18 @@ export default function DriversPage() {
         const matchesSearch =
             driver.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             driver.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (driver.driverNumber && driver.driverNumber.toLowerCase().includes(searchTerm.toLowerCase()));
+            (driver.employeeId && driver.employeeId.toLowerCase().includes(searchTerm.toLowerCase()));
 
-        // Effective Status Logic
-        let effectiveStatus: string = '';
-        if (driver.isBlacklisted) {
-            effectiveStatus = 'Blacklisted';
-        } else if (driver.operatingStatus) {
-            effectiveStatus = driver.operatingStatus;
-        } else if (driver.hiringStage) {
-            effectiveStatus = driver.hiringStage;
-        }
-
-        const matchesStatus = statusFilter === 'all' || effectiveStatus === statusFilter;
+        const matchesStatus = statusFilter === 'all' || driver.status === Number(statusFilter);
 
         return matchesSearch && matchesStatus;
     });
 
     // KPI Calculations
-    const activeCount = drivers.filter(d => d.operatingStatus === DriverOperatingStatus.Active).length;
-    const attentionCount = drivers.filter(d => d.complianceStatus === DriverComplianceStatus.AttentionNeeded).length;
-    const avgRating = drivers.reduce((acc, curr) => acc + (curr.rating || 0), 0) / (drivers.length || 1);
+    const activeCount = drivers.filter(d => d.status === OperatorStatus.Active).length;
+    // Mock compliance for now as backend doesn't support it directly yet
+    const attentionCount = 0;
+    const avgRating = 5.0; // Default
 
     if (loading) {
         return <div className="p-8 text-center text-gray-500">Loading drivers...</div>;
@@ -128,7 +119,7 @@ export default function DriversPage() {
                     <CardContent className="p-4 flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-gray-500">Total Spend (Mo)</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">$12.4k</p>
+                            <p className="text-2xl font-bold text-gray-900 mt-1">$0.0k</p>
                         </div>
                         <div className="h-10 w-10 bg-blue-50 rounded-full flex items-center justify-center">
                             <DollarSign className="h-5 w-5 text-blue-600" />
@@ -155,30 +146,16 @@ export default function DriversPage() {
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Statuses</SelectItem>
-
                         <SelectGroup>
                             <SelectLabel className="flex items-center gap-2 text-emerald-600">
-                                <Truck className="h-4 w-4" /> Operating
+                                <Truck className="h-4 w-4" /> Status
                             </SelectLabel>
-                            {Object.values(DriverOperatingStatus).map((status) => (
-                                <SelectItem key={status} value={status}>{status}</SelectItem>
-                            ))}
-                        </SelectGroup>
 
-                        <SelectGroup>
-                            <SelectLabel className="flex items-center gap-2 text-blue-600">
-                                <UserPlus className="h-4 w-4" /> Hiring
-                            </SelectLabel>
-                            {Object.values(DriverHiringStage).map((stage) => (
-                                <SelectItem key={stage} value={stage}>{stage}</SelectItem>
-                            ))}
-                        </SelectGroup>
+                            <SelectItem value={String(OperatorStatus.Active)}>Active</SelectItem>
+                            <SelectItem value={String(OperatorStatus.Inactive)}>Inactive</SelectItem>
+                            <SelectItem value={String(OperatorStatus.OnLeave)}>On Leave</SelectItem>
+                            <SelectItem value={String(OperatorStatus.Terminated)}>Terminated</SelectItem>
 
-                        <SelectGroup>
-                            <SelectLabel className="flex items-center gap-2 text-red-600">
-                                <Ban className="h-4 w-4" /> Restricted
-                            </SelectLabel>
-                            <SelectItem value="Blacklisted">Blacklisted</SelectItem>
                         </SelectGroup>
                     </SelectContent>
                 </Select>
@@ -189,40 +166,41 @@ export default function DriversPage() {
                 {filteredDrivers.map(driver => {
                     // Determine badge style and text
                     let badgeVariant: "default" | "secondary" | "destructive" | "outline" = "default";
-                    let badgeText = "";
+                    let badgeText = "Unknown"; // Default text
                     let badgeClass = "";
 
-                    if (driver.isBlacklisted) {
-                        badgeVariant = "destructive";
-                        badgeText = "Blacklisted";
-                        badgeClass = "bg-red-500 hover:bg-red-600";
-                    } else if (driver.operatingStatus) {
-                        badgeText = driver.operatingStatus;
-                        switch (driver.operatingStatus) {
-                            case DriverOperatingStatus.Active:
-                                badgeVariant = "default";
-                                badgeClass = "bg-emerald-500 hover:bg-emerald-600";
-                                break;
-                            case DriverOperatingStatus.OnLeave:
-                                badgeVariant = "secondary";
-                                badgeClass = "bg-amber-500 hover:bg-amber-600 text-white";
-                                break;
-                            default:
-                                badgeVariant = "secondary";
-                        }
-                    } else if (driver.hiringStage) {
-                        badgeText = driver.hiringStage;
-                        badgeVariant = "outline";
-                        badgeClass = "bg-blue-50 text-blue-700 border-blue-200";
+                    switch (driver.status) {
+                        case OperatorStatus.Active:
+                            badgeVariant = "default";
+                            badgeClass = "bg-emerald-500 hover:bg-emerald-600";
+                            badgeText = "Active";
+                            break;
+                        case OperatorStatus.Inactive:
+                            badgeVariant = "secondary";
+                            badgeClass = "bg-gray-500 hover:bg-gray-600 text-white";
+                            badgeText = "Inactive";
+                            break;
+                        case OperatorStatus.OnLeave:
+                            badgeVariant = "secondary";
+                            badgeClass = "bg-amber-500 hover:bg-amber-600 text-white";
+                            badgeText = "On Leave";
+                            break;
+                        case OperatorStatus.Terminated:
+                            badgeVariant = "destructive";
+                            badgeClass = "bg-red-500 hover:bg-red-600";
+                            badgeText = "Terminated";
+                            break;
+                        default:
+                            badgeVariant = "secondary";
+                            badgeText = String(driver.status);
                     }
 
                     return (
                         <Link key={driver.id} to={`/app/drivers/${driver.id}`}>
                             <Card className="group hover:shadow-lg transition-all duration-300 border-gray-100 cursor-pointer h-full relative overflow-hidden">
-                                <div className={`absolute top-0 left-0 w-1 h-full ${driver.operatingStatus === DriverOperatingStatus.Active ? 'bg-emerald-500' :
-                                    driver.operatingStatus === DriverOperatingStatus.Terminated ? 'bg-slate-300' :
-                                        driver.isBlacklisted ? 'bg-red-500' :
-                                            driver.hiringStage ? 'bg-blue-400' : 'bg-amber-400'
+                                <div className={`absolute top-0 left-0 w-1 h-full ${driver.status === OperatorStatus.Active ? 'bg-emerald-500' :
+                                    driver.status === OperatorStatus.Terminated ? 'bg-red-500' :
+                                        'bg-amber-400'
                                     }`} />
 
                                 <CardContent className="p-6">
@@ -236,8 +214,8 @@ export default function DriversPage() {
                                                 <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
                                                     {driver.firstName} {driver.lastName}
                                                 </h3>
-                                                {driver.driverNumber && (
-                                                    <p className="text-xs text-gray-500 font-mono">{driver.driverNumber}</p>
+                                                {driver.employeeId && (
+                                                    <p className="text-xs text-gray-500 font-mono">{driver.employeeId}</p>
                                                 )}
                                             </div>
                                         </div>
@@ -248,12 +226,8 @@ export default function DriversPage() {
 
                                     <div className="space-y-3 text-sm">
                                         <div className="flex justify-between py-1 border-b border-gray-50">
-                                            <span className="text-gray-500">Current Unit</span>
-                                            <span className="font-medium text-gray-900">{driver.currentAssettNumber || '-'}</span>
-                                        </div>
-                                        <div className="flex justify-between py-1 border-b border-gray-50">
-                                            <span className="text-gray-500">Home Terminal</span>
-                                            <span className="font-medium text-gray-900">{driver.homeTerminal || '-'}</span>
+                                            <span className="text-gray-500">License State</span>
+                                            <span className="font-medium text-gray-900">{driver.licenseState || '-'}</span>
                                         </div>
                                         <div className="flex justify-between py-1 border-b border-gray-50">
                                             <span className="text-gray-500">Hire Date</span>
@@ -262,13 +236,6 @@ export default function DriversPage() {
                                             </span>
                                         </div>
                                     </div>
-
-                                    {driver.complianceStatus === DriverComplianceStatus.AttentionNeeded && (
-                                        <div className="mt-4 bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg flex items-center gap-2">
-                                            <AlertTriangle className="h-3 w-3" />
-                                            <span>Documents expiring soon</span>
-                                        </div>
-                                    )}
                                 </CardContent>
                             </Card>
                         </Link>

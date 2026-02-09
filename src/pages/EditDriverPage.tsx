@@ -4,8 +4,8 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DriverForm } from "@/components/drivers/DriverForm";
 import { LicensePreview } from "@/components/drivers/LicensePreview";
-import { driversApi } from "@/lib/driversApi";
-import { Driver } from "@/lib/types";
+import { operatorsApi } from "@/lib/operatorsApi";
+import { OperatorDto, OperatorDocumentDto } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 export default function EditDriverPage() {
@@ -13,23 +13,21 @@ export default function EditDriverPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    const [driver, setDriver] = useState<Driver | null>(null);
+    const [driver, setDriver] = useState<OperatorDto | null>(null);
     const [loading, setLoading] = useState(true);
 
     // New uploads
     const [licenseFront, setLicenseFront] = useState<File | null>(null);
     const [licenseBack, setLicenseBack] = useState<File | null>(null);
 
-    // Existing doc URLs (in a real app, you'd fetch documents separately or include in driver payload)
-    // For MOCK, I'll simulate by fetching documents or just using placeholders if driver has data.
-    // The MOCK_DOCUMENTS array in driversApi has fileUrls.
-    const [existingDocs, setExistingDocs] = useState<{ front?: string, back?: string }>({});
+    // Existing doc URLs from backend
+    const [existingDocs, setExistingDocs] = useState<{ front?: OperatorDocumentDto, back?: OperatorDocumentDto }>({});
 
     useEffect(() => {
         if (!id) return;
         const fetchDriver = async () => {
             try {
-                const data = await driversApi.getDriverById(id);
+                const data = await operatorsApi.getById(id);
                 if (!data) {
                     toast({ title: "Error", description: "Driver not found", variant: "destructive" });
                     navigate("/app/drivers");
@@ -37,16 +35,38 @@ export default function EditDriverPage() {
                 }
                 setDriver(data);
 
-                // Fetch docs to populate preview
-                const docs = await driversApi.getDriverDocuments(id);
-                // Simple logic to find front/back based on type or filename
-                const front = docs.find(d => d.docType === 'CDL' || d.fileName.toLowerCase().includes('front'));
-                const back = docs.find(d => d.fileName.toLowerCase().includes('back'));
+                // Fetch attachments separately since documents is not included in getById
+                try {
+                    const attachments = await operatorsApi.getAttachments(id);
+                    console.log("Fetched attachments:", attachments);
 
-                setExistingDocs({
-                    front: front?.fileUrl,
-                    back: back?.fileUrl
-                });
+                    if (attachments && attachments.length > 0) {
+                        // Improved matching: check docKind and title
+                        const front = attachments.find(d =>
+                            d.docKind === 'license' && (
+                                d.title?.toLowerCase().includes('front') ||
+                                d.title?.toLowerCase().includes('driver license (front)')
+                            )
+                        ) || attachments.find(d => d.fileUrl?.toLowerCase().includes('front'));
+
+                        const back = attachments.find(d =>
+                            d.docKind === 'license' && (
+                                d.title?.toLowerCase().includes('back') ||
+                                d.title?.toLowerCase().includes('driver license (back)')
+                            )
+                        ) || attachments.find(d => d.fileUrl?.toLowerCase().includes('back'));
+
+                        console.log("Matched front doc:", front);
+                        console.log("Matched back doc:", back);
+
+                        setExistingDocs({
+                            front: front,
+                            back: back
+                        });
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch attachments", err);
+                }
 
             } catch (error) {
                 console.error("Failed to fetch driver", error);
@@ -57,6 +77,38 @@ export default function EditDriverPage() {
         };
         fetchDriver();
     }, [id, navigate, toast]);
+
+    const handleRemoveDocument = async (side: 'front' | 'back') => {
+        // If it's a new file, just clear it
+        if (side === 'front' && licenseFront) {
+            setLicenseFront(null);
+            toast({ title: "Removed", description: "Front license file removed." });
+            return;
+        }
+        if (side === 'back' && licenseBack) {
+            setLicenseBack(null);
+            toast({ title: "Removed", description: "Back license file removed." });
+            return;
+        }
+
+        // If it's an existing document, detach it
+        const doc = side === 'front' ? existingDocs.front : existingDocs.back;
+        if (doc && driver) {
+            try {
+                await operatorsApi.detachDocument(driver.id, doc.id);
+                toast({ title: "Success", description: `${side === 'front' ? 'Front' : 'Back'} license detached successfully.` });
+
+                // Update local state
+                setExistingDocs(prev => ({
+                    ...prev,
+                    [side]: undefined
+                }));
+            } catch (error) {
+                console.error("Failed to detach document", error);
+                toast({ title: "Error", description: "Could not remove document.", variant: "destructive" });
+            }
+        }
+    };
 
     if (loading) {
         return (
@@ -102,8 +154,9 @@ export default function EditDriverPage() {
                     <LicensePreview
                         frontFile={licenseFront}
                         backFile={licenseBack}
-                        existingFrontUrl={existingDocs.front}
-                        existingBackUrl={existingDocs.back}
+                        existingFrontUrl={existingDocs.front?.fileUrl}
+                        existingBackUrl={existingDocs.back?.fileUrl}
+                        onRemove={handleRemoveDocument}
                     />
                 </div>
             </div>

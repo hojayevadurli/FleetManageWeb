@@ -65,7 +65,8 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                 hours: initialData.hours || 0,
                 initialOdometer: 0,
                 initialHours: 0,
-                inServiceDate: initialData.inServiceDate || (mode === 'create' ? new Date().toISOString().split('T')[0] : ''),
+                // Default to today if missing, even in edit mode (per user request)
+                inServiceDate: initialData.inServiceDate || new Date().toISOString().split('T')[0],
                 outOfServiceDate: initialData.outOfServiceDate || ''
             };
         }
@@ -206,6 +207,11 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
         // Sanitize dates: empty string should be undefined/null for backend DateOnly?
         if (payload.inServiceDate === '') payload.inServiceDate = undefined;
         if (payload.outOfServiceDate === '') payload.outOfServiceDate = undefined;
+
+        // Ensure AcquiredDate is synced with Start Date (InServiceDate) if not explicitly handled
+        if (payload.inServiceDate) {
+            payload.acquiredDate = payload.inServiceDate;
+        }
 
         try {
             await onSave(payload);
@@ -500,8 +506,11 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                         type="number"
                                         className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                         placeholder="0"
-                                        value={formData.mileage}
-                                        onChange={e => setFormData({ ...formData, mileage: parseInt(e.target.value) || 0 })}
+                                        value={formData.mileage ?? ''}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setFormData({ ...formData, mileage: val === '' ? undefined : parseInt(val) });
+                                        }}
                                     />
                                 </div>
                                 <div className="space-y-1.5">
@@ -512,8 +521,11 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                         type="number"
                                         className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                         placeholder="0"
-                                        value={formData.hours || 0}
-                                        onChange={e => setFormData({ ...formData, hours: parseFloat(e.target.value) || 0 })}
+                                        value={formData.hours ?? ''}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setFormData({ ...formData, hours: val === '' ? undefined : parseFloat(val) });
+                                        }}
                                     />
                                 </div>
                             </div>

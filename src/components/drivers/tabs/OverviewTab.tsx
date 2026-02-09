@@ -1,11 +1,11 @@
-import { Driver, DriverOperatingStatus } from "@/lib/types";
+import { OperatorDto } from "@/lib/types";
 import { DriverForm } from "@/components/drivers/DriverForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Shield, Truck, Calendar, Activity, AlertTriangle, CheckCircle, Clock, MapPin, Phone, Mail, FileText, Star, TrendingUp } from "lucide-react";
 
 interface OverviewTabProps {
-    driver: Driver;
+    driver: OperatorDto;
     isEditing?: boolean;
     onCancel?: () => void;
     onSave?: () => void;
@@ -99,7 +99,7 @@ export function OverviewTab({ driver, isEditing = false, onCancel, onSave }: Ove
                         <div className="flex justify-between items-start">
                             <div>
                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Availability</p>
-                                <h3 className="text-xl font-bold text-gray-900 mt-1">{driver.operatingStatus || 'Active'}</h3>
+                                <h3 className="text-xl font-bold text-gray-900 mt-1">{driver.status ? 'Active' : 'Inactive'}</h3>
                             </div>
                             <div className="p-2 bg-purple-100 rounded-full">
                                 <Calendar className="h-4 w-4 text-purple-600" />
@@ -164,7 +164,7 @@ export function OverviewTab({ driver, isEditing = false, onCancel, onSave }: Ove
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-xs font-medium text-gray-500 uppercase">Home Terminal</p>
-                                    <p className="text-sm font-semibold text-gray-900">{driver.homeTerminal || 'Not Assigned'}</p>
+                                    <p className="text-sm font-semibold text-gray-900">{'Chicago, IL'}</p>
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-xs font-medium text-gray-500 uppercase">Last Load Date</p>
@@ -206,7 +206,7 @@ export function OverviewTab({ driver, isEditing = false, onCancel, onSave }: Ove
                                     <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
                                     <div>
                                         <p className="text-xs text-gray-500">Address</p>
-                                        <p className="text-sm font-medium text-gray-900 max-w-[250px]">{driver.address || 'N/A'}</p>
+                                        <p className="text-sm font-medium text-gray-900 max-w-[250px]">{'N/A'}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">

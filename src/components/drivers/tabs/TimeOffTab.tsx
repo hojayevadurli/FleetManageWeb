@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Driver } from "@/lib/types";
+import { OperatorDto } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -21,7 +21,7 @@ import { Calendar as CalendarIcon, CheckCircle2, Clock, XCircle, AlertTriangle, 
 import { format, isSameDay, addDays } from "date-fns";
 
 interface TimeOffTabProps {
-    driver: Driver;
+    driver: OperatorDto;
 }
 
 type RequestStatus = "Approved" | "Pending" | "Rejected";
@@ -81,7 +81,8 @@ export function TimeOffTab({ driver }: TimeOffTabProps) {
     ) : undefined;
 
     // Conflict Detection (Mock)
-    const hasConflict = selectedDateRequest?.status === "Pending" && driver.assignedEquipment;
+    // OperatorDto doesn't have assignedEquipment currently, assuming false for conflict
+    const hasConflict = false; // selectedDateRequest?.status === "Pending" && driver.assignedEquipment;
 
     // Add Request Form State
     const [newRequestType, setNewRequestType] = useState<RequestType>("Vacation");
@@ -206,8 +207,8 @@ export function TimeOffTab({ driver }: TimeOffTabProps) {
                                 <div>
                                     <div className="flex justify-between items-start">
                                         <Badge className={`px-3 py-1 text-sm ${selectedDateRequest.status === "Approved" ? "bg-blue-100 text-blue-800 hover:bg-blue-100" :
-                                                selectedDateRequest.status === "Pending" ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-100" :
-                                                    "bg-red-100 text-red-800 hover:bg-red-100"
+                                            selectedDateRequest.status === "Pending" ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-100" :
+                                                "bg-red-100 text-red-800 hover:bg-red-100"
                                             }`}>
                                             {selectedDateRequest.status}
                                         </Badge>
@@ -226,7 +227,7 @@ export function TimeOffTab({ driver }: TimeOffTabProps) {
                                     <div className="bg-red-50 border border-red-200 p-3 rounded-md flex gap-2 items-start">
                                         <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
                                         <div className="text-xs text-red-800">
-                                            <span className="font-bold">Conflict Warning:</span> Driver is assigned to Unit {driver.assignedEquipment?.unitNumber || "105"} during these dates. Reassign truck before approving.
+                                            <span className="font-bold">Conflict Warning:</span> Driver is assigned to Unit {"105"} during these dates. Reassign truck before approving.
                                         </div>
                                     </div>
                                 )}
