@@ -378,7 +378,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
 
                                 <div className="flex flex-col md:flex-row gap-6 items-start relative z-10">
                                     <div className="space-y-2 shrink-0">
-                                        <h2 className="text-5xl font-black text-slate-900 tracking-tighter leading-[0.9]">{equipment.year} {equipment.make} {equipment.model}</h2>
+                                        <h2 className="text-3xl font-black text-slate-900 tracking-tighter leading-tight">{equipment.year} {equipment.make} {equipment.model}</h2>
 
                                         <div className="flex gap-8 pt-6">
                                             <div>
@@ -501,10 +501,10 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                     bg: 'bg-amber-50'
                                                 }
                                             ].map((s, i) => (
-                                                <div key={i} className={`${s.bg} p-5 rounded-[2rem] border border-slate-100/50`}>
-                                                    <s.icon className={`w-5 h-5 ${s.color} mb-3`} />
-                                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{s.label}</div>
-                                                    <div className="text-base font-black text-slate-900">{s.val}</div>
+                                                <div key={i} className={`${s.bg} p-5 rounded-[2rem] border border-slate-200 shadow-sm`}>
+                                                    <s.icon className={`w-6 h-6 ${s.color} mb-3`} />
+                                                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{s.label}</div>
+                                                    <div className="text-xl font-black text-slate-900 tracking-tight">{s.val}</div>
                                                 </div>
                                             ));
                                         })()}

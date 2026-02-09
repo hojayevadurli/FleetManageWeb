@@ -136,15 +136,9 @@ const VehicleManager = () => {
           }
 
           // Fetch attachments specifically as requested
-          let attachments = wo.documents || [];
-          try {
-            const fetchedAttachments = await workOrdersApi.listAttachments(wo.id);
-            if (fetchedAttachments && fetchedAttachments.length > 0) {
-              attachments = fetchedAttachments;
-            }
-          } catch (e) {
-            console.warn(`[VehicleManager] Failed to fetch attachments for WO ${wo.id}`, e);
-          }
+          // const attachments = wo.documents || [];
+          // REMOVED: listAttachments causes 404. We rely on wo.documents from the list API.
+          const attachments = wo.documents || [];
 
           return {
             id: wo.id,
@@ -200,8 +194,8 @@ const VehicleManager = () => {
         plateNumber: e.licensePlate, // Map for backend
         displayName: e.unitNumber,
         operationalStatus: e.operationalStatus || EquipmentOperationalStatus.Active,
-        acquiredDate: new Date().toISOString().split('T')[0],
-        inServiceDate: new Date().toISOString().split('T')[0],
+        acquiredDate: e.acquiredDate || new Date().toISOString().split('T')[0],
+        inServiceDate: e.inServiceDate || new Date().toISOString().split('T')[0],
         initialOdometer: e.initialOdometer || 0,
         initialHours: e.initialHours || 0,
       };
@@ -271,8 +265,11 @@ const VehicleManager = () => {
         year: selectedEquipment.year,
         operationalStatus: status,
         outOfServiceDate: status === EquipmentOperationalStatus.OutOfService ? new Date().toISOString().split('T')[0] : selectedEquipment.outOfServiceDate,
-        notes: selectedEquipment.notes
-        // Add other fields if needed by backend DTO
+        notes: selectedEquipment.notes,
+
+        // Ensure dates are preserved
+        acquiredDate: selectedEquipment.acquiredDate,
+        inServiceDate: selectedEquipment.inServiceDate
       };
 
       await equipmentApi.update(selectedEquipment.id, payload);
@@ -342,6 +339,11 @@ const VehicleManager = () => {
         // Meters - carefully update only if present in 'data' or fallback
         odometerCurrent: data.mileage !== undefined ? Number(data.mileage) : selectedEquipment.mileage,
         hoursCurrent: data.hours !== undefined ? Number(data.hours) : selectedEquipment.hours,
+
+        // Dates
+        acquiredDate: data.acquiredDate ?? selectedEquipment.acquiredDate,
+        inServiceDate: data.inServiceDate ?? selectedEquipment.inServiceDate,
+        outOfServiceDate: data.outOfServiceDate ?? selectedEquipment.outOfServiceDate,
 
         notes: selectedEquipment.notes
       };
