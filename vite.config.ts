@@ -10,6 +10,12 @@ export default defineConfig({
         port: 5173,
         proxy: {
             "/api": { target: API_URL, changeOrigin: true, secure: false },
+            "/motive-proxy": {
+                target: "https://api.gomotive.com",
+                changeOrigin: true,
+                secure: true,
+                rewrite: (path) => path.replace(/^\/motive-proxy/, "")
+            },
         },
     },
     plugins: [react()],
