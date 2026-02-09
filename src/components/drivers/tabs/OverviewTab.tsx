@@ -1,8 +1,8 @@
-import { Driver } from "@/lib/types";
+import { OperatorDto } from "@/lib/types";
 import { DriverForm } from "@/components/drivers/DriverForm";
 
 interface OverviewTabProps {
-    driver: Driver;
+    driver: OperatorDto;
     isEditing?: boolean;
     onCancel?: () => void;
     onSave?: () => void;
