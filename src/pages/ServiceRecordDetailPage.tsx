@@ -93,14 +93,9 @@ const ServiceRecordDetailPage = () => {
 
             // Fetch attachments
             // Attachments are now included in the WorkOrderDto, but we fetch explicitly to be safe if Include is missing
-            let attachments = wo.documents || [];
-            if (!attachments.length) {
-                try {
-                    attachments = await workOrdersApi.listAttachments(id!);
-                } catch (e) {
-                    console.warn("Could not list attachments independently", e);
-                }
-            }
+            // Attachments are now included in the WorkOrderDto
+            const attachments = wo.documents || [];
+            // REMOVED explicit listAttachments call which causes 404
 
             const mappedAttachments = attachments.map(doc => {
                 const ft = (doc.fileType || '').toLowerCase();

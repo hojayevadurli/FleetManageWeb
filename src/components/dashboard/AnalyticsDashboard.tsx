@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Badge } from '@/components/ui/badge';
 import AIPredictiveForecast from './AIPredictiveForecast';
 import WorkOrderStatusWidget from './WorkOrderStatusWidget';
+import MostUsedShopsWidget from './MostUsedShopsWidget';
 
 interface DashboardProps {
     equipment: Equipment[];
@@ -155,6 +156,11 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
 
                     {/* Work Order Status Analytics */}
                     <WorkOrderStatusWidget workOrders={workOrders} />
+
+                    {/* Most Used Shops Widget */}
+                    <div className="mt-6">
+                        <MostUsedShopsWidget workOrders={workOrders} />
+                    </div>
                 </div>
 
                 <div className="space-y-6">
@@ -175,38 +181,46 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                             <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Recent maintenance audits completed by AI.</p>
                         </div>
                         <div className="space-y-4 flex-1">
-                            {serviceRecords.slice(0, 6).map((sr) => {
-                                const vendorDisplay = (sr as any).vendor || (sr as any).vendorName || 'Unknown Vendor';
+                            {serviceRecords
+                                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                .slice(0, 10)
+                                .map((sr) => {
+                                    const vendorDisplay = (sr as any).vendor || (sr as any).vendorName || 'Unknown Vendor';
+                                    const woNumber = sr.woNumber || 'N/A';
+                                    const title = sr.title || 'Untitled Work Order';
 
-                                // Fix: Resolve status to string if it's a number (Enum)
-                                const statusRaw = sr.status;
-                                let statusLabel = String(statusRaw);
-                                if (typeof statusRaw === 'number') {
-                                    statusLabel = WorkOrderStatus[statusRaw] || 'Unknown';
-                                }
+                                    // Fix: Resolve status to string if it's a number (Enum)
+                                    const statusRaw = sr.status;
+                                    let statusLabel = String(statusRaw);
+                                    if (typeof statusRaw === 'number') {
+                                        statusLabel = WorkOrderStatus[statusRaw] || 'Unknown';
+                                    }
 
-                                const statusLower = statusLabel.toLowerCase();
-                                const statusColor = statusLower === 'closed' || statusLower === 'completed' || statusLower === 'paid' ? 'bg-emerald-50 text-emerald-600' :
-                                    statusLower === 'open' || statusLower === 'inprocess' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600';
+                                    const statusLower = statusLabel.toLowerCase();
+                                    const statusColor = statusLower === 'closed' || statusLower === 'completed' || statusLower === 'paid' ? 'bg-emerald-50 text-emerald-600' :
+                                        statusLower === 'open' || statusLower === 'inprocess' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600';
 
-                                return (
-                                    <div key={sr.id} onClick={() => onTabChange('service', undefined, sr.id)} className="flex items-center gap-4 p-4 rounded-2xl bg-[#f8fafc] border border-transparent hover:border-blue-200 hover:bg-white hover:shadow-md transition-all duration-300 cursor-pointer group">
-                                        <div className="bg-white p-3 rounded-xl border border-slate-100 group-hover:bg-blue-600 group-hover:border-blue-600 transition-all duration-300">
-                                            <ClipboardList className="w-5 h-5 text-slate-400 group-hover:text-white" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-xs text-slate-500 truncate mt-0.5">{(sr as any).location || 'Shop'}</div>
-                                            <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate mt-0.5">{vendorDisplay}</div>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                            <div className="text-sm font-black text-slate-900 tracking-tight">${(sr.totalCost || 0).toLocaleString()}</div>
-                                            <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md mt-1 inline-block ${statusColor}`}>
-                                                {statusLabel}
+                                    return (
+                                        <div key={sr.id} onClick={() => onTabChange('service', undefined, sr.id)} className="flex items-center gap-4 p-4 rounded-2xl bg-[#f8fafc] border border-transparent hover:border-blue-200 hover:bg-white hover:shadow-md transition-all duration-300 cursor-pointer group">
+                                            <div className="bg-white p-3 rounded-xl border border-slate-100 group-hover:bg-blue-600 group-hover:border-blue-600 transition-all duration-300">
+                                                <ClipboardList className="w-5 h-5 text-slate-400 group-hover:text-white" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <span className="text-[10px] font-black text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded tracking-tight">{woNumber}</span>
+                                                    <span className="text-xs font-bold text-slate-900 truncate" title={title}>{title}</span>
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate mt-1">{vendorDisplay}</div>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <div className="text-sm font-black text-slate-900 tracking-tight">${(sr.totalCost || 0).toLocaleString()}</div>
+                                                <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md mt-1 inline-block ${statusColor}`}>
+                                                    {statusLabel}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )
-                            })}
+                                    )
+                                })}
                         </div>
                         <button
                             onClick={() => onTabChange('service')}

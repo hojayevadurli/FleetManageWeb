@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AnalyticsDashboard from "@/components/dashboard/AnalyticsDashboard";
 import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
 import { workOrdersApi } from "@/lib/workOrdersApi";
+import { shopsApi } from "@/lib/shopsApi";
 import { Equipment, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
 
 const Dashboard = () => {
@@ -15,49 +16,70 @@ const Dashboard = () => {
   const fetchData = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
-      const [equipData, woData] = await Promise.all([
+      const [equipData, woData, shopsData] = await Promise.all([
         equipmentApi.list(),
-        workOrdersApi.list({ pageSize: 1000 })
+        workOrdersApi.list({ pageSize: 1000 }),
+        shopsApi.list()
       ]);
 
       // Map EquipmentDto to Equipment
       const mappedEquipment: Equipment[] = equipData.map(mapDtoToEquipment);
 
       // Map WorkOrderDto to WorkOrder
-      const mappedWorkOrders: WorkOrder[] = woData.map(wo => ({
-        id: wo.id,
-        woNumber: wo.workOrderNumber || 'Draft',
-        equipmentId: wo.equipmentId,
-        status: (() => {
-          const s = wo.status;
-          if (typeof s === 'number') return s;
-          const lookup = (WorkOrderStatus as any)[s];
-          if (lookup !== undefined) return lookup;
-          // Case-insensitive fallback
-          const lower = String(s).toLowerCase();
-          // Enum keys are strings, values are numbers. 
-          // We need to find the Key that matches the input string case-insensitively, then get the Value.
-          const key = Object.keys(WorkOrderStatus).find(k => isNaN(Number(k)) && k.toLowerCase() === lower);
-          return key ? (WorkOrderStatus as any)[key] : WorkOrderStatus.Open;
-        })(),
-        priority: (WorkOrderPriority as any)[wo.priority] ?? WorkOrderPriority.Normal,
-        date: wo.openedAt,
-        technician: 'Unknown',
-        totalCost: wo.manualActualTotal || wo.estimatedTotal || (wo.lines || []).reduce((sum: number, l: any) => sum + (l.amount || 0), 0),
-        partsCost: 0,
-        laborCost: 0,
-        title: wo.title,
-        complaint: wo.complaint,
-        diagnosis: wo.diagnosis || '',
-        resolution: wo.resolution || '',
-        costSource: (WorkOrderCostSource as any)[wo.costSource] ?? WorkOrderCostSource.Estimated,
-        estimatedTotal: wo.estimatedTotal || (wo.lines || []).reduce((sum: number, l: any) => sum + (l.amount || 0), 0),
-        manualActualTotal: wo.manualActualTotal,
-        description: wo.notes || '',
-        vendor: '',
-        items: [],
-        media: []
-      }));
+      const mappedWorkOrders: WorkOrder[] = woData.map(wo => {
+        // Resolve vendor name
+        let vendorDisplay = wo.vendorName || '';
+        if (!vendorDisplay && wo.vendorId) {
+          const shop = shopsData.find(s => s.id === wo.vendorId);
+          if (shop) vendorDisplay = shop.shop_name;
+        }
+
+        // Calculate costs from lines
+        const lines = wo.lines || [];
+        const partsCost = lines
+          .filter((l: any) => (l.type || '').toLowerCase().includes('part'))
+          .reduce((sum: number, l: any) => sum + (l.amount || 0), 0);
+
+        const laborCost = lines
+          .filter((l: any) => (l.type || '').toLowerCase().includes('labor'))
+          .reduce((sum: number, l: any) => sum + (l.amount || 0), 0);
+
+        return {
+          id: wo.id,
+          woNumber: wo.workOrderNumber || 'Draft',
+          equipmentId: wo.equipmentId,
+          status: (() => {
+            const s = wo.status;
+            if (typeof s === 'number') return s;
+            const lookup = (WorkOrderStatus as any)[s];
+            if (lookup !== undefined) return lookup;
+            // Case-insensitive fallback
+            const lower = String(s).toLowerCase();
+            // Enum keys are strings, values are numbers. 
+            // We need to find the Key that matches the input string case-insensitively, then get the Value.
+            const key = Object.keys(WorkOrderStatus).find(k => isNaN(Number(k)) && k.toLowerCase() === lower);
+            return key ? (WorkOrderStatus as any)[key] : WorkOrderStatus.Open;
+          })(),
+          priority: (WorkOrderPriority as any)[wo.priority] ?? WorkOrderPriority.Normal,
+          date: wo.openedAt,
+          closedAt: wo.closedAt,
+          technician: 'Unknown',
+          totalCost: wo.manualActualTotal || wo.estimatedTotal || lines.reduce((sum: number, l: any) => sum + (l.amount || 0), 0),
+          partsCost: partsCost,
+          laborCost: laborCost,
+          title: wo.title,
+          complaint: wo.complaint,
+          diagnosis: wo.diagnosis || '',
+          resolution: wo.resolution || '',
+          costSource: (WorkOrderCostSource as any)[wo.costSource] ?? WorkOrderCostSource.Estimated,
+          estimatedTotal: wo.estimatedTotal || lines.reduce((sum: number, l: any) => sum + (l.amount || 0), 0),
+          manualActualTotal: wo.manualActualTotal,
+          description: wo.notes || '',
+          vendor: vendorDisplay, // Mapped vendor name
+          items: [],
+          media: []
+        }
+      });
 
       setEquipment(mappedEquipment);
       setWorkOrders(mappedWorkOrders);

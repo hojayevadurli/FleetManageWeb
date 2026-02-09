@@ -64,7 +64,7 @@ const WorkOrderStatusWidget: React.FC<WorkOrderStatusWidgetProps> = ({ workOrder
     const total = workOrders.length;
 
     return (
-        <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col h-full min-h-[400px]">
+        <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col">
             <div className="mb-6">
                 <div className="flex items-center gap-2 mb-1">
                     <div className="bg-blue-50 p-2 rounded-lg">

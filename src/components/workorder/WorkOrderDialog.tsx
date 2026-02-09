@@ -314,12 +314,9 @@ export default function WorkOrderDialog({
       let docs = (wo as any).documents;
 
       if (!docs || docs.length === 0) {
-        try {
-          docs = await workOrdersApi.listAttachments(id);
-          console.log("[WorkOrderDialog] Fetched attachments explicitly:", docs);
-        } catch (err) {
-          console.error("Failed to list attachments explicitly", err);
-        }
+        // REMOVED: Explicit fetch causes 404.
+        // If documents are missing from the GET /workorders/{id} response, 
+        // they will just be empty for now until backend includes them or a valid endpoint exists.
       }
 
       if (docs && Array.isArray(docs)) {
