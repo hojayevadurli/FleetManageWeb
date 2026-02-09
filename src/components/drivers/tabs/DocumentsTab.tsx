@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Driver, DriverDocument } from "@/lib/types";
-import { driversApi } from "@/lib/driversApi";
+import { OperatorDto, OperatorDocumentDto } from "@/lib/types";
+import { operatorsApi } from "@/lib/operatorsApi";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,51 +9,46 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { FileText, Download, AlertCircle, Upload, Search, Filter, Plus, Calendar, MoreVertical, RefreshCw, Trash2, Eye } from "lucide-react";
 import { DocumentPreview } from "../DocumentPreview";
+import { useToast } from "@/hooks/use-toast";
 
 interface DocumentsTabProps {
-    driver: Driver;
+    driver: OperatorDto;
 }
 
 export function DocumentsTab({ driver }: DocumentsTabProps) {
-    const [documents, setDocuments] = useState<DriverDocument[]>([]);
+    const { toast } = useToast();
+    const [documents, setDocuments] = useState<OperatorDocumentDto[]>([]);
     const [loading, setLoading] = useState(true);
 
     // UI State
-    const [selectedDoc, setSelectedDoc] = useState<DriverDocument | null>(null);
+    const [selectedDoc, setSelectedDoc] = useState<OperatorDocumentDto | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [typeFilter, setTypeFilter] = useState("all");
     const [statusFilter, setStatusFilter] = useState("all");
 
     // Upload State
     const [isUploadOpen, setIsUploadOpen] = useState(false);
-    const [isUploading, setIsUploading] = useState(false);
     const [uploadFile, setUploadFile] = useState<File | null>(null);
     const [uploadType, setUploadType] = useState("");
     const [uploadExpiry, setUploadExpiry] = useState("");
     const [uploadNotes, setUploadNotes] = useState("");
 
     useEffect(() => {
-        const loadDocs = async () => {
-            try {
-                const docs = await driversApi.getDriverDocuments(driver.id);
-                setDocuments(docs);
-                // Auto-select first doc if available
-                if (docs.length > 0) setSelectedDoc(docs[0]);
-            } catch (err) {
-                console.error("Failed to load documents", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadDocs();
-    }, [driver.id]);
+        if (driver.documents) {
+            setDocuments(driver.documents);
+            if (driver.documents.length > 0) setSelectedDoc(driver.documents[0]);
+        }
+        setLoading(false);
+    }, [driver]);
 
     // Filtering Logic
     const filteredDocs = useMemo(() => {
         return documents.filter(doc => {
-            const matchesSearch = doc.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                doc.docType.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesType = typeFilter === "all" || doc.docType === typeFilter;
+            const fileName = doc.fileUrl ? doc.fileUrl.split('/').pop() || 'Document' : 'Document';
+            const matchesSearch = fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (doc.docKind || '').toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesType = typeFilter === "all" || doc.docKind === typeFilter;
+            // Status logic if doc.status is string
             const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
             return matchesSearch && matchesType && matchesStatus;
         });
@@ -61,40 +56,27 @@ export function DocumentsTab({ driver }: DocumentsTabProps) {
 
     // Unique Doc Types for Dropdown
     const docTypes = useMemo(() => {
-        const types = new Set(documents.map(d => d.docType));
+        const types = new Set(documents.map(d => d.docKind).filter(Boolean));
         return Array.from(types).sort();
     }, [documents]);
 
     const handleUpload = async () => {
-        if (!uploadFile || !uploadType) return;
-
-        setIsUploading(true);
-        try {
-            const newDoc = await driversApi.uploadDocument(driver.id, uploadFile, {
-                docType: uploadType,
-                expirationDate: uploadExpiry || undefined,
-                notes: uploadNotes
-            });
-            setDocuments(prev => [...prev, newDoc]);
-            setSelectedDoc(newDoc);
-            setIsUploadOpen(false);
-            // Reset form
-            setUploadFile(null);
-            setUploadType("");
-            setUploadExpiry("");
-            setUploadNotes("");
-        } catch (err) {
-            console.error("Upload failed", err);
-        } finally {
-            setIsUploading(false);
-        }
+        toast({ title: "Not Supported", description: "Document upload requires backend update for attachment creation.", variant: "destructive" });
+        setIsUploadOpen(false);
     };
 
-    const handleDelete = (docId: string, e: React.MouseEvent) => {
+    const handleDelete = async (docId: string, e: React.MouseEvent) => {
         e.stopPropagation();
         if (confirm("Are you sure you want to remove this document?")) {
-            setDocuments(prev => prev.filter(d => d.id !== docId));
-            if (selectedDoc?.id === docId) setSelectedDoc(null);
+            try {
+                await operatorsApi.detachDocument(driver.id, docId);
+                setDocuments(prev => prev.filter(d => d.id !== docId));
+                if (selectedDoc?.id === docId) setSelectedDoc(null);
+                toast({ title: "Success", description: "Document removed." });
+            } catch (error) {
+                console.error("Failed to delete document", error);
+                toast({ title: "Error", description: "Could not remove document.", variant: "destructive" });
+            }
         }
     };
 

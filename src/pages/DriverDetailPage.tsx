@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { Driver, DriverOperatingStatus, DriverHiringStage } from "@/lib/types";
-import { driversApi } from "@/lib/driversApi";
+import { useState, useEffect, useMemo } from "react";
+import { Driver, DriverOperatingStatus, DriverHiringStage, OperatorDto, OperatorStatus, DriverComplianceStatus } from "@/lib/types";
+import { operatorsApi } from "@/lib/operatorsApi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -15,39 +15,119 @@ import { SpendTab } from "@/components/drivers/tabs/SpendTab";
 import { SafetyTab } from "@/components/drivers/tabs/SafetyTab";
 import { PerformanceTab } from "@/components/drivers/tabs/PerformanceTab";
 import { HRTab } from "@/components/drivers/tabs/HRTab";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DriverDetailPage() {
     const { id } = useParams<{ id: string }>();
-    const [driver, setDriver] = useState<Driver | undefined>(undefined);
+    const { toast } = useToast();
+    const [driver, setDriver] = useState<OperatorDto | undefined>(undefined);
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
 
     useEffect(() => {
         if (id) {
             setLoading(true);
-            driversApi.getDriverById(id).then(d => {
-                setDriver(d);
-                setLoading(false);
-            });
+            operatorsApi.getById(id)
+                .then(d => {
+                    setDriver(d);
+                })
+                .catch(err => {
+                    console.error(err);
+                    toast({ title: "Error", description: "Driver not found", variant: "destructive" });
+                })
+                .finally(() => setLoading(false));
         }
-    }, [id]);
+    }, [id, toast]);
+
+    // Adapter for Legacy Tabs
+    const adaptedDriver: Driver | undefined = useMemo(() => {
+        if (!driver) return undefined;
+
+        let metadata: any = {};
+        try {
+            if (driver.notes?.startsWith("{")) {
+                const parsed = JSON.parse(driver.notes);
+                if (parsed.metadata) metadata = parsed.metadata;
+            }
+        } catch (e) { /* ignore */ }
+
+        // Map Status Numerics to Strings
+        console.log("DetailPage Driver Data:", { id: driver.id, status: driver.status, type: typeof driver.status });
+        let opStatus = DriverOperatingStatus.Active;
+
+        const statusVal = driver.status;
+        const statusNum = Number(statusVal);
+
+        if (isNaN(statusNum)) {
+            // Handle String Status from Backend (if applicable)
+            const statusStr = String(statusVal).toLowerCase();
+            if (statusStr === 'active') opStatus = DriverOperatingStatus.Active;
+            else if (statusStr === 'inactive' || statusStr === 'suspended') opStatus = DriverOperatingStatus.Suspended; // Inactive
+            else if (statusStr === 'onleave' || statusStr === 'on leave') opStatus = DriverOperatingStatus.OnLeave;
+            else if (statusStr === 'terminated') opStatus = DriverOperatingStatus.Terminated;
+        } else {
+            // Handle Numeric Status
+            switch (statusNum) {
+                case OperatorStatus.Active: opStatus = DriverOperatingStatus.Active; break;
+                case OperatorStatus.Inactive: opStatus = DriverOperatingStatus.Suspended; break;
+                case OperatorStatus.OnLeave: opStatus = DriverOperatingStatus.OnLeave; break;
+                case OperatorStatus.Terminated: opStatus = DriverOperatingStatus.Terminated; break;
+                default: opStatus = DriverOperatingStatus.Active;
+            }
+        }
+
+        return {
+            id: driver.id,
+            firstName: driver.firstName,
+            lastName: driver.lastName,
+            email: driver.email || "",
+            phone: driver.phone || "",
+            photoUrl: driver.photoUrl,
+            driverNumber: driver.employeeId || "",
+
+            // Mapped Fields
+            operatingStatus: opStatus,
+            hiringStage: metadata.hiringStage || DriverHiringStage.Lead,
+            isBlacklisted: metadata.isBlacklisted || false,
+
+            // Mocked or Metadata Fields
+            homeTerminal: metadata.homeTerminal || "Not Assigned",
+            currentAssettNumber: "N/A", // Backend doesn't support assignment yet
+
+            complianceStatus: DriverComplianceStatus.Good, // Default
+            rating: 5.0, // Default
+
+            hireDate: driver.hireDate || "",
+            // ... other fields that might be used by tabs
+            licenseNumber: driver.licenseNumber,
+            licenseState: driver.licenseState,
+            dlExpireDate: driver.licenseExpirationDate ? String(driver.licenseExpirationDate) : undefined,
+            dlIssueDate: "", // Not in OperatorDto
+            medicalCardExpiration: "",
+            address: metadata.address || "",
+            notes: driver.notes,
+            documents: [], // We don't need to pass docs here for legacy tabs usually, unless they use it
+        } as unknown as Driver;
+    }, [driver]);
 
     if (loading) return <div className="p-8">Loading...</div>;
-    if (!driver) return <div className="p-8">Driver not found</div>;
+    if (!driver || !adaptedDriver) return <div className="p-8">Driver not found</div>;
 
     // Helper to get status display
-    const getStatusDisplay = (driver: Driver) => {
-        if (driver.isBlacklisted) return { text: 'Blacklisted', color: 'bg-red-600 text-white' };
-        if (driver.operatingStatus) {
-            if (driver.operatingStatus === DriverOperatingStatus.Active) return { text: 'Active', color: 'bg-emerald-500 text-white' };
-            if (driver.operatingStatus === DriverOperatingStatus.OnLeave) return { text: 'On Leave', color: 'bg-amber-500 text-white' };
-            return { text: driver.operatingStatus, color: 'bg-gray-500 text-white' };
+    const getStatusDisplay = (d: Driver) => {
+        if (d.isBlacklisted) return { text: 'Blacklisted', color: 'bg-red-600 text-white' };
+        if (d.operatingStatus) {
+            if (d.operatingStatus === DriverOperatingStatus.Active) return { text: 'Active', color: 'bg-emerald-500 text-white' };
+            if (d.operatingStatus === DriverOperatingStatus.OnLeave) return { text: 'On Leave', color: 'bg-amber-500 text-white' };
+            if (d.operatingStatus === DriverOperatingStatus.Terminated) return { text: 'Terminated', color: 'bg-red-500 text-white' };
+            if (d.operatingStatus === DriverOperatingStatus.Suspended) return { text: 'Inactive', color: 'bg-gray-500 text-white' }; // Display 'Inactive' for Suspended/Inactive
+            return { text: d.operatingStatus, color: 'bg-gray-500 text-white' };
         }
-        if (driver.hiringStage) return { text: driver.hiringStage, color: 'bg-blue-500 text-white' };
+        if (d.hiringStage) return { text: d.hiringStage, color: 'bg-blue-500 text-white' };
         return { text: 'Unknown', color: 'bg-gray-500' };
     };
 
-    const statusInfo = driver ? getStatusDisplay(driver) : { text: '', color: '' };
+    const statusInfo = getStatusDisplay(adaptedDriver);
 
     return (
         <div className="space-y-6">
@@ -70,7 +150,7 @@ export default function DriverDetailPage() {
                                 {statusInfo.text}
                             </Badge>
                         </h1>
-                        <p className="text-gray-500 font-mono text-sm">{driver.driverNumber}</p>
+                        <p className="text-gray-500 font-mono text-sm">{driver.employeeId}</p>
                     </div>
                 </div>
                 <div className="flex gap-2">
@@ -107,13 +187,12 @@ export default function DriverDetailPage() {
 
                 <TabsContent value="overview">
                     <OverviewTab
-                        driver={driver}
+                        driver={driver} // Pass OperatorDto
                         isEditing={isEditing}
                         onCancel={() => setIsEditing(false)}
                         onSave={() => {
                             setIsEditing(false);
-                            // Refresh driver data
-                            if (id) driversApi.getDriverById(id).then(setDriver);
+                            if (id) operatorsApi.getById(id).then(setDriver);
                         }}
                     />
                 </TabsContent>
@@ -123,19 +202,19 @@ export default function DriverDetailPage() {
                 </TabsContent>
 
                 <TabsContent value="hr">
-                    <HRTab driver={driver} />
+                    <HRTab driver={adaptedDriver} />
                 </TabsContent>
                 <TabsContent value="safety">
-                    <SafetyTab driver={driver} />
+                    <SafetyTab driver={adaptedDriver} />
                 </TabsContent>
                 <TabsContent value="spend">
-                    <SpendTab driver={driver} />
+                    <SpendTab driver={adaptedDriver} />
                 </TabsContent>
                 <TabsContent value="timeoff">
-                    <TimeOffTab driver={driver} />
+                    <TimeOffTab driver={adaptedDriver} />
                 </TabsContent>
                 <TabsContent value="performance">
-                    <PerformanceTab driver={driver} />
+                    <PerformanceTab driver={adaptedDriver} />
                 </TabsContent>
             </Tabs>
         </div>

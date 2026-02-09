@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Driver, TimeOffRequest } from "@/lib/types";
-import { driversApi } from "@/lib/driversApi";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,17 +15,26 @@ export function TimeOffTab({ driver }: TimeOffTabProps) {
 
     useEffect(() => {
         const loadRequests = async () => {
-            try {
-                const data = await driversApi.getDriverTimeOffRequests(driver.id);
-                setRequests(data);
-            } catch (err) {
-                console.error("Failed to load time off requests", err);
-            } finally {
-                setLoading(false);
+            // Mock Data for now as backend doesn't support TimeOff yet
+            await new Promise(resolve => setTimeout(resolve, 400));
+            if (driver.id === '1') {
+                setRequests([{
+                    id: 't1',
+                    driverId: '1',
+                    driverName: `${driver.firstName} ${driver.lastName}`,
+                    startDate: new Date(new Date().setDate(new Date().getDate() - 5)).toISOString(),
+                    endDate: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString(),
+                    type: 'Home Time', // Fixed typo in previous mock 'HomeTime' -> 'Home Time' or Keep consistent
+                    status: 'Approved',
+                    requestedAt: new Date(new Date().setDate(new Date().getDate() - 10)).toISOString()
+                } as any]); // Cast if type mismatch or just use correct shape
+            } else {
+                setRequests([]);
             }
+            setLoading(false);
         };
         loadRequests();
-    }, [driver.id]);
+    }, [driver.id, driver.firstName, driver.lastName]);
 
     return (
         <div className="space-y-6">

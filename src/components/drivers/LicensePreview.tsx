@@ -9,10 +9,11 @@ interface LicensePreviewProps {
     backFile: File | null;
     existingFrontUrl?: string | null;
     existingBackUrl?: string | null;
+    onRemove?: (side: 'front' | 'back') => void;
     className?: string;
 }
 
-export function LicensePreview({ frontFile, backFile, existingFrontUrl, existingBackUrl, className }: LicensePreviewProps) {
+export function LicensePreview({ frontFile, backFile, existingFrontUrl, existingBackUrl, onRemove, className }: LicensePreviewProps) {
     const [activeTab, setActiveTab] = useState<'front' | 'back'>('front');
     const [zoom, setZoom] = useState(1);
 
@@ -43,6 +44,17 @@ export function LicensePreview({ frontFile, backFile, existingFrontUrl, existing
                         Document Preview
                     </CardTitle>
                     <div className="flex items-center gap-1">
+                        {onRemove && (activeFile || activeUrl) && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                onClick={() => onRemove(activeTab)}
+                                title={`Remove ${activeTab} license`}
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        )}
                         <Button
                             variant="ghost"
                             size="icon"

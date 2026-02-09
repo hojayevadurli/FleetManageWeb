@@ -530,7 +530,7 @@ export enum DriverOperatingStatus {
   Active = 'Active',
   OnLeave = 'On Leave',
   InOrientation = 'In Orientation',
-  Suspended = 'Suspended',
+  Suspended = 'Inactive',
   Terminated = 'Terminated'
 }
 
@@ -626,4 +626,96 @@ export interface TimeOffRequest {
   status: 'Pending' | 'Approved' | 'Denied';
   reason?: string;
   requestedAt: string;
+}
+
+// Operator (Driver) Management Types matching Backend DTOs
+
+export enum OperatorStatus {
+  Active = 1,
+  Inactive = 2,
+  OnLeave = 3,
+  Terminated = 4
+}
+
+export interface OperatorDocumentDto {
+  id: string;
+  fileUrl: string;
+  fileType: string;
+  docKind: string;
+  status: string;
+  confidenceScore?: number;
+  createdAt: string;
+  role: DocumentRole;
+  startDate?: string;
+  expirationDate?: string;
+  isActive: boolean;
+  externalRef?: string;
+  providerName?: string;
+}
+
+export interface OperatorDto {
+  id: string; // PublicId
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  photoUrl?: string;
+  email?: string;
+  phone?: string;
+  status: OperatorStatus; // OperatorStatus enum
+  employeeId?: string;
+  licenseNumber?: string;
+  licenseState?: string;
+  licenseExpirationDate?: string; // DateOnly as string
+  dateOfBirth?: string; // DateOnly as string
+  hireDate?: string; // DateOnly as string
+  terminationDate?: string; // DateOnly as string
+  notes?: string;
+  createdAt: string;
+  documents: OperatorDocumentDto[];
+}
+
+export interface CreateOperatorDto {
+  firstName: string;
+  lastName: string;
+  photoUrl?: string;
+  email?: string;
+  phone?: string;
+  status: OperatorStatus;
+  employeeId?: string;
+  licenseNumber?: string;
+  licenseState?: string;
+  licenseExpirationDate?: string;
+  dateOfBirth?: string;
+  hireDate?: string;
+  notes?: string;
+  documentIds?: string[];
+}
+
+export interface UpdateOperatorDto {
+  firstName: string;
+  lastName: string;
+  photoUrl?: string;
+  email?: string;
+  phone?: string;
+  status: OperatorStatus;
+  employeeId?: string;
+  licenseNumber?: string;
+  licenseState?: string;
+  licenseExpirationDate?: string;
+  dateOfBirth?: string;
+  hireDate?: string;
+  terminationDate?: string;
+  notes?: string;
+  documentIds?: string[];
+}
+
+export interface AddOperatorAttachmentDto {
+  documentId: string;
+  role: DocumentRole;
+  startDate?: string;
+  expirationDate?: string;
+  isActive: boolean;
+  externalRef?: string;
+  providerName?: string;
+  notes?: string;
 }
