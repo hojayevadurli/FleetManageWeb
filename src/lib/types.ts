@@ -184,6 +184,11 @@ export enum DocumentRole {
   PhotoAfter = 55,
   Inspection = 56,
   WorkOrderOther = 59,
+  // Assignment Roles (60-69)
+  AssignmentPhotoStart = 60,
+  AssignmentPhotoEnd = 61,
+  AssignmentVideoStart = 62,
+  AssignmentVideoEnd = 63,
   Other = 99
 }
 
@@ -636,6 +641,52 @@ export enum OperatorStatus {
   OnLeave = 3,
   Terminated = 4
 }
+
+// Equipment Assignment Types
+export interface OperatorAssignment {
+  id: string;
+  operatorId: string;
+  equipmentId: string;
+  equipmentNumber?: string;
+  equipmentType?: string;
+  startAt: string;
+  endAt?: string | null;
+  assignmentType: 'Primary' | 'Temporary' | 'Team';
+  notes?: string;
+  assignedBy: string;
+  createdAt: string;
+}
+
+export interface CreateAssignmentDto {
+  equipmentId: string;
+  startAt: string;
+  assignmentType: 'Primary' | 'Temporary' | 'Team';
+  notes?: string;
+  startPhotoIds?: string[]; // Document IDs for start photos/videos
+}
+
+export interface AssignmentDto {
+  id: string;
+  operatorId: string;
+  operatorName: string;
+  equipmentId: string;
+  equipmentUnitNumber: string;
+  equipmentType: string;
+  startAt: string;
+  endAt?: string | null;
+  assignmentType: string;
+  notes?: string;
+  createdAt: string;
+  startAttachments?: DocumentAttachment[];
+  endAttachments?: DocumentAttachment[];
+}
+
+export interface EndAssignmentDto {
+  endAt: string;
+  endPhotoIds?: string[]; // Document IDs for end photos/videos
+}
+
+
 
 export interface OperatorDocumentDto {
   id: string;

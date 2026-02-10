@@ -1,11 +1,11 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import { Driver, DriverOperatingStatus, DriverHiringStage, OperatorDto, OperatorStatus, DriverComplianceStatus } from "@/lib/types";
 import { operatorsApi } from "@/lib/operatorsApi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, User, FileText, Shield, DollarSign, Calendar, Star, Briefcase } from "lucide-react";
+import { ArrowLeft, User, FileText, Shield, DollarSign, Calendar, Star, Briefcase, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OverviewTab } from "@/components/drivers/tabs/OverviewTab";
@@ -15,14 +15,33 @@ import { SpendTab } from "@/components/drivers/tabs/SpendTab";
 import { SafetyTab } from "@/components/drivers/tabs/SafetyTab";
 import { PerformanceTab } from "@/components/drivers/tabs/PerformanceTab";
 import { HRTab } from "@/components/drivers/tabs/HRTab";
+import { EquipmentAssignmentCTA } from "@/components/drivers/EquipmentAssignmentCTA";
+import { EquipmentAssignmentDialog } from "@/components/drivers/EquipmentAssignmentDialog";
+import { AssignedEquipmentSection } from "@/components/drivers/AssignedEquipmentSection";
 import { useToast } from "@/hooks/use-toast";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function DriverDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { toast } = useToast();
+    const navigate = useNavigate();
     const [driver, setDriver] = useState<OperatorDto | undefined>(undefined);
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
+    const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
+    const [hasEquipment, setHasEquipment] = useState(false); // Set to false to show CTA for testing
+    const [assignmentRefreshKey, setAssignmentRefreshKey] = useState(0); // Add this to trigger refresh
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         if (id) {
@@ -30,6 +49,13 @@ export default function DriverDetailPage() {
             operatorsApi.getById(id)
                 .then(d => {
                     setDriver(d);
+                    // Check if driver has active assignments
+                    return operatorsApi.getAssignments(d.id);
+                })
+                .then(assignments => {
+                    // Check if there are any active assignments (endAt is null)
+                    const hasActiveAssignments = assignments.some(a => !a.endAt);
+                    setHasEquipment(hasActiveAssignments);
                 })
                 .catch(err => {
                     console.error(err);
@@ -127,6 +153,27 @@ export default function DriverDetailPage() {
         return { text: 'Unknown', color: 'bg-gray-500' };
     };
 
+    const handleDeleteOperator = async () => {
+        if (!id) return;
+
+        console.log('Starting delete operation for operator:', id);
+        setDeleting(true);
+        try {
+            console.log('Calling operatorsApi.delete...');
+            await operatorsApi.delete(id);
+            console.log('Delete successful, showing toast and navigating...');
+            toast({ title: "Success", description: "Operator deleted successfully" });
+            // Force a hard refresh to ensure data is reloaded
+            window.location.href = '/app/drivers';
+        } catch (error) {
+            console.error("Failed to delete operator", error);
+            toast({ title: "Error", description: "Failed to delete operator", variant: "destructive" });
+        } finally {
+            setDeleting(false);
+            setShowDeleteDialog(false);
+        }
+    };
+
     const statusInfo = getStatusDisplay(adaptedDriver);
 
     return (
@@ -157,8 +204,46 @@ export default function DriverDetailPage() {
                     <Link to={`/app/drivers/${id}/edit`}>
                         <Button variant="outline">Edit Driver</Button>
                     </Link>
+                    <Button
+                        variant="outline"
+                        onClick={() => setShowDeleteDialog(true)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                    >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                    </Button>
                 </div>
             </div>
+
+            {/* Equipment Assignment CTA - Show if driver has no equipment */}
+            {!hasEquipment && driver && (
+                <div className="mb-6">
+                    <EquipmentAssignmentCTA
+                        driverId={driver.id}
+                        onAssignClick={() => setShowAssignmentDialog(true)}
+                    />
+                </div>
+            )}
+
+            {/* Assigned Equipment Section - Show active assignments */}
+            {driver && (
+                <div className="mb-6">
+                    <AssignedEquipmentSection
+                        driverId={driver.id}
+                        onChangeAssignment={() => setShowAssignmentDialog(true)}
+                        refreshKey={assignmentRefreshKey}
+                        onAssignmentEnded={() => {
+                            // Update hasEquipment state when assignment is ended
+                            if (id) {
+                                operatorsApi.getAssignments(id).then(assignments => {
+                                    const hasActiveAssignments = assignments.some(a => !a.endAt);
+                                    setHasEquipment(hasActiveAssignments);
+                                });
+                            }
+                        }}
+                    />
+                </div>
+            )}
 
             <Tabs defaultValue="overview" className="w-full">
                 <TabsList className="w-full justify-start h-12 bg-gray-100/50 p-1 rounded-xl mb-6 overflow-x-auto">
@@ -217,6 +302,52 @@ export default function DriverDetailPage() {
                     <PerformanceTab driver={adaptedDriver} />
                 </TabsContent>
             </Tabs>
+
+            {/* Equipment Assignment Dialog */}
+            {driver && (
+                <EquipmentAssignmentDialog
+                    open={showAssignmentDialog}
+                    onOpenChange={setShowAssignmentDialog}
+                    driverId={driver.id}
+                    driverName={`${driver.firstName} ${driver.lastName}`}
+                    onAssignmentComplete={() => {
+                        // Refresh driver data and check assignment status
+                        if (id) {
+                            operatorsApi.getById(id).then(setDriver);
+                            operatorsApi.getAssignments(id).then(assignments => {
+                                const hasActiveAssignments = assignments.some(a => !a.endAt);
+                                setHasEquipment(hasActiveAssignments);
+                            });
+                            // Increment refresh key to trigger re-fetch in AssignedEquipmentSection
+                            setAssignmentRefreshKey(prev => prev + 1);
+                        }
+                    }}
+                />
+            )}
+
+            {/* Delete Operator Confirmation Dialog */}
+            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Operator?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete {driver?.firstName} {driver?.lastName}?
+                            This will mark the operator as deleted. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteOperator}
+                            disabled={deleting}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            {deleting && <span className="mr-2">Deleting...</span>}
+                            Delete Operator
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
