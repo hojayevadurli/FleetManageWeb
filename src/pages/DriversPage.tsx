@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
     Users,
     Search,
@@ -22,15 +22,20 @@ import { operatorsApi } from "@/lib/operatorsApi";
 import { OperatorDto, OperatorStatus } from "@/lib/types";
 
 export default function DriversPage() {
+    const navigate = useNavigate();
+    const location = useLocation();
     const [drivers, setDrivers] = useState<OperatorDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     useEffect(() => {
         const loadDrivers = async () => {
             try {
                 const data = await operatorsApi.getAll();
+                console.log('Raw operators data:', data);
+                console.log('Deleted operators:', data.filter(d => d.isDeleted));
                 setDrivers(data);
             } catch (error) {
                 console.error("Failed to load drivers", error);
@@ -39,9 +44,22 @@ export default function DriversPage() {
             }
         };
         loadDrivers();
-    }, []);
+    }, [refreshTrigger]); // Re-run when refreshTrigger changes
+
+    // Check if we navigated here after a delete operation
+    useEffect(() => {
+        if (location.state?.reload) {
+            console.log('Reload triggered from navigation state');
+            setRefreshTrigger(prev => prev + 1);
+            // Clear the state to prevent reload on subsequent navigations
+            window.history.replaceState({}, document.title);
+        }
+    }, [location]);
 
     const filteredDrivers = drivers.filter(driver => {
+        // Exclude soft-deleted operators
+        if (driver.isDeleted) return false;
+
         const matchesSearch =
             driver.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             driver.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||

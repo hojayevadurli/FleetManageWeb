@@ -286,6 +286,40 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
+
+        // Validate required fields
+        if (!formData.phone || formData.phone.trim() === '') {
+            toast({
+                title: "Validation Error",
+                description: "Phone Number is required. Please enter a valid phone number.",
+                variant: "destructive"
+            });
+            setLoading(false);
+            return;
+        }
+
+        if (!formData.email || formData.email.trim() === '') {
+            toast({
+                title: "Validation Error",
+                description: "Email Address is required. Please enter a valid email address.",
+                variant: "destructive"
+            });
+            setLoading(false);
+            return;
+        }
+
+        // Basic email format validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+            toast({
+                title: "Validation Error",
+                description: "Please enter a valid email address format.",
+                variant: "destructive"
+            });
+            setLoading(false);
+            return;
+        }
+
         try {
             // Construct Metadata Payload
             const metadata = {
@@ -450,7 +484,7 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
     );
 
     // Conditional render for View Mode text vs Input
-    const RenderField = ({ name, value, placeholder, type = "text", maxLength }: any) => {
+    const RenderField = ({ name, value, placeholder, type = "text", maxLength, required }: any) => {
         if (!isEditing) {
             return <div className="py-2 text-gray-900 font-medium min-h-[40px] flex items-center">{value || "-"}</div>;
         }
@@ -464,6 +498,7 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
                 value={value}
                 onChange={handleInputChange}
                 className={inputAiClass(name)}
+                required={required}
             />
         );
     };
@@ -549,6 +584,7 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Row 1: First Name and Last Name */}
                         <div className="space-y-2">
                             <LabelWithAi htmlFor="firstName" label="First Name" fieldName="firstName" />
                             <RenderField name="firstName" value={formData.firstName} placeholder="e.g. John" />
@@ -557,6 +593,8 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
                             <LabelWithAi htmlFor="lastName" label="Last Name" fieldName="lastName" />
                             <RenderField name="lastName" value={formData.lastName} placeholder="e.g. Doe" />
                         </div>
+
+                        {/* Row 2: Date of Birth and Internal Driver ID */}
                         <div className="space-y-2">
                             <LabelWithAi htmlFor="dob" label="Date of Birth" fieldName="dob" />
                             <RenderField name="dob" value={formData.dob} type="date" />
@@ -565,126 +603,131 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
                             <Label htmlFor="driverNumber">Internal Driver ID</Label>
                             <RenderField name="driverNumber" value={formData.driverNumber} placeholder="Auto-generated" />
                         </div>
+
+                        {/* Row 3: Phone Number and Email Address */}
                         <div className="space-y-2">
-                            <Label htmlFor="phone">Phone Number</Label>
-                            <RenderField name="phone" value={formData.phone} placeholder="(555) 000-0000" />
+                            <Label htmlFor="phone">Phone Number <span className="text-red-500">*</span></Label>
+                            <RenderField name="phone" value={formData.phone} placeholder="(555) 000-0000" required />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email Address</Label>
-                            <RenderField name="email" value={formData.email} placeholder="john@example.com" type="email" />
+                            <Label htmlFor="email">Email Address <span className="text-red-500">*</span></Label>
+                            <RenderField name="email" value={formData.email} placeholder="john@example.com" type="email" required />
                         </div>
+                    </div>
 
-                        {/* Address Section */}
-                        <div className="col-span-1 md:col-span-2 space-y-4 pt-4 border-t mt-2">
-                            <Label className="flex items-center gap-2 text-gray-700 font-semibold">
-                                <MapPin className="h-4 w-4" />
-                                Residential Address
-                            </Label>
+                    {/* Residential Address Section */}
+                    <div className="space-y-4 pt-6 border-t mt-4">
+                        <Label className="flex items-center gap-2 text-gray-700 font-semibold">
+                            <MapPin className="h-4 w-4" />
+                            Residential Address
+                        </Label>
 
-                            <div className="space-y-4">
-                                {/* Row 1: Street Address */}
-                                <div className="space-y-2">
-                                    <LabelWithAi htmlFor="addressStreet" label="Street Address" fieldName="addressStreet" />
+                        <div className="space-y-4">
+                            {/* Street Address */}
+                            <div className="space-y-2">
+                                <LabelWithAi htmlFor="addressStreet" label="Street Address" fieldName="addressStreet" />
+                                {isEditing ? (
+                                    <>
+                                        {aiFilledFields.has("addressStreet") && (
+                                            <div className="text-[11px] text-yellow-700 flex items-center gap-1 mb-1">
+                                                <Info className="h-3 w-3" />
+                                                AI-detected address — please verify.
+                                            </div>
+                                        )}
+                                        <AddressAutocomplete
+                                            id="addressStreet"
+                                            value={formData.addressStreet}
+                                            onChange={(val) => setFormData(prev => ({ ...prev, addressStreet: val }))}
+                                            onSelect={(parsed) => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    addressStreet: parsed.street,
+                                                    addressCity: parsed.city,
+                                                    addressState: parsed.state,
+                                                    addressZip: parsed.zip
+                                                }));
+                                            }}
+                                            className={inputAiClass("addressStreet")}
+                                            placeholder="Start typing..."
+                                        />
+                                    </>
+                                ) : (
+                                    <div className="py-2 text-gray-900 font-medium">{formData.addressStreet || "-"}</div>
+                                )}
+                            </div>
+
+                            {/* Row 2: Apt/Unit */}
+                            <div className="space-y-2">
+                                <Label htmlFor="addressUnit" className="text-gray-600 font-normal text-sm">
+                                    Apt, Suite, Unit <span className="text-gray-400">(optional)</span>
+                                </Label>
+                                <RenderField name="addressUnit" value={formData.addressUnit} placeholder="e.g. Apt 4B" className="max-w-md" />
+                            </div>
+
+                            {/* Row 3 */}
+                            <div className="grid grid-cols-12 gap-4">
+                                <div className="col-span-12 md:col-span-5 space-y-2">
+                                    <LabelWithAi htmlFor="addressCity" label="City" fieldName="addressCity" />
+                                    <RenderField name="addressCity" value={formData.addressCity} placeholder="City" />
+                                </div>
+                                <div className="col-span-6 md:col-span-4 space-y-2">
+                                    <LabelWithAi htmlFor="addressState" label="State" fieldName="addressState" />
                                     {isEditing ? (
-                                        <>
-                                            {aiFilledFields.has("addressStreet") && (
-                                                <div className="text-[11px] text-yellow-700 flex items-center gap-1 mb-1">
-                                                    <Info className="h-3 w-3" />
-                                                    AI-detected address — please verify.
-                                                </div>
-                                            )}
-                                            <AddressAutocomplete
-                                                id="addressStreet"
-                                                value={formData.addressStreet}
-                                                onChange={(val) => setFormData(prev => ({ ...prev, addressStreet: val }))}
-                                                onSelect={(parsed) => {
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        addressStreet: parsed.street,
-                                                        addressCity: parsed.city,
-                                                        addressState: parsed.state,
-                                                        addressZip: parsed.zip
-                                                    }));
-                                                }}
-                                                className={inputAiClass("addressStreet")}
-                                                placeholder="Start typing..."
-                                            />
-                                        </>
+                                        <Select value={formData.addressState} onValueChange={(val) => handleSelectChange("addressState", val)}>
+                                            <SelectTrigger className={inputAiClass("addressState")}>
+                                                <SelectValue placeholder="State" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {US_STATES.map(s => <SelectItem key={s.value} value={s.value}>{s.value} - {s.label}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
                                     ) : (
-                                        <div className="py-2 text-gray-900 font-medium">{formData.addressStreet || "-"}</div>
+                                        <div className="py-2 text-gray-900 font-medium">{formData.addressState || "-"}</div>
                                     )}
                                 </div>
-
-                                {/* Row 2: Apt/Unit */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="addressUnit" className="text-gray-600 font-normal text-sm">
-                                        Apt, Suite, Unit <span className="text-gray-400">(optional)</span>
-                                    </Label>
-                                    <RenderField name="addressUnit" value={formData.addressUnit} placeholder="e.g. Apt 4B" className="max-w-md" />
-                                </div>
-
-                                {/* Row 3 */}
-                                <div className="grid grid-cols-12 gap-4">
-                                    <div className="col-span-12 md:col-span-5 space-y-2">
-                                        <LabelWithAi htmlFor="addressCity" label="City" fieldName="addressCity" />
-                                        <RenderField name="addressCity" value={formData.addressCity} placeholder="City" />
-                                    </div>
-                                    <div className="col-span-6 md:col-span-4 space-y-2">
-                                        <LabelWithAi htmlFor="addressState" label="State" fieldName="addressState" />
-                                        {isEditing ? (
-                                            <Select value={formData.addressState} onValueChange={(val) => handleSelectChange("addressState", val)}>
-                                                <SelectTrigger className={inputAiClass("addressState")}>
-                                                    <SelectValue placeholder="State" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {US_STATES.map(s => <SelectItem key={s.value} value={s.value}>{s.value} - {s.label}</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                        ) : (
-                                            <div className="py-2 text-gray-900 font-medium">{formData.addressState || "-"}</div>
-                                        )}
-                                    </div>
-                                    <div className="col-span-6 md:col-span-3 space-y-2">
-                                        <LabelWithAi htmlFor="addressZip" label="ZIP Code" fieldName="addressZip" />
-                                        <RenderField name="addressZip" value={formData.addressZip} placeholder="ZIP" />
-                                    </div>
+                                <div className="col-span-6 md:col-span-3 space-y-2">
+                                    <LabelWithAi htmlFor="addressZip" label="ZIP Code" fieldName="addressZip" />
+                                    <RenderField name="addressZip" value={formData.addressZip} placeholder="ZIP" />
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-2 col-span-1 md:col-span-2">
-                            <Label htmlFor="homeTerminal">Home Terminal</Label>
-                            {isEditing ? (
-                                <Select value={formData.homeTerminal} onValueChange={(val) => handleSelectChange("homeTerminal", val)}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select terminal" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Chicago, IL">Chicago, IL</SelectItem>
-                                        <SelectItem value="Gary, IN">Gary, IN</SelectItem>
-                                        <SelectItem value="Joliet, IL">Joliet, IL</SelectItem>
-                                        <SelectItem value="Milwaukee, WI">Milwaukee, WI</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            ) : (
-                                <div className="py-2 text-gray-900 font-medium">{formData.homeTerminal || "-"}</div>
-                            )}
-                        </div>
+                    </div>
 
-                        {/* Notes */}
-                        <div className="space-y-2 col-span-1 md:col-span-2">
-                            <Label htmlFor="notes">Notes</Label>
-                            {isEditing ? (
-                                <textarea
-                                    name="notes"
-                                    value={formData.notes}
-                                    onChange={handleInputChange}
-                                    className="w-full p-2 border rounded-md"
-                                    rows={3}
-                                />
-                            ) : (
-                                <div className="py-2 text-gray-900 font-medium">{formData.notes || "-"}</div>
-                            )}
-                        </div>
+                    {/* Home Terminal */}
+                    <div className="space-y-2 pt-4">
+                        <Label htmlFor="homeTerminal">Home Terminal</Label>
+                        {isEditing ? (
+                            <Select value={formData.homeTerminal} onValueChange={(val) => handleSelectChange("homeTerminal", val)}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select terminal" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Chicago, IL">Chicago, IL</SelectItem>
+                                    <SelectItem value="Gary, IN">Gary, IN</SelectItem>
+                                    <SelectItem value="Joliet, IL">Joliet, IL</SelectItem>
+                                    <SelectItem value="Milwaukee, WI">Milwaukee, WI</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        ) : (
+                            <div className="py-2 text-gray-900 font-medium">{formData.homeTerminal || "-"}</div>
+                        )}
+                    </div>
+
+
+                    {/* Notes */}
+                    <div className="space-y-2 pt-4">
+                        <Label htmlFor="notes">Notes</Label>
+                        {isEditing ? (
+                            <textarea
+                                name="notes"
+                                value={formData.notes}
+                                onChange={handleInputChange}
+                                className="w-full p-2 border rounded-md"
+                                rows={3}
+                            />
+                        ) : (
+                            <div className="py-2 text-gray-900 font-medium">{formData.notes || "-"}</div>
+                        )}
                     </div>
                 </CardContent>
             </Card>

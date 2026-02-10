@@ -4,7 +4,10 @@ import {
     CreateOperatorDto,
     UpdateOperatorDto,
     OperatorDocumentDto,
-    AddOperatorAttachmentDto
+    AddOperatorAttachmentDto,
+    AssignmentDto,
+    CreateAssignmentDto,
+    EndAssignmentDto
 } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -55,6 +58,15 @@ export const operatorsApi = {
         return response.data;
     },
 
+    // Delete Operator (soft delete)
+    delete: async (id: string) => {
+        console.log('Deleting operator with ID:', id);
+        console.log('DELETE URL:', `/operators/${id}`);
+        const response = await api.delete(`/operators/${id}`);
+        console.log('Delete response:', response);
+        return response;
+    },
+
     // Get Attachments
     getAttachments: async (id: string) => {
         const response = await api.get<OperatorDocumentDto[]>(`/operators/${id}/attachments`);
@@ -70,5 +82,28 @@ export const operatorsApi = {
     // Detach Document
     detachDocument: async (id: string, documentId: string) => {
         await api.delete(`/operators/${id}/attachments/${documentId}`);
+    },
+
+    // Get Equipment Assignments
+    getAssignments: async (id: string) => {
+        const response = await api.get<AssignmentDto[]>(`/operators/${id}/assignments`);
+        return response.data;
+    },
+
+    // Create Equipment Assignment
+    assignEquipment: async (id: string, data: CreateAssignmentDto) => {
+        const response = await api.post<AssignmentDto>(`/operators/${id}/assignments`, data);
+        return response.data;
+    },
+
+    // End Equipment Assignment
+    endAssignment: async (id: string, assignmentId: string, data: EndAssignmentDto) => {
+        const response = await api.put(`/operators/${id}/assignments/${assignmentId}/end`, data);
+        return response.data;
+    },
+
+    // Delete Equipment Assignment
+    deleteAssignment: async (id: string, assignmentId: string) => {
+        await api.delete(`/operators/${id}/assignments/${assignmentId}`);
     }
 };
