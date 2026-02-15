@@ -32,6 +32,7 @@ export function DocumentsTab({ driver }: DocumentsTabProps) {
     const [uploadType, setUploadType] = useState("");
     const [uploadExpiry, setUploadExpiry] = useState("");
     const [uploadNotes, setUploadNotes] = useState("");
+    const [isUploading, setIsUploading] = useState(false);
 
     useEffect(() => {
         if (driver.documents) {
@@ -242,7 +243,7 @@ export function DocumentsTab({ driver }: DocumentsTabProps) {
                                 <div className="flex-1 min-w-0 pr-6">
                                     <div className="flex items-center justify-between mb-1">
                                         <h4 className={`text-sm font-semibold truncate ${selectedDoc?.id === doc.id ? 'text-blue-700' : 'text-gray-900'}`}>
-                                            {doc.docType}
+                                            {doc.docKind || 'Document'}
                                         </h4>
                                         <Badge variant="outline" className={`
                                             text-[10px] px-1.5 h-5
@@ -253,18 +254,21 @@ export function DocumentsTab({ driver }: DocumentsTabProps) {
                                             {doc.status}
                                         </Badge>
                                     </div>
-                                    <p className="text-xs text-gray-500 truncate mb-2">{doc.fileName}</p>
+                                    <p className="text-xs text-gray-500 truncate mb-2">{doc.fileUrl?.split('/').pop() || 'Document'}</p>
 
                                     <div className="flex items-center gap-4 text-xs text-gray-400">
                                         <div className="flex items-center gap-1.5">
                                             <Calendar className="h-3 w-3" />
                                             <span>{doc.expirationDate ? new Date(doc.expirationDate).toLocaleDateString() : 'No Expiry'}</span>
                                         </div>
-                                        {doc.daysUntilExpiration && (
-                                            <span className={doc.daysUntilExpiration < 30 ? 'text-amber-600 font-medium' : ''}>
-                                                {doc.daysUntilExpiration} days left
-                                            </span>
-                                        )}
+                                        {doc.expirationDate && (() => {
+                                            const daysLeft = Math.ceil((new Date(doc.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                                            return (
+                                                <span className={daysLeft < 30 ? 'text-amber-600 font-medium' : ''}>
+                                                    {daysLeft} days left
+                                                </span>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
 
@@ -300,8 +304,8 @@ export function DocumentsTab({ driver }: DocumentsTabProps) {
                     {selectedDoc ? (
                         <DocumentPreview
                             fileUrl={selectedDoc.fileUrl}
-                            fileName={selectedDoc.fileName}
-                            fileType={selectedDoc.fileName.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'}
+                            fileName={selectedDoc.fileUrl?.split('/').pop() || 'Document'}
+                            fileType={selectedDoc.fileType || (selectedDoc.fileUrl?.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg')}
                             className="h-full border border-gray-200 rounded-lg overflow-hidden"
                         />
                     ) : (

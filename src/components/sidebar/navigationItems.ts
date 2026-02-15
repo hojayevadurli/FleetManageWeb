@@ -14,7 +14,8 @@ import {
   ClipboardList,
   Fuel,
   BarChart3,
-  Store
+  Store,
+  Plug
 } from "lucide-react";
 
 export interface NavigationItem {
@@ -55,6 +56,11 @@ export const navigationItems: NavigationConfig = [
     title: "Shops List",
     url: "/app/shops",
     icon: Store,
+  },
+  {
+    title: "Integrations",
+    url: "/app/integrations",
+    icon: Plug,
   },
 
 ];
