@@ -1,121 +1,104 @@
 import api from "@/lib/Api";
-import axios from "axios";
+import { Integration } from "@/lib/types";
 
-export type IntegrationProvider = 'Motive' | 'TAFS' | 'WEX';
-
-export interface IntegrationStatus {
-    provider: IntegrationProvider;
-    status: 'Connected' | 'Disconnected' | 'ComingSoon' | 'Error';
-    connectedAt?: string;
-    lastSyncAt?: string;
-    lastSyncStatus?: 'Success' | 'Failed';
-    lastErrorMessage?: string;
-    vehicleCount?: number;
-}
+// Mock data as fallback
+const MOCK_INTEGRATIONS: Integration[] = [
+    {
+        id: "1",
+        provider: "Motive",
+        status: "Disconnected",
+        lastSync: null,
+        vehicleCount: 0,
+        apiKey: "", // Start empty
+    },
+    {
+        id: "2", // Samsara
+        provider: "Samsara",
+        status: "Disconnected",
+        lastSync: null,
+        vehicleCount: 0,
+        apiKey: "",
+    },
+];
 
 export const integrationService = {
-    getIntegrations: async (): Promise<IntegrationStatus[]> => {
+    getIntegrations: async (): Promise<Integration[]> => {
         try {
-            const response = await api.get<IntegrationStatus[]>("/integrations");
-            return response.data;
+            const response = await api.get("/integrations");
+            // Merge generic list with our known providers to ensure UI shows available options
+            const backendIntegrations = response.data as Integration[];
+
+            return MOCK_INTEGRATIONS.map(mock => {
+                const found = backendIntegrations.find(b => b.provider === mock.provider);
+                if (found) {
+                    return {
+                        ...mock,
+                        ...found,
+                        id: found.id || mock.id, // Use backend ID if available
+                        status: found.status || "Connected", // If returned, it's likely connected
+                        apiKey: found.apiKeyEncrypted ? "********" : "", // Mask key
+                        lastSync: found.lastSyncAt ? new Date(found.lastSyncAt) : null,
+                        vehicleCount: found.vehicleCount || 0
+                    };
+                }
+                return mock;
+            });
         } catch (error) {
-            // Check for mock data first
-            const mock = localStorage.getItem('mock_motive_integration');
-            if (mock) {
-                const motive = JSON.parse(mock) as IntegrationStatus;
-                return [
-                    motive,
-                    { provider: 'TAFS', status: 'ComingSoon' },
-                    { provider: 'WEX', status: 'ComingSoon' }
-                ];
-            }
-            // Fallback or rethrow based on strategy. 
-            // For now, let's return a default list if 404/500 to allow UI to render (MVP)
-            // But the user asked to show errors. So I'll rethrow and let UI handle it.
-            // However, to make the sidebar work even if backend is missing endpoints:
-            console.warn("Using mock integrations due to error:", error);
-            return [
-                { provider: 'Motive', status: 'Disconnected' },
-                { provider: 'TAFS', status: 'ComingSoon' },
-                { provider: 'WEX', status: 'ComingSoon' }
-            ];
+            console.warn("Failed to fetch integrations, using mock", error);
+            return MOCK_INTEGRATIONS;
         }
     },
 
-    testMotiveConnection: async (apiKey: string, accountId?: string): Promise<boolean> => {
-        // Use direct proxy to validate key since backend endpoint is unreliable/missing
-        // Calls: /motive-proxy/v2/vehicle_locations with X-API-Key header
+    connectMotive: async (apiKey: string, accountId?: string): Promise<Integration> => {
+        // POST /integrations/connect
+        const response = await api.post("/integrations/connect", {
+            provider: "Motive",
+            apiKey,
+            accountId
+        });
+        return response.data;
+    },
+
+    disconnect: async (provider: string): Promise<void> => {
+        // Not implemented on backend yet, just mock
+        console.log(`Disconnecting ${provider}...`);
+    },
+
+    syncMotive: async (): Promise<{ success: boolean; vehiclesSynced: number; message?: string }> => {
         try {
-            await axios.get("/motive-proxy/v2/vehicle_locations", {
-                headers: { 'X-API-Key': apiKey },
-                params: { per_page: 1 } // Minimal data
+            const response = await api.post("/integrations/motive/sync");
+            return response.data;
+        } catch (error: any) {
+            console.error("Sync failed:", error);
+            if (error.response?.data) {
+                const { errorCode, message, error: errorTitle } = error.response.data;
+                throw new Error(message || errorTitle || "Unknown sync error");
+            }
+            throw error;
+        }
+    },
+
+    // Kept for testing if needed, but syncMotive is preferred
+    testMotiveConnection: async (apiKey: string, accountId?: string): Promise<boolean> => {
+        // We can reuse connect endpoint or just try to sync?
+        // Let's use connect as test.
+        try {
+            await api.post("/integrations/connect", {
+                provider: 'Motive',
+                apiKey,
+                accountId
             });
             return true;
-        } catch (error) {
-            throw error;
+        } catch (e) {
+            return false;
         }
     },
 
-    connectMotive: async (apiKey: string, accountId?: string): Promise<void> => {
-        // POST /integrations/motive/connect
-        try {
-            await api.post("/integrations/motive/connect", { apiKey, accountId });
-        } catch (error) {
-            console.warn("Backend connect failed, falling back to mock persistence for demo:", error);
-            // Verify if it's 404 (Backend missing) -> Allow "Success" for demo
-            // If it's 401/403 (Auth/Tenant) -> Rethrow
-            if (axios.isAxiosError(error)) {
-                if (error.response?.status === 404) {
-                    // Mock success for development if endpoint is missing
-                    // Store in localStorage to persist "Connected" state for refresh
-                    const mockStatus: IntegrationStatus = {
-                        provider: 'Motive',
-                        status: 'Connected',
-                        connectedAt: new Date().toISOString(),
-                        lastSyncStatus: 'Success',
-                        vehicleCount: 0
-                    };
-                    localStorage.setItem('mock_motive_integration', JSON.stringify(mockStatus));
-                    return;
-                }
-            }
-            throw error;
-        }
-    },
-
-    syncMotive: async (): Promise<void> => {
-        // POST /integrations/motive/sync
-        await api.post("/integrations/motive/sync");
-    },
-
-    disconnectIntegration: async (provider: IntegrationProvider): Promise<void> => {
-        // POST /integrations/motive/disconnect (or generic)
-        // Assuming generic or specific endpoint based on provider
-        if (provider === 'Motive') {
-            await api.post("/integrations/motive/disconnect");
-        } else {
-            throw new Error("Not implemented for this provider");
-        }
-    },
-
-    getMotiveVehicles: async (apiKey: string): Promise<any[]> => {
-        // Proxy call to Motive API
-        try {
-            const response = await axios.get("/motive-proxy/v2/vehicle_locations", {
-                headers: { 'X-API-Key': apiKey },
-                params: { per_page: 100 }
-            });
-            return response.data.vehicle_locations || [];
-        } catch (error) {
-            console.error("Failed to fetch Motive vehicles", error);
-            throw error;
-        }
-    },
-
-    saveMotiveMappings: async (mappings: any[]): Promise<void> => {
-        // Mock save to backend
-        console.log("Saving mappings to backend:", mappings);
-        // await api.post("/integrations/motive/mappings", { mappings });
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
+    getMotiveVehicles: async () => {
+        // This is likely replaced by syncMotive which updates DB, 
+        // then we fetch from Equipment? 
+        // Or this could specific endpoint.
+        // For now, let's assume we rely on sync.
+        return [];
     }
 };
