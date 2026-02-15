@@ -5,21 +5,43 @@ import { DocumentAttachment, DocumentRole, AttachDocumentPayload } from './types
 // 1. Universal Upload
 // ------------------------------------------------------------------
 /**
- * Uploads a file to the universal Documents endpoint.
- * Returns the created document metadata (including the ID needed for attachment).
+ * Uploads a file and creates a document record.
+ * Three-step process: upload file → create document → return document ID
  */
 export const uploadDocument = async (
     file: File,
     docKind: string = 'general'
 ): Promise<{ id: string; fileUrl: string; fileType: string }> => {
+    // Step 1: Upload file to storage
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('docKind', docKind);
-    // formData.append('runAiExtract', 'true'); // Optional: explicitly request AI
-    const { data } = await api.post('/documents', formData, {
+    formData.append('files', file);
+
+    const uploadResponse = await api.post<string[]>('/uploads/operators', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
     });
-    return data;
+
+    if (!Array.isArray(uploadResponse.data) || uploadResponse.data.length === 0) {
+        throw new Error('Upload failed: No URL returned');
+    }
+
+    const fileUrl = uploadResponse.data[0];
+
+    // Step 2: Create document record in database
+    const docPayload = {
+        fileUrl,
+        fileType: file.type,
+        docKind,
+        runAiExtract: false
+    };
+
+    const docResponse = await api.post<{ id: string }>('/documents', docPayload);
+
+    // Step 3: Return document ID and metadata
+    return {
+        id: docResponse.data.id,
+        fileUrl,
+        fileType: file.type
+    };
 };
 
 // ------------------------------------------------------------------
