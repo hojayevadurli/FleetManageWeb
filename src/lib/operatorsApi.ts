@@ -7,7 +7,12 @@ import {
     AddOperatorAttachmentDto,
     AssignmentDto,
     CreateAssignmentDto,
-    EndAssignmentDto
+    EndAssignmentDto,
+    OperatorContract,
+    CreateOperatorContractDto,
+    UpdateOperatorContractDto,
+    EmploymentType,
+    OperatorSpendSummaryDto
 } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -105,5 +110,40 @@ export const operatorsApi = {
     // Delete Equipment Assignment
     deleteAssignment: async (id: string, assignmentId: string) => {
         await api.delete(`/operators/${id}/assignments/${assignmentId}`);
+    },
+
+    // Contracts
+    getEmploymentTypes: async () => {
+        const response = await api.get<EmploymentType[]>('/operators/employment-types');
+        return response.data;
+    },
+
+    getContracts: async (id: string) => {
+        const response = await api.get<OperatorContract[]>(`/operators/${id}/contracts`);
+        return response.data;
+    },
+
+    createContract: async (id: string, data: CreateOperatorContractDto) => {
+        const response = await api.post<OperatorContract>(`/operators/${id}/contracts`, data);
+        return response.data;
+    },
+
+    updateContract: async (id: string, contractId: string, data: UpdateOperatorContractDto) => {
+        const response = await api.put<OperatorContract>(`/operators/${id}/contracts/${contractId}`, data);
+        return response.data;
+    },
+
+    deleteContract: async (id: string, contractId: string) => {
+        await api.delete(`/operators/${id}/contracts/${contractId}`);
+    },
+
+    // Spend Analysis
+    getSpend: async (id: string, startDate?: string, endDate?: string) => {
+        const params: any = {};
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+
+        const response = await api.get<OperatorSpendSummaryDto>(`/operators/${id}/spend`, { params });
+        return response.data;
     }
 };

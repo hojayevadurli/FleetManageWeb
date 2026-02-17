@@ -5,7 +5,7 @@ import { operatorsApi } from "@/lib/operatorsApi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, User, FileText, Shield, DollarSign, Calendar, Star, Briefcase, Trash2 } from "lucide-react";
+import { ArrowLeft, User, FileText, Shield, DollarSign, Calendar, Star, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OverviewTab } from "@/components/drivers/tabs/OverviewTab";
@@ -14,10 +14,8 @@ import { TimeOffTab } from "@/components/drivers/tabs/TimeOffTab";
 import { SpendTab } from "@/components/drivers/tabs/SpendTab";
 import { SafetyTab } from "@/components/drivers/tabs/SafetyTab";
 import { PerformanceTab } from "@/components/drivers/tabs/PerformanceTab";
-import { HRTab } from "@/components/drivers/tabs/HRTab";
-import { EquipmentAssignmentCTA } from "@/components/drivers/EquipmentAssignmentCTA";
+
 import { EquipmentAssignmentDialog } from "@/components/drivers/EquipmentAssignmentDialog";
-import { AssignedEquipmentSection } from "@/components/drivers/AssignedEquipmentSection";
 import { useToast } from "@/hooks/use-toast";
 import {
     AlertDialog,
@@ -215,35 +213,7 @@ export default function DriverDetailPage() {
                 </div>
             </div>
 
-            {/* Equipment Assignment CTA - Show if driver has no equipment */}
-            {!hasEquipment && driver && (
-                <div className="mb-6">
-                    <EquipmentAssignmentCTA
-                        driverId={driver.id}
-                        onAssignClick={() => setShowAssignmentDialog(true)}
-                    />
-                </div>
-            )}
 
-            {/* Assigned Equipment Section - Show active assignments */}
-            {driver && (
-                <div className="mb-6">
-                    <AssignedEquipmentSection
-                        driverId={driver.id}
-                        onChangeAssignment={() => setShowAssignmentDialog(true)}
-                        refreshKey={assignmentRefreshKey}
-                        onAssignmentEnded={() => {
-                            // Update hasEquipment state when assignment is ended
-                            if (id) {
-                                operatorsApi.getAssignments(id).then(assignments => {
-                                    const hasActiveAssignments = assignments.some(a => !a.endAt);
-                                    setHasEquipment(hasActiveAssignments);
-                                });
-                            }
-                        }}
-                    />
-                </div>
-            )}
 
             <Tabs defaultValue="overview" className="w-full">
                 <TabsList className="w-full justify-start h-12 bg-gray-100/50 p-1 rounded-xl mb-6 overflow-x-auto">
@@ -253,9 +223,7 @@ export default function DriverDetailPage() {
                     <TabsTrigger value="documents" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                         <FileText className="h-4 w-4" /> Documents
                     </TabsTrigger>
-                    <TabsTrigger value="hr" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                        <Briefcase className="h-4 w-4" /> HR Record
-                    </TabsTrigger>
+
                     <TabsTrigger value="safety" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                         <Shield className="h-4 w-4" /> Safety
                     </TabsTrigger>
@@ -275,9 +243,22 @@ export default function DriverDetailPage() {
                         driver={driver} // Pass OperatorDto
                         isEditing={isEditing}
                         onCancel={() => setIsEditing(false)}
+                        onEdit={() => setIsEditing(true)}
                         onSave={() => {
                             setIsEditing(false);
                             if (id) operatorsApi.getById(id).then(setDriver);
+                        }}
+                        // Equipment Props
+                        hasEquipment={hasEquipment}
+                        onAssignEquipment={() => setShowAssignmentDialog(true)}
+                        assignmentRefreshKey={assignmentRefreshKey}
+                        onAssignmentEnded={() => {
+                            if (id) {
+                                operatorsApi.getAssignments(id).then(assignments => {
+                                    const hasActiveAssignments = assignments.some(a => !a.endAt);
+                                    setHasEquipment(hasActiveAssignments);
+                                });
+                            }
                         }}
                     />
                 </TabsContent>
@@ -286,9 +267,7 @@ export default function DriverDetailPage() {
                     <DocumentsTab driver={driver} />
                 </TabsContent>
 
-                <TabsContent value="hr">
-                    <HRTab driver={adaptedDriver} />
-                </TabsContent>
+
                 <TabsContent value="safety">
                     <SafetyTab driver={adaptedDriver} />
                 </TabsContent>

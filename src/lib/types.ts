@@ -139,6 +139,9 @@ export interface Equipment {
   // Flexible bag for extra properties if needed
   specs?: Record<string, string | number | boolean>;
 
+  assignedOperatorId?: string;
+  assignedOperatorName?: string;
+
   // Categorization
   specificType?: string; // e.g. "Sleeper Tractor", "Dry Van"
 
@@ -152,44 +155,64 @@ export interface Equipment {
 
 // Unified DocumentRole enum for all entity types
 export enum DocumentRole {
-  General = 0,
-  // Equipment Roles
-  Insurance = 10,
-  Registration = 11,
-  Title = 12,
-  Warranty = 13,
-  Lease = 14,
-  DOTInspection = 15,
-  ScaleTicket = 16,
-  // Driver Roles
-  License = 30,           // CDL
-  MedicalCard = 31,
-  TrainingCert = 32,
-  Contract = 33,
-  TWIC = 34,
-  HazmatEndorsement = 35,
-  MVR = 36,
-  BackgroundCheck = 37,
-  DrugTest = 38,
-  ClearinghouseQuery = 39,
-  RoadTest = 40,
-  Orientation = 41,
-  SafetyTraining = 42,
-  // Work Order Roles
-  Invoice = 50,
-  Receipt = 51,
-  Quote = 52,
-  WorkOrder = 53,
-  PhotoBefore = 54,
-  PhotoAfter = 55,
-  Inspection = 56,
-  WorkOrderOther = 59,
-  // Assignment Roles (60-69)
-  AssignmentPhotoStart = 60,
-  AssignmentPhotoEnd = 61,
-  AssignmentVideoStart = 62,
-  AssignmentVideoEnd = 63,
-  Other = 99
+  General = "General",
+
+  // Equipment / Vehicle
+  Insurance = "Insurance",
+  Registration = "Registration",
+  Title = "Title",
+  Warranty = "Warranty",
+  Lease = "Lease",
+  DOTInspection = "DOTInspection",
+  ScaleTicket = "ScaleTicket",
+
+  // Operator
+  OperatorLicense = "OperatorLicense", // CDL
+  MedicalCard = "MedicalCard",
+  TrainingCert = "TrainingCert", // General Training
+  Contract = "Contract",
+
+  // Incidents / Tickets
+  IncidentReport = "IncidentReport",
+  Citation = "Citation",
+  PoliceReport = "PoliceReport",
+  WitnessStatement = "WitnessStatement",
+
+  // Screening
+  MVR = "MVR",
+  BackgroundCheck = "BackgroundCheck",
+  DrugTest = "DrugTest",
+  ClearinghouseQuery = "ClearinghouseQuery",
+
+  // Onboarding / Specific Training
+  RoadTest = "RoadTest",
+  Orientation = "Orientation",
+  SafetyTraining = "SafetyTraining",
+
+  TWIC = "TWIC",
+  HazmatEndorsement = "HazmatEndorsement",
+
+  // Work Order
+  Invoice = "Invoice", // WorkOrderInvoice
+  Receipt = "Receipt", // WorkOrderReceipt
+  Quote = "Quote", // WorkOrderEstimate
+
+  WorkOrder = "WorkOrder", // General/Legacy
+
+  PhotoBefore = "PhotoBefore",
+  PhotoAfter = "PhotoAfter",
+  Inspection = "Inspection",
+
+  WorkOrderOther = "WorkOrderOther",
+
+  // Assignment Attachments
+  AssignmentPhotoStart = "AssignmentPhotoStart",
+  AssignmentPhotoEnd = "AssignmentPhotoEnd",
+  AssignmentVideoStart = "AssignmentVideoStart",
+  AssignmentVideoEnd = "AssignmentVideoEnd",
+
+  // Other
+  Other = "Other"
 }
 
 export interface DocumentAttachment {
@@ -271,6 +294,8 @@ export interface EquipmentDto {
   make: string;
   model: string;
   year: number;
+  assignedOperatorId?: string;
+  assignedOperatorName?: string;
   plateNumber: string;
   operationalStatus: EquipmentOperationalStatus;
   odometerCurrent: number;
@@ -769,4 +794,81 @@ export interface AddOperatorAttachmentDto {
   externalRef?: string;
   providerName?: string;
   notes?: string;
+}
+
+export interface EmploymentType {
+  id: number;
+  name: string;
+  description?: string;
+}
+
+export interface OperatorContract {
+  id: string;
+  operatorId: string;
+  employmentTypeId: number;
+  employmentTypeName: string;
+  // driverRole removed in favor of relation
+  paymentType: string; // Per Mile, Percentage, Hourly
+  paymentRate: number; // e.g. 0.65 or 25.00
+  payFrequency?: string; // Weekly, Bi-Weekly, Monthly
+  grossShare?: number;
+  driverType: string; // Solo, Team
+  showTripRates: boolean;
+  showLoadedMileage: boolean;
+  showEmptyMileage: boolean;
+  coDriverId?: string;
+  startDate: string;
+  endDate?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CreateOperatorContractDto {
+  employmentTypeId: number;
+  paymentType: string;
+  paymentRate: number;
+  payFrequency?: string;
+  grossShare?: number;
+  driverType: string;
+  showTripRates: boolean;
+  showLoadedMileage: boolean;
+  showEmptyMileage: boolean;
+  coDriverId?: string;
+  startDate: string;
+  endDate?: string;
+  notes?: string;
+}
+
+export interface UpdateOperatorContractDto {
+  employmentTypeId?: number;
+  paymentType?: string;
+  paymentRate?: number;
+  payFrequency?: string;
+  grossShare?: number;
+  driverType?: string;
+  showTripRates?: boolean;
+  showLoadedMileage?: boolean;
+  showEmptyMileage?: boolean;
+  coDriverId?: string;
+  startDate?: string;
+  endDate?: string;
+  notes?: string;
+}
+
+export interface OperatorSpendTransactionDto {
+  id: string;
+  date: string;
+  category: string;
+  description: string;
+  amount: number;
+  status: string;
+  linkedEntityId: string;
+  linkedEntityType: string;
+}
+
+export interface OperatorSpendSummaryDto {
+  totalSpend: number;
+  avgWeeklySpend: number;
+  transactions: OperatorSpendTransactionDto[];
 }

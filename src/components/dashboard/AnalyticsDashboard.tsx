@@ -16,9 +16,16 @@ interface DashboardProps {
 
 const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, serviceRecords, onTabChange }) => {
     const totalFleet = equipment.length;
-    const inShop = equipment.filter(e => e.status === EquipmentOperationalStatus.InShop).length;
-    const activeUnits = equipment.filter(e => e.status === EquipmentOperationalStatus.Active).length;
-    const soldUnits = equipment.filter(e => e.status === EquipmentOperationalStatus.Sold).length;
+    const getStatus = (e: Equipment) => {
+        const s = e.status;
+        if (typeof s === 'number') return s;
+        // String fallback
+        return EquipmentOperationalStatus[s as keyof typeof EquipmentOperationalStatus] as unknown as EquipmentOperationalStatus;
+    };
+
+    const inShop = equipment.filter(e => getStatus(e) === EquipmentOperationalStatus.InShop).length;
+    const activeUnits = equipment.filter(e => getStatus(e) === EquipmentOperationalStatus.Active).length;
+    const soldUnits = equipment.filter(e => getStatus(e) === EquipmentOperationalStatus.Sold).length;
 
     // Work orders logic (active rescues/breakdowns)
     // Note: WorkOrder interface in types.ts HAS isRoadside, but the API DTO might not.

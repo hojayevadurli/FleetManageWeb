@@ -272,7 +272,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                                         <Label className="text-xs uppercase font-bold text-slate-400">Document Type</Label>
                                         <Select
                                             value={file.role.toString()}
-                                            onValueChange={(val) => updateFileMetadata(file.id, { role: Number(val) })}
+                                            onValueChange={(val) => updateFileMetadata(file.id, { role: val as DocumentRole })}
                                         >
                                             <SelectTrigger>
                                                 <SelectValue />
