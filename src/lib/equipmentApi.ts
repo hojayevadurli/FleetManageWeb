@@ -1,5 +1,5 @@
 import api from "@/lib/Api";
-import { Equipment, EquipmentDto, EquipmentOperationalStatus, EquipmentDocument } from "@/lib/types";
+import { Equipment, EquipmentDto, EquipmentOperationalStatus, EquipmentDocument, DocumentRole } from "@/lib/types";
 import { uploadsApi } from "@/lib/uploadsApi";
 
 export const mapDtoToEquipment = (dto: EquipmentDto): Equipment => {
@@ -22,6 +22,8 @@ export const mapDtoToEquipment = (dto: EquipmentDto): Equipment => {
     documents: dto.documents || [],
     mileage: dto.odometerCurrent,
     hours: dto.hoursCurrent,
+    assignedOperatorId: dto.assignedOperatorId,
+    assignedOperatorName: dto.assignedOperatorName,
     notes: dto.notes,
     acquiredDate: dto.acquiredDate,
     inServiceDate: dto.inServiceDate,
@@ -90,7 +92,7 @@ export const equipmentApi = {
   async uploadDocument(equipmentId: string, formData: FormData): Promise<EquipmentDocument> {
     // 1. Extract file and metadata from FormData
     const file = formData.get('file') as File;
-    const docRole = parseInt(formData.get('docRole') as string);
+    const docRole = formData.get('docRole') as DocumentRole; // String enum now
     const startDate = formData.get('startDate') as string;
     const expirationDate = formData.get('expirationDate') as string;
     const notes = formData.get('notes') as string;
@@ -125,7 +127,23 @@ export const equipmentApi = {
     return response.data;
   },
 
-  mapRoleToKind(role: number): string {
+  mapRoleToKind(role: DocumentRole | number): string {
+    // Handle string enum values
+    if (typeof role === 'string') {
+      switch (role) {
+        case DocumentRole.Insurance: return 'insurance';
+        case DocumentRole.Registration: return 'registration';
+        case DocumentRole.Title: return 'title';
+        case DocumentRole.Warranty: return 'warranty';
+        case DocumentRole.Lease: return 'lease';
+        case DocumentRole.DOTInspection: return 'inspection';
+        case DocumentRole.ScaleTicket: return 'scale_ticket';
+        case DocumentRole.General: return 'general';
+        default: return 'other';
+      }
+    }
+
+    // Legacy number fallback (if any)
     switch (role) {
       case 0: return 'general';
       // Equipment documents (10-16)
@@ -136,14 +154,6 @@ export const equipmentApi = {
       case 14: return 'lease';
       case 15: return 'inspection';
       case 16: return 'scale_ticket';
-      // Legacy support (old enum values)
-      case 1: return 'registration';
-      case 2: return 'title';
-      case 3: return 'insurance';
-      case 4: return 'warranty';
-      case 5: return 'lease';
-      case 6: return 'other';
-      case 7: return 'inspection';
       default: return 'other';
     }
   },

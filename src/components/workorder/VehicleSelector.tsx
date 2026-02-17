@@ -14,10 +14,10 @@ interface VehicleSelectorProps {
   equipment?: Equipment[]; // Optional prop to avoid redundant fetching
 }
 
-const isSelectable = (status: EquipmentOperationalStatus) => {
-  // Allow Active and In Shop. Exclude Out of Service and Sold.
-  return status === EquipmentOperationalStatus.Active ||
-    status === EquipmentOperationalStatus.InShop;
+const isSelectable = (status: EquipmentOperationalStatus | string | number | null) => {
+  // Relaxed check for Active/In Shop
+  const s = (status ?? "").toString().trim().toLowerCase();
+  return s === "1" || s === "active" || s === "2" || s === "inshop" || s === "in shop";
 };
 
 const VehicleSelector = ({

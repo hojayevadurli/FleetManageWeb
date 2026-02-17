@@ -4,7 +4,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { equipmentApi, mapDtoToEquipment } from "@/lib/equipmentApi";
-import { Equipment } from "@/lib/types";
+import { Equipment, EquipmentOperationalStatus } from "@/lib/types";
+
+// ...
 
 type VehicleType = "truck" | "trailer";
 
@@ -18,12 +20,15 @@ type Option = {
   id: string;
   label: string;
   unitNumber: string;
-  status?: string | null;
+  status?: string | number | null;
 };
 
-const isActive = (status?: string | null) => {
-  const s = (status ?? "").trim().toLowerCase();
-  return s === "" || s === "active";
+const isActive = (status?: EquipmentOperationalStatus | string | number | null) => {
+  if (typeof status === 'number') {
+    return status === EquipmentOperationalStatus.Active;
+  }
+  const s = (status ?? "").toString().trim().toLowerCase();
+  return s === "" || s === "active" || s === "1";
 };
 
 export default function VehicleSelector({
@@ -56,14 +61,32 @@ export default function VehicleSelector({
   const options: Option[] = useMemo(() => {
     const targetType = entity.toLowerCase(); // "truck" or "trailer"
 
+    const isTrailer = (e: Equipment) => {
+      const t = (e.type || "").toLowerCase();
+      const c = (e.fleetCategoryName || "").toLowerCase();
+      const result = t.includes("trailer") || c.includes("trailer") || t.includes("chassis") || t.includes("reefer") || t.includes("flatbed") || t.includes("dry van");
+      // console.log(`Checking isTrailer for ${e.unitNumber} (${t}): ${result}`);
+      return result;
+    };
+
+    const isTruck = (e: Equipment) => {
+      // If it's explicitly a trailer, it's not a truck.
+      if (isTrailer(e)) return false;
+      // Otherwise, assume it's a truck/powered asset
+      return true;
+    };
+
     return equipment
-      .filter(e => isActive(e.status) && e.type?.toLowerCase() === targetType)
+      .filter(e => {
+        if (targetType === 'trailer') return isTrailer(e);
+        return isTruck(e);
+      })
       .map(e => ({
         id: e.id,
         unitNumber: e.unitNumber,
         status: e.status,
         label: [
-          `${entity === 'truck' ? 'Truck' : 'Trailer'} • ${e.unitNumber}`,
+          `${e.type || (entity === 'truck' ? 'Truck' : 'Trailer')} • ${e.unitNumber}`,
           e.year ? `${e.year}` : null,
           e.make ? e.make : null,
           e.model ? e.model : null,

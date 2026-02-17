@@ -16,7 +16,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { operatorsApi } from "@/lib/operatorsApi";
-import { AssignmentDto, DocumentRole } from "@/lib/types";
+import equipmentApi from "@/lib/equipmentApi";
+import { AssignmentDto, DocumentRole, Equipment } from "@/lib/types";
 import { Truck, Calendar, AlertCircle, Loader2, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -36,6 +37,7 @@ export function AssignedEquipmentSection({ driverId, onChangeAssignment, refresh
     const { toast } = useToast();
     const [assignments, setAssignments] = useState<AssignmentDto[]>([]);
     const [pastAssignments, setPastAssignments] = useState<AssignmentDto[]>([]);
+    const [equipmentDetails, setEquipmentDetails] = useState<Record<string, Equipment>>({});
     const [loading, setLoading] = useState(true);
     const [showHistory, setShowHistory] = useState(false);
 
@@ -65,6 +67,17 @@ export function AssignedEquipmentSection({ driverId, onChangeAssignment, refresh
             setPastAssignments(data.filter(a => a.endAt).sort((a, b) =>
                 new Date(b.endAt!).getTime() - new Date(a.endAt!).getTime()
             )); // Sort by most recent end date first
+
+            // Fetch detailed equipment info for all assignments
+            const uniqueIds = Array.from(new Set(data.map(a => a.equipmentId)));
+            const detailsMap: Record<string, Equipment> = {};
+
+            await Promise.all(uniqueIds.map(async (id) => {
+                const eq = await equipmentApi.get(id);
+                if (eq) detailsMap[id] = eq;
+            }));
+
+            setEquipmentDetails(detailsMap);
         } catch (error) {
             console.error("Failed to fetch assignments", error);
             toast({ title: "Error", description: "Failed to load equipment assignments", variant: "destructive" });
@@ -173,60 +186,95 @@ export function AssignedEquipmentSection({ driverId, onChangeAssignment, refresh
             <CardContent>
                 {/* Active Assignments */}
                 {assignments.length > 0 && (
-                    <div className="space-y-3">
-                        {assignments.map((assignment) => (
-                            <div
-                                key={assignment.id}
-                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-blue-100 p-2 rounded">
-                                        <Truck className="h-4 w-4 text-blue-600" />
-                                    </div>
-                                    <div>
+                    <div className="space-y-4">
+                        {assignments.map((assignment) => {
+                            const details = equipmentDetails[assignment.equipmentId];
+                            return (
+                                <div
+                                    key={assignment.id}
+                                    className="flex flex-col gap-2 p-4 bg-gray-50 rounded-lg border border-gray-200"
+                                >
+                                    {/* Header with Type and Actions */}
+                                    <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="bg-white text-gray-700 border-gray-300">
+                                                {assignment.equipmentType || (details?.type || 'Asset')}
+                                            </Badge>
+                                            {assignment.assignmentType !== 'Primary' && (
+                                                <Badge variant="secondary" className="text-[10px] h-5">
+                                                    {assignment.assignmentType}
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 px-2"
+                                            onClick={() => handleEndAssignmentClick(assignment.id)}
+                                        >
+                                            End
+                                        </Button>
+                                    </div>
+
+                                    {/* Main Asset Info */}
+                                    <div className="flex items-start gap-3">
+                                        <div className="bg-white p-2 rounded border border-gray-200 shadow-sm mt-1">
+                                            <Truck className="h-5 w-5 text-blue-600" />
+                                        </div>
+                                        <div>
                                             <Link
                                                 to={`/app/equipment/${assignment.equipmentId}`}
-                                                className="font-medium text-gray-900 hover:text-blue-600 hover:underline transition-colors"
+                                                className="text-lg font-bold text-gray-900 hover:text-blue-600 hover:underline transition-colors block"
                                             >
-                                                {assignment.equipmentUnitNumber || 'Unknown Equipment'}
+                                                {assignment.equipmentUnitNumber || 'Unknown'}
                                             </Link>
-                                            {assignment.assignmentType === 'Primary' && (
-                                                <Badge variant="default" className="bg-blue-600">Primary</Badge>
+
+                                            {/* Rich Details */}
+                                            {details && (
+                                                <div className="text-sm font-medium text-gray-700 mt-0.5">
+                                                    {details.year} {details.make} {details.model}
+                                                </div>
                                             )}
-                                            {assignment.assignmentType === 'Temporary' && (
-                                                <Badge variant="secondary">Temporary</Badge>
-                                            )}
-                                            {assignment.assignmentType === 'Team' && (
-                                                <Badge variant="outline">Team</Badge>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-1 text-sm text-gray-500 mt-1">
-                                            <Calendar className="h-3 w-3" />
-                                            <span>since {format(new Date(assignment.startAt), 'MMM d, yyyy')}</span>
-                                        </div>
-                                        {assignment.notes && (
-                                            <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
-                                                <AlertCircle className="h-3 w-3" />
-                                                <span>{assignment.notes}</span>
+
+                                            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+                                                {details?.vin && (
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="font-semibold text-gray-400">VIN:</span>
+                                                        <span className="font-mono text-gray-600 select-all">{details.vin}</span>
+                                                    </div>
+                                                )}
+                                                {details?.licensePlate && (
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="font-semibold text-gray-400">Plate:</span>
+                                                        <span className="font-mono text-gray-600">{details.licensePlate}</span>
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                        {/* Display attachments */}
-                                        <AssignmentAttachmentViewer
-                                            startAttachments={assignment.startAttachments}
-                                            endAttachments={assignment.endAttachments}
-                                        />
+
+                                            <div className="flex items-center gap-1 text-xs text-gray-400 mt-2">
+                                                <Calendar className="h-3 w-3" />
+                                                <span>Assigned: {format(new Date(assignment.startAt), 'MMM d, yyyy')}</span>
+                                            </div>
+
+                                            {assignment.notes && (
+                                                <div className="flex items-center gap-1 text-xs text-yellow-600 mt-2 bg-yellow-50 px-2 py-1 rounded">
+                                                    <AlertCircle className="h-3 w-3" />
+                                                    <span>{assignment.notes}</span>
+                                                </div>
+                                            )}
+
+                                            {/* Display attachments */}
+                                            <div className="mt-2">
+                                                <AssignmentAttachmentViewer
+                                                    startAttachments={assignment.startAttachments}
+                                                    endAttachments={assignment.endAttachments}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEndAssignmentClick(assignment.id)}
-                                >
-                                    End Assignment
-                                </Button>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
 

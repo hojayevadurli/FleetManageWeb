@@ -19,7 +19,8 @@ import {
     Pencil,
     Trash2,
     Plus,
-    Lock
+    Lock,
+    User
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -352,12 +353,26 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             <div className="flex-[3] bg-white rounded-[3rem] p-10 border border-slate-200 shadow-sm relative overflow-hidden">
                                 <div className="mb-6">
                                     <Select
-                                        value={equipment.status?.toString() || ''}
+                                        value={(() => {
+                                            const s = equipment.status;
+                                            if (typeof s === 'number') return s.toString();
+                                            if (typeof s === 'string') {
+                                                // If backend returns "Active", map to 1
+                                                const val = EquipmentOperationalStatus[s as keyof typeof EquipmentOperationalStatus];
+                                                return val ? val.toString() : '';
+                                            }
+                                            return '';
+                                        })()}
                                         onValueChange={(val) => onUpdateStatus && onUpdateStatus(Number(val) as EquipmentOperationalStatus)}
                                     >
-                                        <SelectTrigger className={`w-auto min-w-[140px] px-4 py-1.5 h-auto rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${equipment.status === EquipmentOperationalStatus.Active ? 'bg-emerald-100/50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300' :
-                                            equipment.status === EquipmentOperationalStatus.InShop ? 'bg-amber-100/50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300' :
-                                                'bg-rose-100/50 text-rose-700 border-rose-200 hover:bg-rose-100 hover:border-rose-300'
+                                        <SelectTrigger className={`w-auto min-w-[140px] px-4 py-1.5 h-auto rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${(() => {
+                                            const s = equipment.status;
+                                            const statusVal = typeof s === 'string' ? EquipmentOperationalStatus[s as keyof typeof EquipmentOperationalStatus] : s;
+
+                                            if (statusVal === EquipmentOperationalStatus.Active) return 'bg-emerald-100/50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300';
+                                            if (statusVal === EquipmentOperationalStatus.InShop) return 'bg-amber-100/50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300';
+                                            return 'bg-rose-100/50 text-rose-700 border-rose-200 hover:bg-rose-100 hover:border-rose-300';
+                                        })()
                                             }`}>
                                             <SelectValue />
                                         </SelectTrigger>
@@ -390,6 +405,36 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                 <div className="font-bold text-slate-800">{equipment.licensePlate || 'N/A'}</div>
                                             </div>
                                         </div>
+
+                                        <div className="pt-6">
+                                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Assigned Operator</div>
+                                            {equipment.assignedOperatorId ? (
+                                                <div
+                                                    onClick={() => navigate(`/app/drivers/${equipment.assignedOperatorId}`)}
+                                                    className="flex items-center gap-4 bg-blue-50/50 p-3 rounded-2xl border border-blue-100/50 cursor-pointer hover:bg-blue-100/50 transition-all group w-fit pr-8"
+                                                >
+                                                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform shadow-sm shadow-blue-200">
+                                                        <User className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-black text-slate-900">{equipment.assignedOperatorName}</div>
+                                                        <div className="text-[9px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1">
+                                                            View Profile <ExternalLink className="w-3 h-3" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100 w-fit pr-8">
+                                                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 border-dashed">
+                                                        <User className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-black text-slate-400">Unassigned</div>
+                                                        <div className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">No Operator</div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* 2x2 Stats Grid */}
@@ -397,7 +442,27 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                         {(() => {
                                             // Robust helper to map any doc role/kind format to our Enum
                                             const getRole = (d: any): DocumentRole | null => {
-                                                if (typeof d.docRole === 'number') return d.docRole;
+                                                if (typeof d.docRole === 'number') {
+                                                    switch (d.docRole) {
+                                                        case 10: return EquipmentDocRole.Insurance;
+                                                        case 11: return EquipmentDocRole.Registration;
+                                                        case 12: return EquipmentDocRole.Title;
+                                                        case 13: return EquipmentDocRole.Warranty;
+                                                        case 14: return EquipmentDocRole.Lease;
+                                                        case 15: return EquipmentDocRole.DOTInspection;
+                                                        case 16: return EquipmentDocRole.ScaleTicket;
+                                                        case 0: return EquipmentDocRole.General;
+                                                        // Legacy 1-7
+                                                        case 1: return EquipmentDocRole.Registration;
+                                                        case 2: return EquipmentDocRole.Title;
+                                                        case 3: return EquipmentDocRole.Insurance;
+                                                        case 4: return EquipmentDocRole.Warranty;
+                                                        case 5: return EquipmentDocRole.Lease;
+                                                        case 6: return EquipmentDocRole.Other;
+                                                        case 7: return EquipmentDocRole.DOTInspection;
+                                                        default: return EquipmentDocRole.Other;
+                                                    }
+                                                }
 
                                                 const k = (d.docRole || d.docKind || '').toString().toLowerCase();
 

@@ -21,7 +21,8 @@ import {
     Lock,
     Zap,
     Map as MapIcon,
-    Bus
+    Bus,
+    User
 } from 'lucide-react';
 import { equipmentApi, EquipmentCreatePayload } from '@/lib/equipmentApi';
 import { fleetCategoriesApi, FleetCategory } from '@/lib/fleetCategoriesApi';
@@ -206,11 +207,15 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
         setIsAddModalOpen(false);
     };
 
-    const getStatusColor = (status: EquipmentOperationalStatus) => {
-        if (status === EquipmentOperationalStatus.Active) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-        if (status === EquipmentOperationalStatus.InShop) return 'bg-amber-100 text-amber-700 border-amber-200';
-        if (status === EquipmentOperationalStatus.OutOfService) return 'bg-rose-100 text-rose-700 border-rose-200';
-        if (status === EquipmentOperationalStatus.Sold) return 'bg-slate-100 text-slate-700 border-slate-200';
+    const getStatusColor = (status: EquipmentOperationalStatus | string) => {
+        // Handle both number (Enum) and string (Backend DTO) cases
+        const statusStr = typeof status === 'string' ? status : EquipmentOperationalStatus[status];
+        if (!statusStr) return 'bg-slate-100 text-slate-700 border-slate-200';
+
+        if (status === EquipmentOperationalStatus.Active || statusStr === 'Active') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+        if (status === EquipmentOperationalStatus.InShop || statusStr === 'InShop') return 'bg-amber-100 text-amber-700 border-amber-200';
+        if (status === EquipmentOperationalStatus.OutOfService || statusStr === 'OutOfService') return 'bg-rose-100 text-rose-700 border-rose-200';
+        if (status === EquipmentOperationalStatus.Sold || statusStr === 'Sold') return 'bg-slate-100 text-slate-700 border-slate-200';
         return 'bg-slate-100 text-slate-700 border-slate-200';
     };
 
@@ -361,8 +366,11 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                                             </div>
                                         </div>
                                         <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase border tracking-widest flex items-center gap-1.5 ${getStatusColor(e.status)}`}>
-                                            {e.status === EquipmentOperationalStatus.OutOfService && <AlertCircle className="w-3 h-3" />}
-                                            {EquipmentOperationalStatus[e.status].replace(/([A-Z])/g, ' $1').trim()}
+                                            {(e.status === EquipmentOperationalStatus.OutOfService || String(e.status) === 'OutOfService') && <AlertCircle className="w-3 h-3" />}
+                                            {(() => {
+                                                const rawLabel = typeof e.status === 'string' ? e.status : EquipmentOperationalStatus[e.status];
+                                                return rawLabel ? rawLabel.replace(/([A-Z])/g, ' $1').trim() : 'Unknown';
+                                            })()}
                                         </span>
                                     </div>
 
@@ -372,6 +380,17 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                                             <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
                                                 <span className="font-mono">VIN: {e.vin.slice(-8)}</span>
                                             </div>
+                                            {e.assignedOperatorName && (
+                                                <div className="flex items-center gap-1.5 mt-2 p-1.5 bg-blue-50/50 rounded-lg w-fit border border-blue-100/50">
+                                                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                                        <User className="w-3 h-3" />
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-[9px] text-blue-400 font-black uppercase tracking-widest leading-none">Driver</span>
+                                                        <span className="block text-xs font-bold text-slate-700 leading-none mt-0.5">{e.assignedOperatorName}</span>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 flex flex-col gap-1.5">
@@ -397,7 +416,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                                                 : 'hover:bg-white hover:text-amber-600 text-slate-400 hover:border-amber-100 hover:shadow-sm'
                                                 }`}
                                         >
-                                            {e.status === EquipmentOperationalStatus.OutOfService || e.status === EquipmentOperationalStatus.Sold ? (
+                                            {(e.status === EquipmentOperationalStatus.OutOfService || String(e.status) === 'OutOfService' || e.status === EquipmentOperationalStatus.Sold || String(e.status) === 'Sold') ? (
                                                 <Lock className="w-4 h-4" />
                                             ) : (
                                                 <ClipboardList className="w-4 h-4" />
