@@ -149,10 +149,10 @@ const WorkOrders = () => {
       });
     }
 
-    // Sort newest opened date first
+    // Sort newest created first (fallback to openedAt if createdAt missing)
     filtered.sort((a, b) => {
-      const da = new Date(a.openedAt).getTime();
-      const db = new Date(b.openedAt).getTime();
+      const da = new Date(a.createdAt || a.openedAt).getTime();
+      const db = new Date(b.createdAt || b.openedAt).getTime();
       return db - da;
     });
 
