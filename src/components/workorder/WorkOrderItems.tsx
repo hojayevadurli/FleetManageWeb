@@ -87,7 +87,7 @@ const WorkOrderItems = ({ items, onItemsChange }: WorkOrderItemsProps) => {
                 <span className="text-slate-300 mr-1 text-lg pt-1">•</span>
 
                 {/* Description */}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <Label className="text-[10px] uppercase text-slate-400 font-bold mb-1 block">Description</Label>
                   <Input
                     value={item.description}
@@ -98,7 +98,7 @@ const WorkOrderItems = ({ items, onItemsChange }: WorkOrderItemsProps) => {
                 </div>
 
                 {/* Quantity */}
-                <div className="w-20">
+                <div className="w-14 shrink-0">
                   <Label className="text-[10px] uppercase text-slate-400 font-bold mb-1 block">Qty</Label>
                   <Input
                     type="number"
@@ -111,15 +111,15 @@ const WorkOrderItems = ({ items, onItemsChange }: WorkOrderItemsProps) => {
                       newItems[index].quantity = isNaN(val) ? 0 : val;
                       onItemsChange(newItems);
                     }}
-                    className="h-8 text-right font-mono text-xs"
+                    className="h-8 text-right font-mono text-xs px-1"
                   />
                 </div>
 
                 {/* Unit Price */}
-                <div className="w-28 relative">
+                <div className="w-24 shrink-0">
                   <Label className="text-[10px] uppercase text-slate-400 font-bold mb-1 block">Unit Price</Label>
                   <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                    <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
                     <Input
                       type="number"
                       min="0"
@@ -131,13 +131,13 @@ const WorkOrderItems = ({ items, onItemsChange }: WorkOrderItemsProps) => {
                         newItems[index].price = isNaN(val) ? 0 : val;
                         onItemsChange(newItems);
                       }}
-                      className="h-8 pl-5 text-right font-mono text-xs"
+                      className="h-8 pl-4 text-right font-mono text-xs px-1"
                     />
                   </div>
                 </div>
 
                 {/* Amount Display (Read Only) */}
-                <div className="w-24 text-right pt-6">
+                <div className="w-16 shrink-0 text-right pt-6">
                   <div className="text-xs font-bold text-slate-700">
                     ${((item.price || 0) * (item.quantity || 0)).toFixed(2)}
                   </div>
