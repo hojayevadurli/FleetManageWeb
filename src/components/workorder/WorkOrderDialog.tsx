@@ -860,11 +860,26 @@ export default function WorkOrderDialog({
     onOpenChange(isOpen);
   };
 
-  const createDisabled = isSubmitting || !newWorkOrder.vehicle_id || (computedLines.length === 0 && !newWorkOrder.description?.trim());
+  const hasUnuploadedFiles = selectedFiles.length > 0;
+  const createDisabled = isSubmitting || !newWorkOrder.vehicle_id || (computedLines.length === 0 && !newWorkOrder.description?.trim()) || hasUnuploadedFiles;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-7xl w-full h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem]">
+      <DialogContent
+        className="max-w-7xl w-full h-[95vh] flex flex-col p-0 overflow-hidden rounded-[2.5rem]"
+        onInteractOutside={(e) => {
+          const target = e.target as HTMLElement;
+          if (target?.closest?.('.pac-container')) {
+            e.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(e) => {
+          const target = e.target as HTMLElement;
+          if (target?.closest?.('.pac-container')) {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader className="px-10 py-8 border-b border-slate-100 bg-white sticky top-0 z-10">
           <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight">{editWoId ? "Edit Work Order" : "Create New Work Order"}</DialogTitle>
           <DialogDescription className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{editWoId ? "Modify existing maintenance record" : "Create a new maintenance work order for your fleet"}</DialogDescription>
@@ -1192,6 +1207,20 @@ export default function WorkOrderDialog({
                       </Select>
                     </div>
 
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="odometer" className="text-xs font-bold text-slate-500 mb-1 block">Odometer (Optional)</Label>
+                      <Input
+                        id="odometer"
+                        type="number"
+                        placeholder="e.g. 154000"
+                        value={newWorkOrder.odometer}
+                        onChange={(e) => setNewWorkOrder((p) => ({ ...p, odometer: e.target.value }))}
+                        className="h-9"
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -1527,6 +1556,12 @@ export default function WorkOrderDialog({
               )}
 
               {/* ACTION BUTTONS */}
+              {hasUnuploadedFiles && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-xs font-medium animate-in fade-in slide-in-from-bottom-1">
+                  <Upload className="w-3.5 h-3.5 shrink-0" />
+                  <span>You have {selectedFiles.length} pending file{selectedFiles.length > 1 ? 's' : ''}. Please click <strong>"Upload Files"</strong> above before creating the work order.</span>
+                </div>
+              )}
               <div className="flex items-center justify-end gap-3 pt-6 pb-2">
                 <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold text-slate-500">Cancel</Button>
                 <Button
