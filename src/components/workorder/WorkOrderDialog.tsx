@@ -482,7 +482,8 @@ export default function WorkOrderDialog({
     const created = await workOrdersApi.createDraft({
       equipmentId: newWorkOrder.vehicle_id,
       title: "Draft for Attachments",
-      openedAt: new Date().toISOString()
+      openedAt: new Date().toISOString(),
+      workOrderNumber: customWorkOrderNumber
     });
 
     if (!created?.id) {

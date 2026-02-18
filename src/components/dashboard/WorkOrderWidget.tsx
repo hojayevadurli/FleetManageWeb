@@ -96,7 +96,7 @@ const WorkOrderWidget = () => {
                 <div key={wo.id} className="flex justify-between items-center text-sm">
                   <div className="min-w-0">
                     <div className="font-medium">
-                      {wo.workOrderNumber ?? formatShortId(wo.id)}
+                      {wo.workOrderNumber || `WO-${formatShortId(wo.id)}`}
                     </div>
                     <div className="text-gray-500 truncate">
                       {wo.equipmentId} • {title}
