@@ -465,8 +465,9 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
         }
     };
 
-    // Helper for AI Indicator
-    const LabelWithAi = ({ htmlFor, label, fieldName }: { htmlFor?: string, label: string, fieldName: string }) => (
+    // Helper for AI Indicator — rendered as a function call, NOT a component,
+    // to avoid remounting on every parent re-render.
+    const renderLabelWithAi = (htmlFor: string | undefined, label: string, fieldName: string) => (
         <Label htmlFor={htmlFor} className="flex justify-between items-center group">
             {label}
             {aiFilledFields.has(fieldName) && (
@@ -483,8 +484,10 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
         isEditing && aiFilledFields.has(fieldName) && "bg-yellow-50/50 border-yellow-200 transition-colors duration-500 focus:bg-white focus:border-blue-400"
     );
 
-    // Conditional render for View Mode text vs Input
-    const RenderField = ({ name, value, placeholder, type = "text", maxLength, required }: any) => {
+    // Render helper — called as a function, NOT used as <RenderField />.
+    // This prevents React from treating it as a new component on each render,
+    // which was causing inputs to lose focus after every keystroke.
+    const renderField = (name: string, value: string, placeholder?: string, type: string = "text", maxLength?: number, required?: boolean) => {
         if (!isEditing) {
             return <div className="py-2 text-gray-900 font-medium min-h-[40px] flex items-center">{value || "-"}</div>;
         }
@@ -586,32 +589,32 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Row 1: First Name and Last Name */}
                         <div className="space-y-2">
-                            <LabelWithAi htmlFor="firstName" label="First Name" fieldName="firstName" />
-                            <RenderField name="firstName" value={formData.firstName} placeholder="e.g. John" />
+                            {renderLabelWithAi("firstName", "First Name", "firstName")}
+                            {renderField("firstName", formData.firstName, "e.g. John")}
                         </div>
                         <div className="space-y-2">
-                            <LabelWithAi htmlFor="lastName" label="Last Name" fieldName="lastName" />
-                            <RenderField name="lastName" value={formData.lastName} placeholder="e.g. Doe" />
+                            {renderLabelWithAi("lastName", "Last Name", "lastName")}
+                            {renderField("lastName", formData.lastName, "e.g. Doe")}
                         </div>
 
                         {/* Row 2: Date of Birth and Internal Driver ID */}
                         <div className="space-y-2">
-                            <LabelWithAi htmlFor="dob" label="Date of Birth" fieldName="dob" />
-                            <RenderField name="dob" value={formData.dob} type="date" />
+                            {renderLabelWithAi("dob", "Date of Birth", "dob")}
+                            {renderField("dob", formData.dob, undefined, "date")}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="driverNumber">Internal Driver ID</Label>
-                            <RenderField name="driverNumber" value={formData.driverNumber} placeholder="Auto-generated" />
+                            {renderField("driverNumber", formData.driverNumber, "Auto-generated")}
                         </div>
 
                         {/* Row 3: Phone Number and Email Address */}
                         <div className="space-y-2">
                             <Label htmlFor="phone">Phone Number <span className="text-red-500">*</span></Label>
-                            <RenderField name="phone" value={formData.phone} placeholder="(555) 000-0000" required />
+                            {renderField("phone", formData.phone, "(555) 000-0000", "text", undefined, true)}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">Email Address <span className="text-red-500">*</span></Label>
-                            <RenderField name="email" value={formData.email} placeholder="john@example.com" type="email" required />
+                            {renderField("email", formData.email, "john@example.com", "email", undefined, true)}
                         </div>
                     </div>
 
@@ -625,7 +628,7 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
                         <div className="space-y-4">
                             {/* Street Address */}
                             <div className="space-y-2">
-                                <LabelWithAi htmlFor="addressStreet" label="Street Address" fieldName="addressStreet" />
+                                {renderLabelWithAi("addressStreet", "Street Address", "addressStreet")}
                                 {isEditing ? (
                                     <>
                                         {aiFilledFields.has("addressStreet") && (
@@ -661,17 +664,17 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
                                 <Label htmlFor="addressUnit" className="text-gray-600 font-normal text-sm">
                                     Apt, Suite, Unit <span className="text-gray-400">(optional)</span>
                                 </Label>
-                                <RenderField name="addressUnit" value={formData.addressUnit} placeholder="e.g. Apt 4B" className="max-w-md" />
+                                {renderField("addressUnit", formData.addressUnit, "e.g. Apt 4B")}
                             </div>
 
                             {/* Row 3 */}
                             <div className="grid grid-cols-12 gap-4">
                                 <div className="col-span-12 md:col-span-5 space-y-2">
-                                    <LabelWithAi htmlFor="addressCity" label="City" fieldName="addressCity" />
-                                    <RenderField name="addressCity" value={formData.addressCity} placeholder="City" />
+                                    {renderLabelWithAi("addressCity", "City", "addressCity")}
+                                    {renderField("addressCity", formData.addressCity, "City")}
                                 </div>
                                 <div className="col-span-6 md:col-span-4 space-y-2">
-                                    <LabelWithAi htmlFor="addressState" label="State" fieldName="addressState" />
+                                    {renderLabelWithAi("addressState", "State", "addressState")}
                                     {isEditing ? (
                                         <Select value={formData.addressState} onValueChange={(val) => handleSelectChange("addressState", val)}>
                                             <SelectTrigger className={inputAiClass("addressState")}>
@@ -686,8 +689,8 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
                                     )}
                                 </div>
                                 <div className="col-span-6 md:col-span-3 space-y-2">
-                                    <LabelWithAi htmlFor="addressZip" label="ZIP Code" fieldName="addressZip" />
-                                    <RenderField name="addressZip" value={formData.addressZip} placeholder="ZIP" />
+                                    {renderLabelWithAi("addressZip", "ZIP Code", "addressZip")}
+                                    {renderField("addressZip", formData.addressZip, "ZIP")}
                                 </div>
                             </div>
                         </div>
@@ -742,11 +745,11 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                        <LabelWithAi label="License Number (DL)" fieldName="licenseNumber" />
-                        <RenderField name="licenseNumber" value={formData.licenseNumber} placeholder="D1234567" className="uppercase" />
+                        {renderLabelWithAi(undefined, "License Number (DL)", "licenseNumber")}
+                        {renderField("licenseNumber", formData.licenseNumber, "D1234567")}
                     </div>
                     <div className="space-y-2">
-                        <LabelWithAi label="License State" fieldName="licenseState" />
+                        {renderLabelWithAi(undefined, "License State", "licenseState")}
                         {isEditing ? (
                             <Select value={formData.licenseState} onValueChange={(val) => handleSelectChange("licenseState", val)}>
                                 <SelectTrigger className={inputAiClass("licenseState")}>
@@ -761,12 +764,12 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
                         )}
                     </div>
                     <div className="space-y-2">
-                        <LabelWithAi label="Issue Date" fieldName="dlIssueDate" />
-                        <RenderField name="dlIssueDate" value={formData.dlIssueDate} type="date" />
+                        {renderLabelWithAi(undefined, "Issue Date", "dlIssueDate")}
+                        {renderField("dlIssueDate", formData.dlIssueDate, undefined, "date")}
                     </div>
                     <div className="space-y-2">
-                        <LabelWithAi label="Expiration Date" fieldName="dlExpireDate" />
-                        <RenderField name="dlExpireDate" value={formData.dlExpireDate} type="date" />
+                        {renderLabelWithAi(undefined, "Expiration Date", "dlExpireDate")}
+                        {renderField("dlExpireDate", formData.dlExpireDate, undefined, "date")}
                     </div>
 
                     {/* Attached License Documents */}
@@ -802,7 +805,7 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
 
                     <div className="space-y-2">
                         <Label>Medical Card Expiration</Label>
-                        <RenderField name="medicalExpiration" value={formData.medicalExpiration} type="date" />
+                        {renderField("medicalExpiration", formData.medicalExpiration, undefined, "date")}
                     </div>
                 </CardContent>
             </Card>

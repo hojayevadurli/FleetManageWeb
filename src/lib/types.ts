@@ -867,8 +867,85 @@ export interface OperatorSpendTransactionDto {
   linkedEntityType: string;
 }
 
-export interface OperatorSpendSummaryDto {
-  totalSpend: number;
-  avgWeeklySpend: number;
-  transactions: OperatorSpendTransactionDto[];
+
+
+export enum IncidentType {
+  Accident = 'Accident',
+  Violation = 'Violation',
+  Warning = 'Warning',
+  Complaint = 'Complaint',
+  DotInspection = 'DotInspection',
+  Other = 'Other'
+}
+
+export enum IncidentStatus {
+  Open = 'Open',
+  UnderReview = 'UnderReview',
+  Disputed = 'Disputed',
+  Closed = 'Closed'
+}
+
+export interface OperatorIncident {
+  id: string; // PublicId
+  operatorId: string;
+  operatorName: string;
+  equipmentId?: string;
+  equipmentUnitNumber?: string;
+  type: IncidentType;
+  date: string;
+  location: string;
+  description?: string;
+  fineAmount?: number;
+  points?: number;
+  status: IncidentStatus;
+  isAtFault: boolean;
+
+  reportNumber?: string;
+  inspectionLevel?: string;
+  isOutOfService?: boolean;
+  violations?: string; // JSON or text
+  inspectedParty?: string;
+
+  createdAt: string;
+  documents: OperatorDocumentDto[];
+}
+
+export interface CreateIncidentDto {
+  operatorId: string;
+  equipmentId?: string;
+  type: IncidentType;
+  date: string; // ISO string
+  location: string;
+  description?: string;
+  fineAmount?: number;
+  points?: number;
+  status?: IncidentStatus;
+  isAtFault?: boolean;
+
+  reportNumber?: string;
+  inspectionLevel?: string;
+  isOutOfService?: boolean;
+  violations?: string;
+  inspectedParty?: string;
+
+  documentIds?: string[];
+}
+
+export interface UpdateIncidentDto {
+  type?: IncidentType;
+  date?: string;
+  location?: string;
+  description?: string;
+  fineAmount?: number;
+  points?: number;
+  status?: IncidentStatus;
+  isAtFault?: boolean;
+
+  reportNumber?: string;
+  inspectionLevel?: string;
+  isOutOfService?: boolean;
+  violations?: string;
+  inspectedParty?: string;
+
+  documentIds?: string[];
 }

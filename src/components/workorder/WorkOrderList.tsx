@@ -126,8 +126,10 @@ const WorkOrderList = ({
     <div className="space-y-4 pb-32">
       {workOrders.map((wo) => {
         const config = statusConfig(wo.status);
-        const woNumber = wo.workOrderNumber ?? formatShortId(wo.id);
-        const unitNumber = equipmentMap[wo.equipmentId] || wo.equipmentId.slice(0, 8).toUpperCase();
+        const unitNumber = equipmentMap[wo.equipmentId] || null;
+        const woNumber = wo.workOrderNumber
+          || (unitNumber ? `${unitNumber}-WO-?` : `WO-${formatShortId(wo.id)}`);
+        const displayUnit = unitNumber || wo.equipmentId.slice(0, 8).toUpperCase();
 
         // Vendor Logic
         const vendorData = wo.vendorId ? vendorMap[wo.vendorId] : null;
@@ -224,7 +226,7 @@ const WorkOrderList = ({
                     <Truck className="h-4 w-4 text-slate-400" />
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Asset</span>
                   </div>
-                  <div className="font-bold text-slate-900">{unitNumber}</div>
+                  <div className="font-bold text-slate-900">{displayUnit}</div>
                   <div className="text-xs text-slate-500 truncate">Freightliner Cascadia</div> {/* MOCK MODEL */}
                 </div>
 

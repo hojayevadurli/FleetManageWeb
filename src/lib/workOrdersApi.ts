@@ -198,11 +198,12 @@ export const workOrdersApi = {
     equipmentId: string;
     title?: string;
     openedAt?: string; // ISO
+    workOrderNumber?: string | null;
   }): Promise<WorkOrderDto> => {
     const dto: WorkOrderUpsertDto = {
       equipmentId: args.equipmentId,
       vendorId: null,
-      workOrderNumber: null,
+      workOrderNumber: args.workOrderNumber ?? null,
       odometerAtService: null,
       openedAt: args.openedAt ?? new Date().toISOString(),
       title: args.title ?? "Draft",
