@@ -204,9 +204,12 @@ export default function FileUpload(props: FileUploadProps) {
           <div className="flex justify-between items-center mb-2">
             <Label className="text-sm">Selected ({files.length})</Label>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {props.uploadDisabled && props.uploadDisabledReason && (
-                <span className="text-xs text-rose-500 font-medium">{props.uploadDisabledReason}</span>
+                <div className="w-full flex items-center gap-2 px-3 py-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs font-semibold mb-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                  {props.uploadDisabledReason}
+                </div>
               )}
               <Button
                 size="sm"
