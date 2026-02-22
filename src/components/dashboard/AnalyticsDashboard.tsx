@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import AIPredictiveForecast from './AIPredictiveForecast';
 import WorkOrderStatusWidget from './WorkOrderStatusWidget';
 import MostUsedShopsWidget from './MostUsedShopsWidget';
+import PartsVsLaborWidget from './PartsVsLaborWidget';
 
 interface DashboardProps {
     equipment: Equipment[];
@@ -162,7 +163,10 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                     )}
 
                     {/* Work Order Status Analytics */}
-                    <WorkOrderStatusWidget workOrders={workOrders} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <WorkOrderStatusWidget workOrders={workOrders} />
+                        <PartsVsLaborWidget workOrders={workOrders} />
+                    </div>
 
                     {/* Most Used Shops Widget */}
                     <div className="mt-6">

@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
-import { FileText, Plus, Upload, AlertCircle } from "lucide-react";
+import { FileText, Plus, Upload, AlertCircle, ShieldCheck } from "lucide-react";
 
 // --- Info Item ---
 interface InfoItemProps {
@@ -57,6 +57,7 @@ interface ServiceLine {
     unitPrice: number;
     cost: number;
     type?: string;
+    isWarrantyClaim?: boolean;
 }
 
 interface ServiceItemsListProps {
@@ -83,6 +84,7 @@ export const ServiceItemsList = ({ items, total, tax }: ServiceItemsListProps) =
                             <TableCell className="pl-6 font-medium text-slate-700">
                                 {item.description}
                                 {item.type && <Badge variant="outline" className="ml-2 text-[10px] h-5 py-0 px-1.5 text-slate-400 border-slate-200 font-normal">{item.type}</Badge>}
+                                {item.isWarrantyClaim && <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200 text-[10px] h-5 py-0 px-1.5 font-bold"><ShieldCheck className="w-3 h-3 mr-1 inline-block" />Warranty</Badge>}
                             </TableCell>
                             <TableCell className="text-center text-slate-600">{item.quantity}</TableCell>
                             <TableCell className="text-right text-slate-600 font-mono">${item.unitPrice?.toFixed(2)}</TableCell>

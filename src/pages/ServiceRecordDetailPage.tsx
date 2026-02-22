@@ -159,7 +159,9 @@ const ServiceRecordDetailPage = () => {
                     quantity: l.qty,
                     unitPrice: l.unitPrice,
                     cost: l.amount,
-                    type: l.type as any
+                    type: l.type as any,
+                    isWarrantyClaim: l.isWarrantyClaim,
+                    warrantyExpiryDate: l.warrantyExpiryDate
                 })) || [],
                 media: mappedAttachments,
                 odometer: wo.odometerAtService || 0,
@@ -276,8 +278,11 @@ const ServiceRecordDetailPage = () => {
     const taxTypes = ['tax', 'taxes', 'fee', 'fees'];
     const taxLines = validLines.filter(l => taxTypes.includes((l.type || '').toLowerCase()));
     const serviceLines = validLines.filter(l => !taxTypes.includes((l.type || '').toLowerCase()));
+    const warrantyLines = validLines.filter(l => l.isWarrantyClaim);
+
     const taxSum = taxLines.reduce((acc, l) => acc + (l.cost || 0), 0);
     const serviceSum = serviceLines.reduce((acc, l) => acc + (l.cost || 0), 0);
+    const warrantySavings = warrantyLines.reduce((acc, l) => acc + (l.cost || 0), 0);
     const totalSum = taxSum + serviceSum;
     const hasLines = validLines.length > 0;
     const displayedTotal = hasLines ? totalSum : (record?.totalCost || 0);
@@ -464,6 +469,23 @@ const ServiceRecordDetailPage = () => {
                                         <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-100 text-[9px]">Verified</Badge>
                                     </div>
                                 </InfoItem>
+
+                                {warrantyLines.length > 0 && (
+                                    <InfoItem icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} label="Warranty Items">
+                                        <div className="flex flex-col gap-1 mt-1">
+                                            {warrantyLines.map((wl, idx) => (
+                                                <div key={idx} className="flex flex-col border border-emerald-100 bg-emerald-50 rounded-lg p-2">
+                                                    <span className="text-xs font-bold text-slate-800 leading-tight">{wl.description}</span>
+                                                    {wl.warrantyExpiryDate ? (
+                                                        <span className="text-[10px] font-bold text-emerald-600 uppercase mt-0.5">Expires: {new Date(wl.warrantyExpiryDate).toLocaleDateString()}</span>
+                                                    ) : (
+                                                        <span className="text-[10px] font-bold text-emerald-600 uppercase mt-0.5">Warranty Logged</span>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </InfoItem>
+                                )}
 
                                 <InfoItem icon={<Star className="w-4 h-4" />} label="My Rating">
                                     {record.rating && record.rating > 0 ? (

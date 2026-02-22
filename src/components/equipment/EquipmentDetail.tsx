@@ -165,6 +165,12 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
 
     const equipmentHistory = workOrders.filter(wo => wo.equipmentId === equipment.id);
 
+    const [historyWarrantyFilter, setHistoryWarrantyFilter] = useState(false);
+    const filteredHistory = useMemo(() => {
+        if (!historyWarrantyFilter) return equipmentHistory;
+        return equipmentHistory.filter(wo => wo.items && wo.items.some(l => l.isWarrantyClaim));
+    }, [equipmentHistory, historyWarrantyFilter]);
+
     // Suggested prompts for immediate utility
     const suggestedPrompts = [
         { text: `Summarize the last 3 repairs for Unit ${equipment.unitNumber}`, icon: History },
@@ -636,10 +642,22 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                 <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-xs tracking-widest">
                                     <History className="w-4 h-4 text-slate-400" /> Verified Maintenance Audit History
                                 </h3>
+                                <div className="flex items-center gap-2 px-2">
+                                    <input
+                                        type="checkbox"
+                                        id="historyWarrantyFilter"
+                                        checked={historyWarrantyFilter}
+                                        onChange={(e) => setHistoryWarrantyFilter(e.target.checked)}
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <label htmlFor="historyWarrantyFilter" className="text-xs font-black uppercase tracking-widest text-slate-500 cursor-pointer">
+                                        Has Warranty
+                                    </label>
+                                </div>
                             </div>
                             <div className="divide-y divide-slate-100 max-h-[800px] overflow-y-auto custom-scrollbar">
-                                {equipmentHistory.length > 0 ? (
-                                    equipmentHistory.map(wo => (
+                                {filteredHistory.length > 0 ? (
+                                    filteredHistory.map(wo => (
                                         <div key={wo.id} className="p-10 flex items-start justify-between hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/app/service/${wo.id}`)}>
                                             <div className="space-y-3 flex-1 pr-12">
                                                 <div className="flex items-center gap-4">
@@ -647,6 +665,11 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                     {wo.media && wo.media.length > 0 && (
                                                         <span className="flex items-center gap-1.5 text-[9px] bg-blue-50 px-2 py-0.5 rounded-lg text-blue-600 uppercase font-black tracking-widest border border-blue-100 shadow-sm">
                                                             <FileText className="w-3 h-3" /> Invoice Attached
+                                                        </span>
+                                                    )}
+                                                    {wo.items?.some(l => l.isWarrantyClaim) && (
+                                                        <span className="flex items-center gap-1.5 text-[9px] bg-purple-50 px-2 py-0.5 rounded-lg text-purple-600 uppercase font-black tracking-widest border border-purple-100 shadow-sm">
+                                                            <ShieldCheck className="w-3 h-3" /> Warranty Claim
                                                         </span>
                                                     )}
                                                     <span className="text-[9px] bg-emerald-50 px-2 py-0.5 rounded-lg text-emerald-600 uppercase font-black tracking-widest border border-emerald-100">Audit Pass</span>

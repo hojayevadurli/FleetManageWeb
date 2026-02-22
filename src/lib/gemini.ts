@@ -79,7 +79,7 @@ function normalizeReceiptResult(parsed: any): ReceiptParsedData | null {
     items: items.map((it: any) => ({
       description: String(it.description || ""),
       cost: Number(it.cost || 0),
-      type: String(it.type || "fee"),
+      type: String(it.type || "misc").toLowerCase(),
     })),
     total: Number(parsed.total || 0),
     notes: parsed.notes ? String(parsed.notes) : undefined,
@@ -200,8 +200,8 @@ export const parseReceipt = async (
 3. BUSINESS NAME
 
 4. SERVICE DETAILS:
-   - Date (YYYY-MM-DD)
-   - Items (parts/labor/fee/tax)
+    - Date (YYYY-MM-DD)
+    - Items (Categorize EACH item as ONE of: "part", "labor", "fee", "tax", "misc", or "discount")
    - Total
    - Unit/Truck number if present
 
@@ -214,7 +214,7 @@ OUTPUT RULES:
   "businessContact": { "phone": "", "email": "", "website": "" },
   "businessName": "",
   "date": "YYYY-MM-DD",
-  "items": [ { "description": "", "cost": 0, "type": "parts|labor|fee|tax" } ],
+  "items": [ { "description": "", "cost": 0, "type": "part|labor|fee|tax|misc|discount" } ],
   "total": 0,
   "notes": "",
   "unitNumber": "",

@@ -46,6 +46,7 @@ const WorkOrders = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | WorkOrderDto["status"]>("all");
+  const [warrantyFilter, setWarrantyFilter] = useState(false);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -149,6 +150,11 @@ const WorkOrders = () => {
       });
     }
 
+    // Warranty filter
+    if (warrantyFilter) {
+      filtered = filtered.filter(w => w.lines?.some(l => l.isWarrantyClaim));
+    }
+
     // Sort newest created first (fallback to openedAt if createdAt missing)
     filtered.sort((a, b) => {
       const da = new Date(a.createdAt || a.openedAt).getTime();
@@ -157,7 +163,7 @@ const WorkOrders = () => {
     });
 
     return filtered;
-  }, [workOrders, searchTerm, statusFilter, equipmentMap, vendorMap]);
+  }, [workOrders, searchTerm, statusFilter, warrantyFilter, equipmentMap, vendorMap]);
 
   const updateWorkOrderStatus = async (id: string, status: WorkOrderDto["status"]) => {
     try {
@@ -204,7 +210,9 @@ const WorkOrders = () => {
           description: l.description,
           qty: l.qty,
           unitPrice: l.unitPrice,
-          partNumber: l.partNumber ?? null
+          partNumber: l.partNumber ?? null,
+          isWarrantyClaim: l.isWarrantyClaim,
+          warrantyExpiryDate: l.warrantyExpiryDate ?? null
         })),
         replaceDocuments: false,
         documentIds: []
@@ -259,7 +267,9 @@ const WorkOrders = () => {
           description: l.description,
           qty: l.qty,
           unitPrice: l.unitPrice,
-          partNumber: l.partNumber ?? null
+          partNumber: l.partNumber ?? null,
+          isWarrantyClaim: l.isWarrantyClaim,
+          warrantyExpiryDate: l.warrantyExpiryDate ?? null
         })),
         replaceDocuments: false,
         documentIds: [],
@@ -346,6 +356,8 @@ const WorkOrders = () => {
         onSearchChange={setSearchTerm}
         statusFilter={statusFilter}
         onStatusChange={setStatusFilter}
+        warrantyFilter={warrantyFilter}
+        onWarrantyFilterChange={setWarrantyFilter}
       />
 
       <WorkOrderList
