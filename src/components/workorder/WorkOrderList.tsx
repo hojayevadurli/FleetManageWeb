@@ -297,6 +297,9 @@ const WorkOrderList = ({
                         <li key={idx} className="flex items-center gap-2">
                           <span className="h-1.5 w-1.5 rounded-full bg-slate-400 shrink-0"></span>
                           <span className="truncate">{line.description}</span>
+                          {line.isWarrantyClaim && (
+                            <span className="text-xs font-bold text-red-500 shrink-0 uppercase tracking-widest">(Warranty Part)</span>
+                          )}
                         </li>
                       ))}
 

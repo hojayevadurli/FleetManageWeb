@@ -37,6 +37,9 @@ export interface WorkOrderUpsertDto {
     qty: number;
     unitPrice: number;
     partNumber?: string | null;
+    isWarrantyClaim?: boolean;
+    warrantyExpiryDate?: string | null;
+    category?: string | null;
   }[];
   replaceDocuments?: boolean;
   documentIds?: string[];
@@ -164,10 +167,14 @@ function normalizeWorkOrder(data: any): WorkOrderDto {
       ...l,
       id: l.id || l.Id,
       type: l.type || l.Type,
+      category: l.category || l.Category,
       description: l.description || l.Description,
       qty: l.qty ?? l.Qty ?? 0,
       unitPrice: l.unitPrice ?? l.UnitPrice ?? 0,
-      amount: l.amount ?? l.Amount ?? 0
+      amount: l.amount ?? l.Amount ?? 0,
+      partNumber: l.partNumber || l.PartNumber,
+      isWarrantyClaim: l.isWarrantyClaim ?? l.IsWarrantyClaim ?? false,
+      warrantyExpiryDate: l.warrantyExpiryDate || l.WarrantyExpiryDate
     })),
     documents: (data.documents || data.Documents || []).map(normalizeDocument)
   } as WorkOrderDto;

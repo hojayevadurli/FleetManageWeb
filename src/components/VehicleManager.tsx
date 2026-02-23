@@ -168,7 +168,9 @@ const VehicleManager = () => {
               unitPrice: l.unitPrice,
               cost: l.qty * l.unitPrice,
               type: l.type as any,
-              serviceType: l.type
+              serviceType: l.type,
+              isWarrantyClaim: l.isWarrantyClaim,
+              warrantyExpiryDate: l.warrantyExpiryDate
             })),
             media: attachments.map(doc => ({
               url: doc.fileUrl,

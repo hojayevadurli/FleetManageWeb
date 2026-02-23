@@ -58,6 +58,8 @@ export interface WorkOrderItem {
   cost: number;
   type?: 'parts' | 'labor' | 'fee' | 'tax' | 'discount';
   partNumber?: string;
+  isWarrantyClaim?: boolean;
+  warrantyExpiryDate?: string;
 }
 
 export interface VendorReview {
@@ -417,11 +419,14 @@ export interface ServiceHistoryUpsertDto {
 export interface WorkOrderLineDto {
   id: string;
   type: string;
+  category?: string;
   description: string;
   qty: number;
   unitPrice: number;
   amount: number;
   partNumber?: string;
+  isWarrantyClaim?: boolean;
+  warrantyExpiryDate?: string;
 }
 
 export interface WorkOrderDocumentDto {

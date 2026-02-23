@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Driver, OperatorSpendSummaryDto } from "@/lib/types";
 import { operatorsApi } from "@/lib/operatorsApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -358,9 +359,15 @@ export function SpendTab({ driver }: SpendTabProps) {
                                     </TableCell>
                                     <TableCell className="text-gray-600">{tx.description}</TableCell>
                                     <TableCell>
-                                        <span className="text-blue-600 hover:underline cursor-pointer text-sm">
-                                            {tx.linkedEntityType || "Ref"} #{tx.linkedEntityId ? tx.linkedEntityId.substring(0, 8) : "?"}
-                                        </span>
+                                        {tx.linkedEntityType === 'Work Order' ? (
+                                            <Link to={`/app/service/${tx.id}`} className="text-blue-600 hover:underline cursor-pointer text-sm font-semibold">
+                                                {tx.linkedEntityType} #{tx.linkedEntityId}
+                                            </Link>
+                                        ) : (
+                                            <span className="text-gray-600 text-sm font-semibold">
+                                                {tx.linkedEntityType || "Ref"} #{tx.linkedEntityId}
+                                            </span>
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         <span className={`text-xs font-semibold px-2 py-1 rounded-full ${tx.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'

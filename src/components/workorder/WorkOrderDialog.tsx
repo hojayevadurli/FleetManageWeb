@@ -85,7 +85,7 @@ export default function WorkOrderDialog({
   onAfterCreated
 }: WorkOrderDialogProps) {
   const [workOrderItems, setWorkOrderItems] = useState<WorkOrderItemData[]>([]);
-  // Fetch company name first so it can be used in initial state if possible (though unlikely on first render)
+  const [historicalParts, setHistoricalParts] = useState<{ description: string, date: string, id: string }[]>([]);
   // Fetch company name first so it can be used in initial state if possible
   const [fetchedCompanyName, setFetchedCompanyName] = useState<string | null>(null);
   const fetchedCompanyNameRef = useRef<string | null>(null);
@@ -244,6 +244,27 @@ export default function WorkOrderDialog({
     }
   }, [open, editWoId]);
 
+  // Fetch Historical Parts for Ghost Warranty Check
+  useEffect(() => {
+    if (open && newWorkOrder.vehicle_id) {
+      workOrdersApi.list({ equipmentId: newWorkOrder.vehicle_id }).then(wos => {
+        const parts: { description: string, date: string, id: string }[] = [];
+        wos.forEach(wo => {
+          if (wo.lines) {
+            wo.lines.filter(l => l.type === 'part' || l.type === 'misc').forEach(l => {
+              parts.push({
+                description: l.description,
+                date: wo.openedAt,
+                id: wo.id
+              });
+            });
+          }
+        });
+        setHistoricalParts(parts);
+      }).catch(console.error);
+    }
+  }, [open, newWorkOrder.vehicle_id]);
+
   // ✅ Unified Hydration Logic (Client-Side)
   // acts as "hydrateForm" to restore state exactly as left
   const loadWorkOrderDetails = async (id: string) => {
@@ -254,6 +275,24 @@ export default function WorkOrderDialog({
       console.log("[WorkOrderDialog] Loaded WO:", wo);
       console.log("[WorkOrderDialog] Loaded WO - Documents count:", wo.documents?.length ?? 0);
 
+      // Helper to fix potential 0026 or 2026 issues
+      const normalizeDateString = (dateStr: string | null | undefined): string => {
+        if (!dateStr) return "";
+        try {
+          const d = new Date(dateStr);
+          if (!isNaN(d.getTime())) {
+            let year = d.getFullYear();
+            if (year > 0 && year < 100) year += 2000;
+            // Also catch 0024 - 0030 which happens if input directly takes '0026'
+            if (year >= 1 && year <= 99) year += 2000;
+
+            d.setFullYear(year);
+            return d.toISOString().split('T')[0];
+          }
+        } catch { }
+        return dateStr;
+      };
+
       // 1. Basic Hydration
       setNewWorkOrder({
         vehicle_id: wo.equipmentId,
@@ -261,7 +300,7 @@ export default function WorkOrderDialog({
         priority: ((wo.priority as unknown as WorkOrderPriority) === WorkOrderPriority.Low ? "low" :
           (wo.priority as unknown as WorkOrderPriority) === WorkOrderPriority.High ? "high" :
             (wo.priority as unknown as WorkOrderPriority) === WorkOrderPriority.Critical ? "critical" : "normal"),
-        eta_date: wo.openedAt ? new Date(wo.openedAt).toISOString().split('T')[0] : "",
+        eta_date: normalizeDateString(wo.openedAt),
         eta_hours: "",
         // Prioritize: 1. Live Ref (most current fetch), 2. Fetched State, 3. Saved in Notes, 4. Saved Prop, 5. Empty
         company_name: fetchedCompanyNameRef.current || fetchedCompanyName || wo.notes?.match(/Branch: (.*?)(\n|$)/)?.[1] || initialCompanyName || "",
@@ -301,9 +340,12 @@ export default function WorkOrderDialog({
       // 3. Line Items (Effectively acting as our "Parsed Snapshot")
       if (wo.lines && wo.lines.length > 0) {
         setWorkOrderItems(wo.lines.map(l => ({
+          type: (l.type as any) || "misc",
           description: l.description,
           price: l.unitPrice,
-          quantity: l.qty
+          quantity: l.qty,
+          partNumber: l.partNumber,
+          isWarrantyClaim: l.isWarrantyClaim
         })));
         // If we have lines, we assume "AI Complete" valid state for UI
         // This is part of the hydration-ready concept: existing lines 'are' the result.
@@ -411,6 +453,7 @@ export default function WorkOrderDialog({
       comment: ""
     });
     setWorkOrderItems([]);
+    setHistoricalParts([]);
     setSelectedFiles([]);
     setExistingDocuments([]);
     setDraftWorkOrderId(null);
@@ -428,13 +471,50 @@ export default function WorkOrderDialog({
   const computedLines = useMemo(() => {
     const items = (workOrderItems ?? []).filter(x => x.description.trim());
     return items.map((item) => ({
-      type: "misc" as const,
+      type: (item.type as any) || "misc",
       description: item.description,
       qty: item.quantity,
       unitPrice: item.price,
       amount: item.price * item.quantity,
-      partNumber: null
+      partNumber: item.partNumber || null,
+      isWarrantyClaim: item.isWarrantyClaim || false,
+      warrantyExpiryDate: null
     }));
+  }, [workOrderItems]);
+
+  const smartSummary = useMemo(() => {
+    let partsTotal = 0;
+    let laborTotal = 0;
+    let taxesTotal = 0;
+    let warrantySavings = 0;
+
+    workOrderItems.forEach(item => {
+      const cost = (item.price || 0) * (item.quantity || 0);
+      const t = (item.type || 'misc').toLowerCase();
+
+      if (t === 'labor') {
+        laborTotal += cost;
+      } else if (t === 'fee' || t === 'tax') {
+        taxesTotal += cost;
+      } else {
+        partsTotal += cost;
+      }
+
+      if (item.isWarrantyClaim) {
+        warrantySavings += cost;
+      }
+    });
+
+    // Warranty is not deducted from grand total.
+    const grandTotal = partsTotal + laborTotal + taxesTotal;
+
+    return {
+      partsTotal,
+      laborTotal,
+      taxesTotal,
+      warrantySavings,
+      grandTotal
+    };
   }, [workOrderItems]);
 
   const generateNextWorkOrderNumber = async (vehicleId: string, unitNumber: string) => {
@@ -634,7 +714,9 @@ export default function WorkOrderDialog({
           description: l.description,
           qty: l.qty,
           unitPrice: l.unitPrice,
-          partNumber: l.partNumber
+          partNumber: l.partNumber,
+          isWarrantyClaim: l.isWarrantyClaim,
+          warrantyExpiryDate: l.warrantyExpiryDate
         })),
         // replaceDocuments: true, // REMOVED: Managed via separate endpoints
         // documentIds: currentDocIds // REMOVED: Managed via separate endpoints
@@ -747,7 +829,8 @@ export default function WorkOrderDialog({
           .map(it => ({
             description: it.description,
             price: it.cost || 0,
-            quantity: 1
+            quantity: 1,
+            type: (it.type === 'part' || it.type === 'labor' || it.type === 'fee' || it.type === 'tax' || it.type === 'discount' || it.type === 'misc') ? it.type : 'misc'
           }));
 
         // Check if there is a discrepancy between items total and receipt total (usually Tax/Fees)
@@ -760,7 +843,8 @@ export default function WorkOrderDialog({
             newItems.push({
               description: "Tax / Fees",
               price: parseFloat(diff.toFixed(2)),
-              quantity: 1
+              quantity: 1,
+              type: "tax"
             });
           }
         }
@@ -809,8 +893,19 @@ export default function WorkOrderDialog({
 
         // Auto-fill Service Date (Map to eta_date)
         if (result.date) {
-          setNewWorkOrder(prev => ({ ...prev, eta_date: result.date }));
-          toast.info(`Service Date detected: ${result.date}`);
+          let extractedDate = result.date;
+          try {
+            const d = new Date(result.date);
+            if (!isNaN(d.getTime())) {
+              let year = d.getFullYear();
+              if (year > 0 && year <= 99) year += 2000;
+              d.setFullYear(year);
+              extractedDate = d.toISOString().split('T')[0];
+            }
+          } catch { }
+
+          setNewWorkOrder(prev => ({ ...prev, eta_date: extractedDate }));
+          toast.info(`Service Date detected: ${extractedDate}`);
         }
 
         // Auto-fill Odometer
@@ -852,6 +947,26 @@ export default function WorkOrderDialog({
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleScanExistingAttachment = async () => {
+    if (!previewUrl) return;
+    setIsParsingReceipt(true);
+    try {
+      const resp = await fetch(previewUrl);
+      const blob = await resp.blob();
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+        const file = new File([blob], "existing_attachment", { type: blob.type || (previewUrl.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg') });
+        await processAIParsing(file, base64);
+      };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to download attachment for scanning.");
+      setIsParsingReceipt(false);
+    }
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -1412,7 +1527,7 @@ export default function WorkOrderDialog({
                   }
                 </CardHeader>
                 <CardContent className="p-4">
-                  <WorkOrderItems items={workOrderItems} onItemsChange={setWorkOrderItems} />
+                  <WorkOrderItems items={workOrderItems} onItemsChange={setWorkOrderItems} historicalParts={historicalParts} />
 
                   <div className="mt-4 pt-4 border-t border-slate-100">
                     <div className="flex gap-2">
@@ -1554,6 +1669,31 @@ export default function WorkOrderDialog({
                 </Collapsible>
               )}
 
+              {/* SMART SUMMARY (Live Financials) */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 shadow-inner animate-in fade-in slide-in-from-bottom-2">
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-blue-500" /> Live Summary
+                </h4>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Parts</span>
+                    <span className="text-sm font-bold text-slate-700 font-mono">${smartSummary.partsTotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Labor</span>
+                    <span className="text-sm font-bold text-slate-700 font-mono">${smartSummary.laborTotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Taxes/Fees</span>
+                    <span className="text-sm font-bold text-slate-700 font-mono">${smartSummary.taxesTotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-col items-end border-l border-slate-200 pl-4">
+                    <span className="text-[10px] font-black text-slate-900 uppercase tracking-wider">Total Due</span>
+                    <span className="text-xl font-black text-slate-900 font-mono">${smartSummary.grandTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
               {/* ACTION BUTTONS */}
               {!newWorkOrder.vehicle_id && (
                 <div className="flex items-center gap-2 px-3 py-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs font-semibold animate-in fade-in slide-in-from-bottom-1">
@@ -1624,9 +1764,27 @@ export default function WorkOrderDialog({
                   <p className="text-white text-xs font-medium truncate">Previewing Uploaded Document</p>
                 </div>
               </div>
-              <p className="mt-3 text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> AI Analysis Active
-              </p>
+              <div className="mt-3 flex items-center justify-between w-full">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> AI Analysis Active
+                </p>
+                {workOrderItems.length === 0 && !isParsingReceipt && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[10px] text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleScanExistingAttachment();
+                    }}
+                  >
+                    Scan Attachment for Items
+                  </Button>
+                )}
+                {isParsingReceipt && (
+                  <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                )}
+              </div>
             </div>
           )}
         </div>
