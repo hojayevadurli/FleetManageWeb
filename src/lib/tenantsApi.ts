@@ -14,6 +14,7 @@ export interface Tenant {
     trialEndsAt?: string;
     currentPeriodEnd?: string;
     planKey?: string;
+    stripeCustomerId?: string | null;
 }
 
 export interface UpdateTenantPayload {

@@ -3,7 +3,7 @@ import { Truck, AlertTriangle, DollarSign, ShieldCheck, ClipboardList, Zap, Chev
 import { Equipment, EquipmentOperationalStatus, WorkOrder, WorkOrderStatus } from '@/lib/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Badge } from '@/components/ui/badge';
-import AIPredictiveForecast from './AIPredictiveForecast';
+import AIPMLogicStreamWidget from './AIPMLogicStreamWidget';
 import WorkOrderStatusWidget from './WorkOrderStatusWidget';
 import MostUsedShopsWidget from './MostUsedShopsWidget';
 import PartsVsLaborWidget from './PartsVsLaborWidget';
@@ -175,16 +175,11 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                 </div>
 
                 <div className="space-y-6">
-                    <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col">
-                        <div className="mb-8">
-                            <div className="flex items-center gap-2 mb-1">
-                                <h3 className="font-black text-slate-900 text-xl tracking-tight">AI Forecast</h3>
-                                <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-[8px] h-4">Beta</Badge>
-                            </div>
-                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Predictive Health & Event Foresight</p>
-                        </div>
-                        <AIPredictiveForecast />
-                    </div>
+                    <AIPMLogicStreamWidget
+                        equipment={equipment}
+                        workOrders={workOrders}
+                        serviceRecords={serviceRecords}
+                    />
 
                     <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col">
                         <div className="mb-8">

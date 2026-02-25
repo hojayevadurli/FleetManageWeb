@@ -7,6 +7,7 @@ import tenantsApi, { Tenant } from "@/lib/tenantsApi";
 import billingApi, { STRIPE_PRICE_ID } from "@/lib/billingApi";
 import equipmentApi from "@/lib/equipmentApi";
 import { differenceInDays, format, parseISO } from "date-fns";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EquipmentOperationalStatus } from "@/lib/types";
 
@@ -19,6 +20,22 @@ const BillingSection = () => {
   const pricePerAsset = 6;
   const estimatedMonthlyCost = assetCount * pricePerAsset;
 
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("success")) {
+      toast.success("Subscription updated successfully!");
+      navigate(location.pathname, { replace: true });
+    } else if (params.get("canceled")) {
+      toast.info("Checkout was canceled.", { description: "You have not been charged." });
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.search, navigate]);
+
+  const [managing, setManaging] = useState(false);
+
   useEffect(() => {
     const fetchTenantData = async () => {
       try {
@@ -28,7 +45,9 @@ const BillingSection = () => {
         ]);
         const billableAssets = equipmentData.filter(e =>
           e.operationalStatus === EquipmentOperationalStatus.Active ||
-          e.operationalStatus === EquipmentOperationalStatus.InShop
+          String(e.operationalStatus) === 'Active' ||
+          e.operationalStatus === EquipmentOperationalStatus.InShop ||
+          String(e.operationalStatus) === 'InShop'
         );
         setTenant(tenantData);
         setAssetCount(billableAssets.length);
@@ -52,6 +71,19 @@ const BillingSection = () => {
       console.error("Checkout error:", error);
       toast.error("Failed to start checkout session");
       setCheckingOut(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    setManaging(true);
+    try {
+      const returnUrl = window.location.href; // current URL (e.g. localhost:5173/app/settings/billing)
+      const response = await billingApi.createPortalSession(returnUrl);
+      window.location.href = response.url;
+    } catch (error) {
+      console.error("Portal error:", error);
+      toast.error("Failed to open billing portal");
+      setManaging(false);
     }
   };
 
@@ -147,21 +179,38 @@ const BillingSection = () => {
         </div>
 
         {/* Call to Action */}
-        <div className="flex justify-end">
-          <Button
-            onClick={handleAddPaymentMethod}
-            disabled={checkingOut}
-            className="bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 px-6 py-6 disabled:opacity-50"
-          >
-            {checkingOut ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Redirecting...
-              </>
-            ) : (
-              "Add Payment Method"
-            )}
-          </Button>
+        <div className="flex justify-end items-center gap-4 pt-6 border-t border-slate-100">
+          {(tenant?.billingStatus === "active" || tenant?.billingStatus === "trialing") && tenant?.stripeCustomerId ? (
+            <Button
+              onClick={handleManageSubscription}
+              disabled={managing}
+              className="bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 hover:text-slate-900 transition-all px-6 py-6 disabled:opacity-50"
+            >
+              {managing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Redirecting...
+                </>
+              ) : (
+                "Manage Subscription"
+              )}
+            </Button>
+          ) : (
+            <Button
+              onClick={handleAddPaymentMethod}
+              disabled={checkingOut}
+              className="bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 px-6 py-6 disabled:opacity-50"
+            >
+              {checkingOut ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Redirecting...
+                </>
+              ) : (
+                "Add Payment Method"
+              )}
+            </Button>
+          )}
         </div>
       </div>
     </div>

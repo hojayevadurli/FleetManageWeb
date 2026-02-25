@@ -38,6 +38,7 @@ export type User = {
   Company?: string;
   lastPasswordChange?: string;
   photoUrl?: string; // Mocked client-side
+  phoneNumber?: string;
 };
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
