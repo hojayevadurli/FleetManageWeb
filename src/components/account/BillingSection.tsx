@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import tenantsApi, { Tenant } from "@/lib/tenantsApi";
 import billingApi, { STRIPE_PRICE_ID } from "@/lib/billingApi";
 import equipmentApi from "@/lib/equipmentApi";
-import { differenceInDays, format, parseISO } from "date-fns";
+import { differenceInDays, format, parseISO, endOfMonth } from "date-fns";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EquipmentOperationalStatus } from "@/lib/types";
@@ -80,8 +80,9 @@ const BillingSection = () => {
       const returnUrl = window.location.href; // current URL (e.g. localhost:5173/app/settings/billing)
       const response = await billingApi.createPortalSession(returnUrl);
       window.location.href = response.url;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Portal error:", error);
+      console.error("Portal error details:", error.response?.data);
       toast.error("Failed to open billing portal");
       setManaging(false);
     }
@@ -108,10 +109,16 @@ const BillingSection = () => {
 
   // Plan Display Logic
   const planName = tenant?.planKey === 'professional' ? 'Professional Plan' : 'Standard Plan';
-  // Fallback to January 1, 2026 if no date provided, or format real date
+
+  let fallbackDate = new Date();
+  if (isTrialActive && trialEndDate) {
+    fallbackDate = trialEndDate;
+  }
+
+  // Fallback to end of the month if no date provided, or format real date
   const nextBillingDate = tenant?.currentPeriodEnd
     ? format(parseISO(tenant.currentPeriodEnd), "MMM d, yyyy")
-    : "Jan 1, 2026";
+    : format(endOfMonth(fallbackDate), "MMM d, yyyy");
 
   return (
     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden w-full">
