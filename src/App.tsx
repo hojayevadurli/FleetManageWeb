@@ -82,6 +82,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+import { SubscriptionProvider, useSubscription } from "./contexts/SubscriptionContext";
+
 // Root route handler
 const RootRoute = () => {
   const { user, loading } = useAuth();
@@ -106,34 +108,10 @@ const RootRoute = () => {
 
 const DashboardHeader = () => {
   const { user: authUser, signOut } = useAuth();
+  const { tenant, trialDaysLeft: trialDays } = useSubscription();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [trialDays, setTrialDays] = useState<number | null>(null);
-  const [companyName, setCompanyName] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchTenantData = async () => {
-      try {
-        const tenant = await tenantsApi.getCurrent();
-
-        if (tenant?.name) {
-          setCompanyName(tenant.name);
-        }
-
-        if (tenant?.trialEndsAt) {
-          const end = parseISO(tenant.trialEndsAt);
-          const days = differenceInDays(end, new Date());
-          setTrialDays(days > 0 ? days : 0);
-        } else {
-          setTrialDays(29);
-        }
-      } catch (e) {
-        console.error("Failed to fetch tenant data", e);
-        setTrialDays(29);
-      }
-    };
-    fetchTenantData();
-  }, []);
+  const companyName = tenant?.name || null;
 
   // Handle potential nested user object from backend
   const user = (authUser as any)?.user || authUser;
@@ -256,91 +234,84 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <HelmetProvider>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<RootRoute />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              {/* Backend sends /reset link */}
-              <Route path="/reset" element={<ResetPassword />} />
-              {/* Backend sends /confirm-email link */}
-              <Route path="/confirm-email" element={<ConfirmEmail />} />
-              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-              <Route path="/terms" element={<Terms />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/app/*" element={
-                <ProtectedRoute>
-                  <SidebarProvider>
-                    <div className="min-h-screen flex w-full">
-                      <AppSidebar />
-                      <SidebarInset>
-                        <DashboardHeader />
-                        <div className="flex flex-1 flex-col gap-4 p-4">
-                          <Routes>
-                            <Route path="/" element={<Dashboard />} />
-                            <Route path="/dashboard" element={<Dashboard />} />
-                            <Route path="/equipment" element={<Equipment />} />
-                            <Route path="/equipment/map" element={<FleetMap />} />
-                            <Route path="/service" element={<WorkOrders />} />
-                            <Route path="/history/trucks" element={<HistoryTrucks />} />
-                            <Route path="/history/repairs" element={<RepairHistoryPage />} />
+        <SubscriptionProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<RootRoute />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                {/* Backend sends /reset link */}
+                <Route path="/reset" element={<ResetPassword />} />
+                {/* Backend sends /confirm-email link */}
+                <Route path="/confirm-email" element={<ConfirmEmail />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/app/*" element={
+                  <ProtectedRoute>
+                    <SidebarProvider>
+                      <div className="min-h-screen flex w-full">
+                        <AppSidebar />
+                        <SidebarInset>
+                          <DashboardHeader />
+                          <div className="flex flex-1 flex-col gap-4 p-4">
+                            <Routes>
+                              <Route path="/" element={<Dashboard />} />
+                              <Route path="/dashboard" element={<Dashboard />} />
+                              <Route path="/equipment" element={<Equipment />} />
+                              <Route path="/equipment/map" element={<FleetMap />} />
+                              <Route path="/service" element={<WorkOrders />} />
+                              <Route path="/history/trucks" element={<HistoryTrucks />} />
+                              <Route path="/history/repairs" element={<RepairHistoryPage />} />
 
-                            {/* Driver Routes */}
-                            <Route path="/drivers" element={<DriversPage />} />
-                            <Route path="/drivers/new" element={<CreateDriverPage />} />
-                            <Route path="/drivers/:id" element={<DriverDetailPage />} />
-                            <Route path="/drivers/:id/edit" element={<EditDriverPage />} />
+                              {/* Driver Routes */}
+                              <Route path="/drivers" element={<DriversPage />} />
+                              <Route path="/drivers/new" element={<CreateDriverPage />} />
+                              <Route path="/drivers/:id" element={<DriverDetailPage />} />
+                              <Route path="/drivers/:id/edit" element={<EditDriverPage />} />
 
-                            <Route path="/service/:id" element={<ServiceRecordDetailPage />} />
-                            <Route path="/maintenance/upcoming" element={<UpcomingMaintenance />} />
-                            <Route path="/inspections" element={<InspectionsPage />} />
-                            <Route path="/shops" element={<ShopsPage />} />
-                            <Route path="/shops/:id" element={<ShopDetailView />} />
-                            <Route path="/shops/map" element={<ShopMap shops={[]} />} />
-                            <Route path="/vendor-analytics" element={<VendorAnalytics />} />
-                            <Route path="/integrations" element={<IntegrationsPage />} />
-                            <Route path="/operations/fuel" element={<FuelTracking />} />
-                            <Route path="/ai-chat" element={<AIChatPage />} />
-                            <Route path="/ai-chat" element={<AIChatPage />} />
-                            <Route path="/support" element={<SupportPage />} />
+                              <Route path="/service/:id" element={<ServiceRecordDetailPage />} />
+                              <Route path="/maintenance/upcoming" element={<UpcomingMaintenance />} />
+                              <Route path="/inspections" element={<InspectionsPage />} />
+                              <Route path="/shops" element={<ShopsPage />} />
+                              <Route path="/shops/:id" element={<ShopDetailView />} />
+                              <Route path="/shops/map" element={<ShopMap shops={[]} />} />
+                              <Route path="/vendor-analytics" element={<VendorAnalytics />} />
+                              <Route path="/integrations" element={<IntegrationsPage />} />
+                              <Route path="/operations/fuel" element={<FuelTracking />} />
+                              <Route path="/ai-chat" element={<AIChatPage />} />
+                              <Route path="/ai-chat" element={<AIChatPage />} />
+                              <Route path="/support" element={<SupportPage />} />
 
-                            {/* Settings Routes */}
-                            <Route path="/settings" element={<SettingsLayout />}>
-                              <Route index element={<Navigate to="account" replace />} />
-                              <Route path="account" element={<AccountTab />} />
-                              <Route path="billing" element={<BillingTab />} />
-                              <Route path="preferences" element={<PreferencesTab />} />
-                              <Route path="team" element={<TeamTab />} />
-                            </Route>
-                            <Route path="/account" element={<Navigate to="/app/settings/account" replace />} />
+                              {/* Settings Routes */}
+                              <Route path="/settings" element={<SettingsLayout />}>
+                                <Route index element={<Navigate to="account" replace />} />
+                                <Route path="account" element={<AccountTab />} />
+                                <Route path="billing" element={<BillingTab />} />
+                                <Route path="preferences" element={<PreferencesTab />} />
+                                <Route path="team" element={<TeamTab />} />
+                              </Route>
+                              <Route path="/account" element={<Navigate to="/app/settings/account" replace />} />
 
-                            <Route path="*" element={<NotFound />} />
-                          </Routes>
-                        </div>
-                      </SidebarInset>
-                    </div>
-                  </SidebarProvider>
-                </ProtectedRoute>
-              } />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
+                              <Route path="*" element={<NotFound />} />
+                            </Routes>
+                          </div>
+                        </SidebarInset>
+                      </div>
+                    </SidebarProvider>
+                  </ProtectedRoute>
+                } />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </SubscriptionProvider>
       </AuthProvider>
     </HelmetProvider>
   </QueryClientProvider>
 );
 
 export default App;
-
-
-
-
-
-
-
-
-

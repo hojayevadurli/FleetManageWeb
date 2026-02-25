@@ -17,4 +17,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Global Error Handler for 403 Billing/Trial Expiry
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // If the backend `TenantGuardMiddleware` throws a 403 for an inactive subscription...
+    if (error.response?.status === 403) {
+      const errorText = error.response.data; // Usually "Billing inactive or trial expired..." from middleware
+      if (typeof errorText === 'string' && (errorText.toLowerCase().includes('billing active') || errorText.toLowerCase().includes('trial expired') || errorText.toLowerCase().includes('billing inactive'))) {
+        // Dispatch the global custom event picked up by SubscriptionContext
+        window.dispatchEvent(new Event("fleetmanage:payment-required"));
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;

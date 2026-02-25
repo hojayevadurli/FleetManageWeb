@@ -40,10 +40,8 @@ const AccountTab = () => {
                 const tenantData = await tenantsApi.getCurrent();
                 if (tenantData) {
                     setCompanyName(tenantData.name);
-                    // Use tenant phone if available, or fallback to user phone? 
-                    // For now, let's treat phone as a tenant property based on previous code, 
-                    // or strictly bind it to what we get.
-                    setPhone(tenantData.phone || "");
+                    // Use user phone as primary, fallback to tenant phone if profile lacks one
+                    setPhone(user?.phoneNumber || tenantData.phone || "");
                     setIndustryName(tenantData.industryName || "");
                     setIndustryId(tenantData.industryId || 0);
                 }
@@ -73,15 +71,14 @@ const AccountTab = () => {
                 name: companyName,
                 industryId: industryId,
                 email: email, // Tenant email? Or keep separate? The API expects it.
-                phone: phone
+                phone: phone // Keep tenant phone synced for now if needed, or remove.
             });
 
-            // 2. Update User Profile (Name)
+            // 2. Update User Profile (Name & Phone)
             const updatedUser = await updateProfile({
                 fullName: name,
                 photoUrl: photoUrl,
-                // If the backend Profile endpoint supports phone, we could send it here too.
-                // For now, assume phone is on tenant for this business app logic.
+                phone: phone
             });
             updateUser(updatedUser);
 

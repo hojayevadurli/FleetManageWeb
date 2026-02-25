@@ -240,7 +240,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                 }
             }
 
-            const matchesStatus = statusFilter === 'ALL' || e.status === statusFilter;
+            const matchesStatus = statusFilter === 'ALL' || e.status === statusFilter || String(e.status) === EquipmentOperationalStatus[statusFilter as number];
 
             return matchesSearch && matchesType && matchesStatus;
         });
