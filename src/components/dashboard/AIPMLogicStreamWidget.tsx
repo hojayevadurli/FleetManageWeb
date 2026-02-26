@@ -3,6 +3,7 @@ import { Activity, Zap, Layers, AlertCircle, Bot, History, Settings, Flame } fro
 import { Equipment, WorkOrder } from '@/lib/types';
 import { differenceInDays, parseISO } from 'date-fns';
 
+// TODO: 
 interface PMLog {
     id: string;
     type: 'logic' | 'alert' | 'strategy' | 'audit';
@@ -15,6 +16,8 @@ interface AIPMLogicStreamWidgetProps {
     workOrders: WorkOrder[];
     serviceRecords: WorkOrder[];
 }
+
+//putting just a comment for git
 
 const getTypeConfig = (type: PMLog['type']) => {
     switch (type) {
