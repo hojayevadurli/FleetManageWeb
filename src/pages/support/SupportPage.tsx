@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Star, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
-import api from "@/lib/api";
+import api from "@/lib/Api.temp";
 import SupportTicketHistory from "@/components/SupportTicketHistory";
 
 export default function SupportPage() {

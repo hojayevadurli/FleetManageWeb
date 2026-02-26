@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import api from "@/lib/Api";
+import api from "@/lib/Api.temp";
 import { SupportTicket } from "@/types/support";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";

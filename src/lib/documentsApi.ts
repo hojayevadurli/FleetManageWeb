@@ -1,4 +1,4 @@
-import api from "@/lib/Api";
+import api from "@/lib/Api.temp";
 
 export type DocKind = "invoice" | "receipt" | "work_order" | "license" | "unknown";
 

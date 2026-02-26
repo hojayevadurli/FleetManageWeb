@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { AppLogo } from "@/components/auth/AppLogo";
-import { api } from "@/lib/Api";
+import { api } from "@/lib/Api.temp";
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();

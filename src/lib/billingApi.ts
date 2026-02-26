@@ -1,4 +1,4 @@
-import api from "@/lib/Api";
+import api from "@/lib/Api.temp";
 
 export interface CreateCheckoutResponse {
     sessionId: string;

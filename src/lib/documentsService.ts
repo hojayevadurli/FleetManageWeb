@@ -1,4 +1,4 @@
-import api from './Api';
+import api from './Api.temp';
 import { DocumentAttachment, DocumentRole, AttachDocumentPayload } from './types';
 
 // ------------------------------------------------------------------

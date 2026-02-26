@@ -39,7 +39,7 @@ import EditVehicleDialog from "../EditVehicleDialog";
 import VehicleSyncButton from "./VehicleSyncButton";
 import VehicleLocationDialog from "./VehicleLocationDialog";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/Api";
+import { api } from "@/lib/Api.temp";
 
 interface Vehicle {
   id: string;

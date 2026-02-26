@@ -1,4 +1,4 @@
-import api from "@/lib/Api";
+import api from "@/lib/Api.temp";
 
 export const uploadsApi = {
   uploadWorkOrderFiles: async (files: File[]): Promise<string[]> => {

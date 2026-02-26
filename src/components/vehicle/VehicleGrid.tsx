@@ -17,7 +17,7 @@ import type { CheckedState } from "@radix-ui/react-checkbox";
 import { Truck, Trash2 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/Api";
+import { api } from "@/lib/Api.temp";
 
 import VehicleCard from "./VehicleCard";
 

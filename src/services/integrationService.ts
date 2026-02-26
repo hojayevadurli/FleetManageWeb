@@ -1,4 +1,4 @@
-import api from "@/lib/Api";
+import api from "@/lib/Api.temp";
 import { Integration } from "@/lib/types";
 
 // Mock data as fallback
