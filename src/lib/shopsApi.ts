@@ -1,4 +1,4 @@
-import api from "@/lib/Api.temp";
+import api from "@/lib/Api";
 import { Shop, ShopRating, ShopRateCategory, VendorPreference, RATE_CATEGORY_TO_PREFERENCE, PREFERENCE_TO_RATE_CATEGORY } from "@/components/shops/types/ShopTypes";
 
 export interface RatingCreatePayload {

@@ -1,4 +1,4 @@
-import api from "@/lib/Api.temp";
+import api from "@/lib/Api";
 import { Equipment, EquipmentDto, EquipmentOperationalStatus, EquipmentDocument, DocumentRole } from "@/lib/types";
 import { uploadsApi } from "@/lib/uploadsApi";
 

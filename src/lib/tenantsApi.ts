@@ -1,4 +1,4 @@
-import api from "@/lib/Api.temp";
+import api from "@/lib/Api";
 
 export interface Tenant {
     id: string;

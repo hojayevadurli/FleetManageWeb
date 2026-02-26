@@ -1,5 +1,5 @@
 // src/lib/Auth.ts
-import api from "@/lib/Api.temp";
+import api from "@/lib/Api";
 
 const TOKEN_KEY = "auth_token";
 

@@ -1,4 +1,4 @@
-import api from "@/lib/Api.temp";
+import api from "@/lib/Api";
 import { OperatorIncident, CreateIncidentDto, UpdateIncidentDto, IncidentType } from "@/lib/types";
 
 export const incidentsApi = {

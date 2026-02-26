@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.tsx
 import { createContext, useContext, useEffect, useState } from "react";
-import { api } from "@/lib/Api.temp";
+import { api } from "@/lib/Api";
 import {
   login as authLogin,
   me as fetchMe,
