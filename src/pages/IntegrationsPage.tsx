@@ -121,9 +121,8 @@ const IntegrationsPage = () => {
                         logo="https://assets.website-files.com/62a8d672221c9b68627730e6/62b4065633a6972e25902099_Motive-Logo.svg"
                         name="Motive"
                         description="Sync vehicles, locations, odometer, fuel %, engine hours, and driver assignment from Motive."
-                        status={getStatus('Motive')}
-                        onConnect={() => handleConnect('Motive')}
-                        onManage={() => handleManage('Motive')}
+                        status="ComingSoon"
+                        onNotifyMe={() => handleNotifyMe('Motive')}
                     />
 
                     {/* TAFS Card */}

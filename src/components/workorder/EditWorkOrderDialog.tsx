@@ -254,7 +254,18 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
 
         // Auto-fill Vendor Name
         if (result.businessName) {
-          const match = vendors.find(v => v.name.toLowerCase().includes(result.businessName.toLowerCase()) || result.businessName.toLowerCase().includes(v.name.toLowerCase()));
+          const match = vendors.find(v => {
+            const includesMatch = v.name.toLowerCase().includes(result.businessName!.toLowerCase()) || result.businessName!.toLowerCase().includes(v.name.toLowerCase());
+            if (includesMatch) {
+              const parsedCity = result.businessAddress?.city?.toLowerCase()?.trim();
+              const vendorCity = v.city?.toLowerCase()?.trim();
+              if (parsedCity && vendorCity && parsedCity !== vendorCity) {
+                return false;
+              }
+              return true;
+            }
+            return false;
+          });
           if (match) {
             setEditData(prev => ({ ...prev, vendor_id: match.id, vendor_name: match.name }));
             toast.success(`AI Match: Vendor found "${match.name}"`);
@@ -300,10 +311,12 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
   const loadVendors = async (currentWorkOrder?: WorkOrderDto) => {
     try {
       const data = await shopsApi.list();
-      // map to Vendor type roughly
       const mapped = data.map((s: any) => ({
         id: s.id,
         name: s.shop_name || s.name || s.shopName || "Unknown Shop",
+        city: s.city,
+        state: s.state,
+        address: s.address1 || ""
       })) as Vendor[];
       setVendors(mapped);
 

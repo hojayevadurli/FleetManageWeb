@@ -164,6 +164,9 @@ export default function CreateWorkOrderDialog({
       const mapped = data.map((s: any) => ({
         id: s.id,
         name: s.shop_name || s.name || "Unknown Shop",
+        city: s.city,
+        state: s.state,
+        address: s.address1 || ""
       })) as Vendor[];
       setVendors(mapped);
       return mapped;
@@ -199,7 +202,13 @@ export default function CreateWorkOrderDialog({
     const updatedVendors = await refreshVendors();
     // Auto-select the most recent one if we have a name match or just created one
     if (shopInitialData.shop_name) {
-      const match = updatedVendors.find(v => v.name.toLowerCase() === shopInitialData.shop_name?.toLowerCase());
+      const match = updatedVendors.find(v => {
+        const nameMatch = v.name.toLowerCase() === shopInitialData.shop_name?.toLowerCase();
+        if (shopInitialData.city && v.city) {
+          return nameMatch && v.city.toLowerCase() === shopInitialData.city.toLowerCase();
+        }
+        return nameMatch;
+      });
       if (match) {
         setNewWorkOrder(prev => ({ ...prev, vendor_id: match.id, vendor_name: match.name }));
       }
@@ -530,6 +539,11 @@ export default function CreateWorkOrderDialog({
       const dto: WorkOrderUpsertDto = {
         equipmentId: newWorkOrder.vehicle_id,
         vendorId: newWorkOrder.vendor_id,
+        vendorNameRaw: parsedVendorDetails?.name || newWorkOrder.vendor_name || null,
+        vendorAddress: parsedVendorDetails?.street || null,
+        vendorCity: parsedVendorDetails?.city || null,
+        vendorState: parsedVendorDetails?.state || null,
+        vendorZip: parsedVendorDetails?.zip || null,
         workOrderNumber: customWorkOrderNumber,
         odometerAtService: (newWorkOrder.odometer && !isNaN(parseInt(newWorkOrder.odometer))) ? parseInt(newWorkOrder.odometer) : null,
         openedAt: newWorkOrder.service_date ? new Date(newWorkOrder.service_date).toISOString() : new Date().toISOString(),
@@ -707,7 +721,40 @@ export default function CreateWorkOrderDialog({
             // 2. Fuzzy match
             const isFuzzy = fuzzyMatch(result.businessName, v.name, 0.75); // 75% threshold
 
-            return includesMatch || isFuzzy;
+            if (includesMatch || isFuzzy) {
+              const parsedCity = result.businessAddress?.city?.toLowerCase()?.trim();
+              const vendorCity = v.city?.toLowerCase()?.trim();
+
+              const parsedState = result.businessAddress?.state?.toLowerCase()?.trim();
+              const vendorState = v.state?.toLowerCase()?.trim();
+
+              if (parsedCity && vendorCity && parsedCity !== vendorCity) {
+                return false; // Different city
+              }
+
+              if (parsedState && vendorState && parsedState !== vendorState) {
+                return false; // Different state
+              }
+
+              // Validate street address if available
+              if (result.businessAddress?.street && v.address) {
+                const incomingStreetNum = result.businessAddress.street.replace(/\D/g, '').trim();
+                const vendorStreetNum = v.address.replace(/\D/g, '').trim();
+
+                // If we have a street number for both, and they differ, they're likely different locations.
+                if (incomingStreetNum && vendorStreetNum && incomingStreetNum !== vendorStreetNum) {
+                  // Check for substring edge cases before definitively failing it
+                  const incomingLower = result.businessAddress.street.toLowerCase();
+                  const vendorLower = v.address.toLowerCase();
+                  if (!incomingLower.includes(vendorLower) && !vendorLower.includes(incomingLower)) {
+                    return false; // Different location of the same chain
+                  }
+                }
+              }
+
+              return true;
+            }
+            return false;
           });
 
           if (match) {

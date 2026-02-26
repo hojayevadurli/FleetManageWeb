@@ -16,6 +16,11 @@ export interface WorkOrderUpsertDto {
   equipmentId: string;
   vendorId?: string | null;
   vendorName?: string | null;
+  vendorNameRaw?: string | null;
+  vendorAddress?: string | null;
+  vendorCity?: string | null;
+  vendorState?: string | null;
+  vendorZip?: string | null;
   workOrderNumber?: string | null;
   odometerAtService?: number | null;
   hoursAtService?: number | null;

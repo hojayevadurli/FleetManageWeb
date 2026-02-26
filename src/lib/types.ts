@@ -80,6 +80,8 @@ export interface Vendor {
   slug: string;
   name: string;
   address: string;
+  city?: string;
+  state?: string;
   phone: string;
   website?: string;
   email: string;

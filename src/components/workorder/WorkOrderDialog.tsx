@@ -166,6 +166,9 @@ export default function WorkOrderDialog({
       const mapped = data.map((s: any) => ({
         id: s.id,
         name: s.shop_name || s.name || "Unknown Shop",
+        city: s.city,
+        state: s.state,
+        address: s.address1 || ""
       })) as Vendor[];
       setVendors(mapped);
       return mapped;
@@ -866,7 +869,40 @@ export default function WorkOrderDialog({
             // 2. Fuzzy match
             const isFuzzy = fuzzyMatch(result.businessName, v.name, 0.75); // 75% threshold
 
-            return includesMatch || isFuzzy;
+            if (includesMatch || isFuzzy) {
+              const parsedCity = result.businessAddress?.city?.toLowerCase()?.trim();
+              const vendorCity = v.city?.toLowerCase()?.trim();
+
+              const parsedState = result.businessAddress?.state?.toLowerCase()?.trim();
+              const vendorState = v.state?.toLowerCase()?.trim();
+
+              if (parsedCity && vendorCity && parsedCity !== vendorCity) {
+                return false; // Different city
+              }
+
+              if (parsedState && vendorState && parsedState !== vendorState) {
+                return false; // Different state
+              }
+
+              // Validate street address if available
+              if (result.businessAddress?.street && v.address) {
+                const incomingStreetNum = result.businessAddress.street.replace(/\D/g, '').trim();
+                const vendorStreetNum = v.address.replace(/\D/g, '').trim();
+
+                // If we have a street number for both, and they differ, they're likely different locations.
+                if (incomingStreetNum && vendorStreetNum && incomingStreetNum !== vendorStreetNum) {
+                  // Check for substring edge cases before definitively failing it
+                  const incomingLower = result.businessAddress.street.toLowerCase();
+                  const vendorLower = v.address.toLowerCase();
+                  if (!incomingLower.includes(vendorLower) && !vendorLower.includes(incomingLower)) {
+                    return false; // Different location of the same chain
+                  }
+                }
+              }
+
+              return true;
+            }
+            return false;
           });
 
           if (match) {
