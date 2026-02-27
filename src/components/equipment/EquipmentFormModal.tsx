@@ -26,6 +26,7 @@ import { decodeVin, validateVin } from '@/lib/nhtsaApi';
 import { fleetCategoriesApi, FleetCategory } from '@/lib/fleetCategoriesApi';
 import { equipmentTypesApi } from '@/lib/equipmentTypesApi';
 import { EquipmentTypeDto } from '@/lib/types';
+import { toast } from 'sonner';
 
 interface EquipmentFormModalProps {
     isOpen: boolean;
@@ -120,7 +121,6 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
     const [isDecoding, setIsDecoding] = useState(false);
     const [decodeError, setDecodeError] = useState<string | null>(null);
     const [autoFilledFields, setAutoFilledFields] = useState<string[]>([]);
-    const [submitError, setSubmitError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [categories, setCategories] = useState<FleetCategory[]>([]);
     const [equipmentTypes, setEquipmentTypes] = useState<EquipmentTypeDto[]>([]);
@@ -200,7 +200,23 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSubmitError(null);
+
+        // Client-side validation for custom components and essential fields
+        if (!formData.fleetCategoryId) {
+            toast.error("Please select a Fleet Classification.");
+            return;
+        }
+
+        if (!formData.specificType) {
+            toast.error("Please select a Specific Type.");
+            return;
+        }
+
+        if (!formData.make || formData.make.trim() === '') {
+            toast.error("Please provide the Make of the asset.");
+            return;
+        }
+
         setIsSubmitting(true);
 
         const payload = { ...formData };
@@ -218,7 +234,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
             onClose();
         } catch (err: any) {
             console.error(err);
-            setSubmitError(err.message || "Failed to save equipment");
+            toast.error(err.message || "Failed to save equipment");
         } finally {
             setIsSubmitting(false);
         }
@@ -258,18 +274,6 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                     gap: 3px;
                                 }
                         `}</style>
-
-                        {submitError && (
-                            <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-start gap-3 animate-in slide-in-from-top-2 duration-200">
-                                <div className="bg-rose-100 p-2 rounded-full shrink-0">
-                                    <AlertCircle className="w-5 h-5 text-rose-600" />
-                                </div>
-                                <div>
-                                    <h4 className="text-sm font-black text-rose-700">Action Required</h4>
-                                    <p className="text-sm font-medium text-rose-600/90 mt-0.5">{submitError}</p>
-                                </div>
-                            </div>
-                        )}
 
                         <div className="space-y-6">
                             {/* 1. Unit Number */}
