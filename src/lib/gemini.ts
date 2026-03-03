@@ -202,8 +202,9 @@ export const parseReceipt = async (
 4. SERVICE DETAILS:
     - Date (YYYY-MM-DD)
     - Items (Categorize EACH item as ONE of: "part", "labor", "fee", "tax", "misc", or "discount")
-   - Total
-   - Unit/Truck number if present
+      - If there is a discount, MUST output it as a SINGLE item with a NEGATIVE cost (e.g., -25.00). DO NOT output multiple discount items for the same deduction. DO NOT create "Additional Member Saving" and "Discount" as separate items if they represent the same amount.
+    - Total
+    - Unit/Truck number if present
 
 OUTPUT RULES:
 - Respond with ONLY valid JSON (no markdown, no commentary).
