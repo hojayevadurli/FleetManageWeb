@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface WorkOrderItemData {
-  type: "part" | "labor" | "fee" | "tax" | "misc";
+  type: "part" | "labor" | "fee" | "tax" | "misc" | "discount";
   description: string;
   price: number;
   quantity: number;
@@ -128,6 +128,7 @@ const WorkOrderItems = ({ items, onItemsChange, historicalParts = [] }: WorkOrde
                             <SelectItem value="fee">Fee</SelectItem>
                             <SelectItem value="tax">Tax</SelectItem>
                             <SelectItem value="misc">Misc</SelectItem>
+                            <SelectItem value="discount">Discount</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -182,7 +183,6 @@ const WorkOrderItems = ({ items, onItemsChange, historicalParts = [] }: WorkOrde
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
                           <Input
                             type="number"
-                            min="0"
                             step="0.01"
                             value={item.price}
                             onChange={(e) => {

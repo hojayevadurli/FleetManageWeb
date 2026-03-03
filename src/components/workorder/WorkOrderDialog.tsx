@@ -489,6 +489,7 @@ export default function WorkOrderDialog({
     let partsTotal = 0;
     let laborTotal = 0;
     let taxesTotal = 0;
+    let discountsTotal = 0;
     let warrantySavings = 0;
 
     workOrderItems.forEach(item => {
@@ -499,6 +500,8 @@ export default function WorkOrderDialog({
         laborTotal += cost;
       } else if (t === 'fee' || t === 'tax') {
         taxesTotal += cost;
+      } else if (t === 'discount') {
+        discountsTotal += cost;
       } else {
         partsTotal += cost;
       }
@@ -509,12 +512,13 @@ export default function WorkOrderDialog({
     });
 
     // Warranty is not deducted from grand total.
-    const grandTotal = partsTotal + laborTotal + taxesTotal;
+    const grandTotal = partsTotal + laborTotal + taxesTotal + discountsTotal;
 
     return {
       partsTotal,
       laborTotal,
       taxesTotal,
+      discountsTotal,
       warrantySavings,
       grandTotal
     };
@@ -1710,7 +1714,7 @@ export default function WorkOrderDialog({
                 <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-blue-500" /> Live Summary
                 </h4>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Parts</span>
                     <span className="text-sm font-bold text-slate-700 font-mono">${smartSummary.partsTotal.toFixed(2)}</span>
@@ -1722,6 +1726,12 @@ export default function WorkOrderDialog({
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Taxes/Fees</span>
                     <span className="text-sm font-bold text-slate-700 font-mono">${smartSummary.taxesTotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Discount</span>
+                    <span className="text-sm font-bold text-emerald-600 font-mono">
+                      {smartSummary.discountsTotal < 0 ? '-' : ''}${Math.abs(smartSummary.discountsTotal).toFixed(2)}
+                    </span>
                   </div>
                   <div className="flex flex-col items-end border-l border-slate-200 pl-4">
                     <span className="text-[10px] font-black text-slate-900 uppercase tracking-wider">Total Due</span>

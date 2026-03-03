@@ -14,6 +14,7 @@ import { TimeOffTab } from "@/components/drivers/tabs/TimeOffTab";
 import { SpendTab } from "@/components/drivers/tabs/SpendTab";
 import { SafetyTab } from "@/components/drivers/tabs/SafetyTab";
 import { PerformanceTab } from "@/components/drivers/tabs/PerformanceTab";
+import { AddIncidentSheet } from "@/components/drivers/AddIncidentSheet";
 
 import { EquipmentAssignmentDialog } from "@/components/drivers/EquipmentAssignmentDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +39,9 @@ export default function DriverDetailPage() {
     const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
     const [hasEquipment, setHasEquipment] = useState(false); // Set to false to show CTA for testing
     const [assignmentRefreshKey, setAssignmentRefreshKey] = useState(0); // Add this to trigger refresh
+    const [safetyRefreshKey, setSafetyRefreshKey] = useState(0);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [showAddInspection, setShowAddInspection] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
@@ -269,7 +272,7 @@ export default function DriverDetailPage() {
 
 
                 <TabsContent value="safety">
-                    <SafetyTab driver={adaptedDriver} />
+                    <SafetyTab driver={adaptedDriver} refreshKey={safetyRefreshKey} onAddRecord={() => setShowAddInspection(true)} />
                 </TabsContent>
                 <TabsContent value="spend">
                     <SpendTab driver={adaptedDriver} />
@@ -303,6 +306,13 @@ export default function DriverDetailPage() {
                     }}
                 />
             )}
+
+            <AddIncidentSheet
+                open={showAddInspection}
+                onOpenChange={setShowAddInspection}
+                driver={adaptedDriver}
+                onSuccess={() => setSafetyRefreshKey(prev => prev + 1)}
+            />
 
             {/* Delete Operator Confirmation Dialog */}
             <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
