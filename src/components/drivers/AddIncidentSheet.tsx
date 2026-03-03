@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Driver, IncidentType, IncidentStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { incidentsApi } from "@/lib/incidentsApi";
+import { tenantsApi } from "@/lib/tenantsApi";
 import { toast } from "sonner";
 import {
     Sheet,
@@ -46,8 +47,23 @@ export function AddIncidentSheet({ open, onOpenChange, driver, onSuccess }: AddI
     const [isAtFault, setIsAtFault] = useState(false);
     const [inspectedParty, setInspectedParty] = useState(driver ? `${driver.firstName} ${driver.lastName}` : "");
 
-    // Mock company name - in a real app this would come from a context or API
-    const defaultCompanyName = "Everin LLC";
+    const [companyName, setCompanyName] = useState<string>("");
+
+    useEffect(() => {
+        const fetchTenantData = async () => {
+            try {
+                const tenant = await tenantsApi.getCurrent();
+                if (tenant?.name) {
+                    setCompanyName(tenant.name);
+                }
+            } catch (e) {
+                console.error("Failed to fetch tenant data", e);
+            }
+        };
+        if (open) {
+            fetchTenantData();
+        }
+    }, [open]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -123,12 +139,14 @@ export function AddIncidentSheet({ open, onOpenChange, driver, onSuccess }: AddI
                     <div className="flex flex-col md:flex-row gap-4 mb-4">
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex-1">
                             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Company *</Label>
-                            <Select defaultValue={defaultCompanyName}>
+                            <Select value={companyName} onValueChange={setCompanyName}>
                                 <SelectTrigger className="w-full bg-slate-50 border-slate-200">
                                     <SelectValue placeholder="Select Company" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={defaultCompanyName}>{defaultCompanyName}</SelectItem>
+                                    {companyName && (
+                                        <SelectItem value={companyName}>{companyName}</SelectItem>
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>
