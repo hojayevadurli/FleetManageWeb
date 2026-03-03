@@ -139,16 +139,12 @@ export function AddIncidentSheet({ open, onOpenChange, driver, onSuccess }: AddI
                     <div className="flex flex-col md:flex-row gap-4 mb-4">
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex-1">
                             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Company *</Label>
-                            <Select value={companyName} onValueChange={setCompanyName}>
-                                <SelectTrigger className="w-full bg-slate-50 border-slate-200">
-                                    <SelectValue placeholder="Select Company" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {companyName && (
-                                        <SelectItem value={companyName}>{companyName}</SelectItem>
-                                    )}
-                                </SelectContent>
-                            </Select>
+                            <Input
+                                readOnly
+                                value={companyName}
+                                className="w-full bg-slate-50 border-slate-200 text-slate-700 font-medium cursor-default focus-visible:ring-0"
+                                placeholder="Loading..."
+                            />
                         </div>
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex-1">
                             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Record Type *</Label>
