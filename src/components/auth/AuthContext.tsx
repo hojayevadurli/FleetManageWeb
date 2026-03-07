@@ -120,7 +120,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         companyName,
         fullName,
         email,
-        phoneNumber,
+        phone: phoneNumber,
         password,
         industryId
       });
