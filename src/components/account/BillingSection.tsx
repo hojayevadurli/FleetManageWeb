@@ -16,6 +16,7 @@ const BillingSection = () => {
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
   const [assetCount, setAssetCount] = useState(0);
+  const [upcomingInvoiceAmount, setUpcomingInvoiceAmount] = useState<number | null>(null);
 
   const pricePerAsset = 6;
   const estimatedMonthlyCost = assetCount * pricePerAsset;
@@ -39,9 +40,10 @@ const BillingSection = () => {
   useEffect(() => {
     const fetchTenantData = async () => {
       try {
-        const [tenantData, equipmentData] = await Promise.all([
+        const [tenantData, equipmentData, upcomingInvoice] = await Promise.all([
           tenantsApi.getCurrent(),
-          equipmentApi.list()
+          equipmentApi.list(),
+          billingApi.getUpcomingInvoice().catch(() => null)
         ]);
         const billableAssets = equipmentData.filter(e =>
           e.operationalStatus === EquipmentOperationalStatus.Active ||
@@ -51,6 +53,9 @@ const BillingSection = () => {
         );
         setTenant(tenantData);
         setAssetCount(billableAssets.length);
+        if (upcomingInvoice) {
+          setUpcomingInvoiceAmount(upcomingInvoice.amountDue);
+        }
       } catch (error) {
         console.error("Failed to fetch tenant data", error);
         toast.error("Failed to load subscription details");
@@ -179,7 +184,13 @@ const BillingSection = () => {
                 <p className="text-slate-500 mt-2">Billed monthly • Next billing date: {nextBillingDate}</p>
               </div>
               <div className="text-right">
-                <h3 className="text-3xl font-bold text-slate-900">${estimatedMonthlyCost}<span className="text-lg text-slate-500 font-medium">/mo</span></h3>
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Next Payment Due</p>
+                <h3 className="text-3xl font-bold text-slate-900">
+                  ${upcomingInvoiceAmount !== null ? upcomingInvoiceAmount.toFixed(2) : estimatedMonthlyCost.toFixed(2)}
+                </h3>
+                {upcomingInvoiceAmount !== null && upcomingInvoiceAmount !== estimatedMonthlyCost && (
+                  <p className="text-xs text-slate-500 mt-1 max-w-[150px] ml-auto">Includes prorations & previous payments</p>
+                )}
               </div>
             </div>
           </div>

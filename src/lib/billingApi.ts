@@ -39,6 +39,12 @@ export const billingApi = {
     async createPortalSession(returnUrl: string): Promise<{ url: string }> {
         const response = await api.post<{ url: string }>("/billing/portal-session", { returnUrl });
         return response.data;
+    },
+
+    // GET /api/billing/upcoming-invoice
+    async getUpcomingInvoice(): Promise<{ amountDue: number, date: string | null }> {
+        const response = await api.get<{ amountDue: number, date: string | null }>("/billing/upcoming-invoice");
+        return response.data;
     }
 };
 
