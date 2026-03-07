@@ -104,8 +104,15 @@ export const BillingHistorySection = () => {
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
-                                            <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-bold text-xs group">
-                                                View Receipt
+                                            <Button
+                                                variant={invoice.status === 'open' || invoice.status === 'uncollectible' ? 'default' : 'ghost'}
+                                                size="sm"
+                                                className={invoice.status === 'open' || invoice.status === 'uncollectible'
+                                                    ? "bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs group rounded-xl px-4"
+                                                    : "text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-bold text-xs group"
+                                                }
+                                            >
+                                                {invoice.status === 'open' || invoice.status === 'uncollectible' ? "Pay Invoice" : "View Receipt"}
                                                 <ArrowUpRight className="ml-1.5 w-3.5 h-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
                                             </Button>
                                         </a>
