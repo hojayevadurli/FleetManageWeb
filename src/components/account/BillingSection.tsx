@@ -1,12 +1,12 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Clock, Truck, Loader2 } from "lucide-react";
+import { CreditCard, Clock, Truck, Loader2, FileText, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import tenantsApi, { Tenant } from "@/lib/tenantsApi";
-import billingApi, { STRIPE_PRICE_ID } from "@/lib/billingApi";
+import billingApi, { STRIPE_PRICE_ID, InvoiceDto } from "@/lib/billingApi";
 import equipmentApi from "@/lib/equipmentApi";
-import { differenceInDays, format, parseISO, endOfMonth } from "date-fns";
+import { differenceInDays, format, parseISO, endOfMonth, startOfDay } from "date-fns";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EquipmentOperationalStatus } from "@/lib/types";
@@ -17,6 +17,7 @@ const BillingSection = () => {
   const [checkingOut, setCheckingOut] = useState(false);
   const [assetCount, setAssetCount] = useState(0);
   const [upcomingInvoiceAmount, setUpcomingInvoiceAmount] = useState<number | null>(null);
+  const [invoices, setInvoices] = useState<InvoiceDto[]>([]);
 
   const pricePerAsset = 6;
   const estimatedMonthlyCost = assetCount * pricePerAsset;
@@ -40,10 +41,11 @@ const BillingSection = () => {
   useEffect(() => {
     const fetchTenantData = async () => {
       try {
-        const [tenantData, equipmentData, upcomingInvoice] = await Promise.all([
+        const [tenantData, equipmentData, upcomingInvoice, invoiceHistory] = await Promise.all([
           tenantsApi.getCurrent(),
           equipmentApi.list(),
-          billingApi.getUpcomingInvoice().catch(() => null)
+          billingApi.getUpcomingInvoice().catch(() => null),
+          billingApi.getHistory().catch(() => [])
         ]);
         const billableAssets = equipmentData.filter(e =>
           e.operationalStatus === EquipmentOperationalStatus.Active ||
@@ -53,6 +55,7 @@ const BillingSection = () => {
         );
         setTenant(tenantData);
         setAssetCount(billableAssets.length);
+        setInvoices(invoiceHistory);
         if (upcomingInvoice) {
           setUpcomingInvoiceAmount(upcomingInvoice.amountDue);
         }
@@ -105,9 +108,12 @@ const BillingSection = () => {
     );
   }
 
-  // Calculate trial info
-  const trialEndDate = tenant?.trialEndsAt ? parseISO(tenant.trialEndsAt) : null;
-  const trialDaysRemaining = trialEndDate ? differenceInDays(trialEndDate, new Date()) : 0;
+  // Extract purely the date part to prevent UTC time shifting local dates backwards
+  const trialEndDateStr = tenant?.trialEndsAt ? tenant.trialEndsAt.substring(0, 10) : null;
+  const trialEndDate = trialEndDateStr ? parseISO(trialEndDateStr) : null;
+
+  // Use startOfDay to be safe when diffing against current local time
+  const trialDaysRemaining = trialEndDate ? differenceInDays(trialEndDate, startOfDay(new Date())) : 0;
 
   const isTrialActive = trialDaysRemaining > 0;
   const isPaid = tenant?.status === 'Active' && !isTrialActive;
@@ -115,15 +121,14 @@ const BillingSection = () => {
   // Plan Display Logic
   const planName = tenant?.planKey === 'professional' ? 'Professional Plan' : 'Standard Plan';
 
-  let fallbackDate = new Date();
-  if (isTrialActive && trialEndDate) {
-    fallbackDate = trialEndDate;
+  let nextBillingDate = "N/A";
+  if (tenant?.currentPeriodEnd) {
+    nextBillingDate = format(parseISO(tenant.currentPeriodEnd.substring(0, 10)), "MMM d, yyyy");
+  } else if (isTrialActive && trialEndDate) {
+    nextBillingDate = format(trialEndDate, "MMM d, yyyy");
+  } else {
+    nextBillingDate = format(endOfMonth(new Date()), "MMM d, yyyy");
   }
-
-  // Fallback to end of the month if no date provided, or format real date
-  const nextBillingDate = tenant?.currentPeriodEnd
-    ? format(parseISO(tenant.currentPeriodEnd), "MMM d, yyyy")
-    : format(endOfMonth(fallbackDate), "MMM d, yyyy");
 
   return (
     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden w-full">
@@ -230,6 +235,51 @@ const BillingSection = () => {
             </Button>
           )}
         </div>
+
+        {/* Invoice History */}
+        {invoices.length > 0 && (
+          <div className="pt-8 border-t border-slate-100">
+            <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-slate-400" />
+              Invoice History
+            </h3>
+            <div className="rounded-xl border border-slate-200 overflow-hidden">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-medium">
+                  <tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Amount</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Receipt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {invoices.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3">{format(parseISO(inv.date.substring(0, 10)), "MMM d, yyyy")}</td>
+                      <td className="px-4 py-3">${inv.amount.toFixed(2)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${inv.status === 'paid' ? 'bg-green-100 text-green-700' :
+                            inv.status === 'open' ? 'bg-blue-100 text-blue-700' :
+                              'bg-slate-100 text-slate-700'
+                          }`}>
+                          {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {inv.receiptUrl && (
+                          <a href={inv.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 font-medium flex items-center justify-end gap-1">
+                            <ExternalLink className="w-4 h-4" /> View
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
