@@ -33,6 +33,7 @@ import HistoryTrucks from "./pages/HistoryTrucks";
 import RepairHistoryPage from "./pages/RepairHistoryPage";
 
 import UpcomingMaintenance from "./pages/UpcomingMaintenance";
+import MaintenancePredictionsPage from "./pages/maintenance/MaintenancePredictionsPage";
 import InspectionsPage from "./pages/InspectionsPage";
 import ShopsPage from "./pages/ShopsPage";
 import ShopMap from "./pages/ShopMap";
@@ -275,6 +276,7 @@ const App = () => (
 
                               <Route path="/service/:id" element={<ServiceRecordDetailPage />} />
                               <Route path="/maintenance/upcoming" element={<UpcomingMaintenance />} />
+                              <Route path="/maintenance/predictions" element={<MaintenancePredictionsPage />} />
                               <Route path="/inspections" element={<InspectionsPage />} />
                               <Route path="/shops" element={<ShopsPage />} />
                               <Route path="/shops/:id" element={<ShopDetailView />} />
