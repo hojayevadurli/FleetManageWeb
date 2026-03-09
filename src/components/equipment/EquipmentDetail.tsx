@@ -37,6 +37,8 @@ import {
 import { Equipment, EquipmentOperationalStatus, WorkOrder, ChatMessage, Warranty, EquipmentDocRole, DocumentRole } from '@/lib/types';
 import { getEquipmentChatResponse } from '@/lib/gemini';
 import SpendAnalytics from './SpendAnalytics';
+import { getMaintenancePredictions, getRiskLevelText } from '@/lib/maintenanceApi';
+import type { PredictedMaintenanceEvent } from '@/types/maintenance';
 
 interface ExtendedChatMessage extends ChatMessage {
     sources?: any[];
@@ -96,6 +98,30 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     }, [sessions, currentSessionId]);
 
     const [isLoaded, setIsLoaded] = useState(false);
+
+    const [predictions, setPredictions] = useState<PredictedMaintenanceEvent[]>([]);
+    const [loadingPredictions, setLoadingPredictions] = useState(false);
+
+    useEffect(() => {
+        let mounted = true;
+        const loadPredictions = async () => {
+            if (!equipment?.id) return;
+            try {
+                setLoadingPredictions(true);
+                const data = await getMaintenancePredictions({
+                    equipmentId: equipment.id,
+                    take: 5,
+                });
+                if (mounted) setPredictions(data);
+            } catch (err) {
+                console.error('Failed to load predictions for equipment', err);
+            } finally {
+                if (mounted) setLoadingPredictions(false);
+            }
+        };
+        void loadPredictions();
+        return () => { mounted = false; };
+    }, [equipment?.id]);
 
     // PERSISTENCE: Save/Load Sessions
     useEffect(() => {
@@ -623,12 +649,60 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                         {/* Left as placeholder/commented out to match original file state if desired, or kept simplified */}
 
                         {/* Bottom Row: Predictive */}
-                        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm p-24 text-center">
-                            <div className="bg-slate-50 w-24 h-24 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
-                                <Cpu className="w-12 h-12 text-slate-300" />
+                        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm p-10 mt-8">
+                            <div className="flex items-center gap-4 mb-8">
+                                <div className="bg-blue-50 w-12 h-12 rounded-[1rem] flex items-center justify-center shadow-inner">
+                                    <Cpu className="w-6 h-6 text-blue-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900">Predictive Uptime Metrics</h3>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">AI-driven maintenance forecasting</p>
+                                </div>
                             </div>
-                            <h3 className="text-xl font-black text-slate-900 mb-2">Predictive Uptime Metrics</h3>
-                            <p className="text-slate-500 font-medium max-w-md mx-auto">Asset durability scoring and maintenance forecasting models are currently calibrating.</p>
+
+                            {loadingPredictions ? (
+                                <div className="text-center py-10 opacity-50">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-400 mx-auto mb-4"></div>
+                                    <p className="text-xs font-bold text-slate-400">Calibrating models...</p>
+                                </div>
+                            ) : predictions.length === 0 ? (
+                                <div className="text-center py-10 opacity-50">
+                                    <div className="bg-emerald-50 w-16 h-16 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4">
+                                        <ShieldCheck className="w-8 h-8 text-emerald-400" />
+                                    </div>
+                                    <p className="text-sm font-bold text-slate-500">No predictions found.</p>
+                                    <p className="text-xs text-slate-400 mt-1">This unit is currently operating without any high-risk forecast patterns.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {predictions.map((pred) => (
+                                        <div key={pred.id} className="relative group bg-slate-50 rounded-2xl p-6 border border-slate-200/60 hover:border-blue-200 hover:shadow-md transition-all">
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest ${pred.urgency === 'critical' ? 'bg-rose-100 text-rose-700' :
+                                                    pred.urgency === 'high' ? 'bg-amber-100 text-amber-700' :
+                                                        pred.urgency === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-emerald-100 text-emerald-700'
+                                                    }`}>
+                                                    {pred.urgency} Risk
+                                                </div>
+                                                <div className="text-xs font-bold text-slate-400">Risk: {getRiskLevelText(pred.riskScore)}</div>
+                                            </div>
+                                            <h4 className="font-black text-slate-900 text-lg leading-tight mb-2">{pred.title}</h4>
+                                            <p className="text-sm text-slate-600 font-medium line-clamp-2 mb-4">{pred.description}</p>
+
+                                            <div className="space-y-2 mt-auto pt-4 border-t border-slate-100">
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="text-slate-500 font-bold uppercase tracking-wider">Est. Cost</span>
+                                                    <span className="font-black text-slate-900">${pred.estimatedRepairCost?.toLocaleString() ?? '—'}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="text-slate-500 font-bold uppercase tracking-wider">Pot. Savings</span>
+                                                    <span className="font-black text-emerald-600">${pred.estimatedSavings?.toLocaleString() ?? '—'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

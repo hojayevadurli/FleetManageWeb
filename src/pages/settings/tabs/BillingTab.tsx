@@ -1,7 +1,6 @@
 
 import BillingSection from "@/components/account/BillingSection";
 import { PaymentMethodsSection } from "@/components/account/PaymentMethodsSection";
-import { BillingHistorySection } from "@/components/account/BillingHistorySection";
 import { BillingAddressSection } from "@/components/account/BillingAddressSection";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { AlertCircle } from "lucide-react";
@@ -25,8 +24,6 @@ const BillingTab = () => {
             )}
 
             <BillingSection />
-
-            <BillingHistorySection />
 
             <BillingAddressSection />
         </div>

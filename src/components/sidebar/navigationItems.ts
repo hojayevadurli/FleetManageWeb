@@ -52,6 +52,13 @@ export const navigationItems: NavigationConfig = [
     url: "/app/service",
     icon: ClipboardList,
   },
+  /* temporarily disable predictions menu
+  {
+    title: "Predictions",
+    url: "/app/maintenance/predictions",
+    icon: BarChart3,
+  },
+  */
   {
     title: "Shops List",
     url: "/app/shops",

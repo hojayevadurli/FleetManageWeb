@@ -7,6 +7,8 @@ import AIPMLogicStreamWidget from './AIPMLogicStreamWidget';
 import WorkOrderStatusWidget from './WorkOrderStatusWidget';
 import MostUsedShopsWidget from './MostUsedShopsWidget';
 import PartsVsLaborWidget from './PartsVsLaborWidget';
+import { getMaintenancePredictions } from '@/lib/maintenanceApi';
+import type { PredictedMaintenanceEvent } from '@/types/maintenance';
 
 interface DashboardProps {
     equipment: Equipment[];
@@ -16,6 +18,22 @@ interface DashboardProps {
 }
 
 const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, serviceRecords, onTabChange }) => {
+    const [predictions, setPredictions] = React.useState<PredictedMaintenanceEvent[]>([]);
+
+    React.useEffect(() => {
+        let mounted = true;
+        const loadPredictions = async () => {
+            try {
+                const data = await getMaintenancePredictions({ take: 10 });
+                if (mounted) setPredictions(data);
+            } catch (err) {
+                console.error('Failed to load predictions for dashboard', err);
+            }
+        };
+        void loadPredictions();
+        return () => { mounted = false; };
+    }, []);
+
     const totalFleet = equipment.length;
     const getStatus = (e: Equipment) => {
         const s = e.status;
@@ -176,11 +194,10 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
 
                 <div className="space-y-6">
                     <AIPMLogicStreamWidget
-                        equipment={equipment}
-                        workOrders={workOrders}
-                        serviceRecords={serviceRecords}
+                        predictions={predictions}
                     />
 
+                    {/* AI Log Stream Component Temporarily Hidden
                     <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col">
                         <div className="mb-8">
                             <h3 className="font-black text-slate-900 text-xl tracking-tight">AI Log Stream</h3>
@@ -234,7 +251,8 @@ const AnalyticsDashboard: React.FC<DashboardProps> = ({ equipment, workOrders, s
                         >
                             View All Audits
                         </button>
-                    </div>
+                    </div> 
+                    */}
                 </div>
             </div>
         </div>
