@@ -1,11 +1,10 @@
 import VehicleManager from "@/components/VehicleManager";
-import { Page } from "@/components/layout/Page";
 
 const Equipment = () => {
     return (
-        <Page>
+        <div className="flex-1 w-full h-full bg-slate-50">
             <VehicleManager />
-        </Page>
+        </div>
     );
 };
 

@@ -378,7 +378,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                                         <div>
                                             <p className="text-sm font-black text-slate-800 line-clamp-1">{e.year} {e.make} {e.model}</p>
                                             <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
-                                                <span className="font-mono">VIN: {e.vin.slice(-8)}</span>
+                                                <span className="font-mono">VIN: {e.vin ? e.vin.slice(-8) : 'N/A'}</span>
                                             </div>
                                             {e.assignedOperatorName && (
                                                 <div className="flex items-center gap-1.5 mt-2 p-1.5 bg-blue-50/50 rounded-lg w-fit border border-blue-100/50">

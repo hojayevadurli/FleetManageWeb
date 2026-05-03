@@ -1,64 +1,81 @@
-import { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet-async';
-import { IntegrationCard } from '@/components/integrations/IntegrationCard';
-import { MotiveConnectModal } from '@/components/integrations/MotiveConnectModal';
-import { MotiveManageModal } from '@/components/integrations/MotiveManageModal';
-import { integrationService, IntegrationStatus, IntegrationProvider } from '@/services/integrationService';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect, useCallback } from "react";
+import { Helmet } from "react-helmet-async";
+import { IntegrationCard } from "@/components/integrations/IntegrationCard";
+import { MotiveConnectModal } from "@/components/integrations/MotiveConnectModal";
+import { MotiveManageModal } from "@/components/integrations/MotiveManageModal";
+import { integrationService } from "@/services/integrationService";
+import { IntegrationStatus, IntegrationProvider } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+type CardStatus = "Connected" | "Disconnected" | "ComingSoon" | "Error" | "Connecting";
 
 const IntegrationsPage = () => {
     const [integrations, setIntegrations] = useState<IntegrationStatus[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [retrying, setRetrying] = useState(false);
 
-    // Modals state
     const [motiveConnectOpen, setMotiveConnectOpen] = useState(false);
     const [motiveManageOpen, setMotiveManageOpen] = useState(false);
 
     const { toast } = useToast();
 
-    const fetchIntegrations = async () => {
+    const fetchIntegrations = useCallback(async (showToastOnError = true) => {
         setLoading(true);
         setError(false);
+
         try {
             const data = await integrationService.getIntegrations();
-            setIntegrations(data);
+            setIntegrations(Array.isArray(data) ? data : []);
         } catch (e) {
             console.error("Failed to load integrations", e);
             setError(true);
-            toast({
-                title: "Error",
-                description: "Failed to load integration status.",
-                variant: "destructive"
-            });
+
+            if (showToastOnError) {
+                toast({
+                    title: "Error",
+                    description: "Failed to load integration status.",
+                    variant: "destructive",
+                });
+            }
         } finally {
             setLoading(false);
         }
-    };
+    }, [toast]);
 
-    const refreshSilent = async () => {
+    const handleRetry = async () => {
+        setRetrying(true);
         try {
-            const data = await integrationService.getIntegrations();
-            setIntegrations(data);
-        } catch (e) {
-            console.error("Silent refresh failed", e);
+            await fetchIntegrations(true);
+        } finally {
+            setRetrying(false);
         }
     };
 
-    useEffect(() => {
-        fetchIntegrations();
+    const refreshSilent = useCallback(async () => {
+        try {
+            const data = await integrationService.getIntegrations();
+            setIntegrations(Array.isArray(data) ? data : []);
+            setError(false);
+        } catch (e) {
+            console.error("Silent refresh failed", e);
+        }
     }, []);
 
+    useEffect(() => {
+        fetchIntegrations(true);
+    }, [fetchIntegrations]);
+
     const handleConnect = (provider: IntegrationProvider) => {
-        if (provider === 'Motive') {
+        if (provider === "Motive") {
             setMotiveConnectOpen(true);
         }
     };
 
     const handleManage = (provider: IntegrationProvider) => {
-        if (provider === 'Motive') {
+        if (provider === "Motive") {
             setMotiveManageOpen(true);
         }
     };
@@ -71,32 +88,49 @@ const IntegrationsPage = () => {
     };
 
     const getIntegration = (provider: IntegrationProvider) => {
-        return integrations.find(i => i.provider === provider);
+        return integrations.find((i) => i.provider === provider);
     };
 
-    const getStatus = (provider: IntegrationProvider) => {
-        const int = getIntegration(provider);
-        return int?.status || 'Disconnected';
+    const normalizeStatus = (status?: string): CardStatus => {
+        switch (status) {
+            case "Connected":
+            case "Disconnected":
+            case "ComingSoon":
+            case "Error":
+            case "Connecting":
+                return status;
+            default:
+                return "Disconnected";
+        }
+    };
+
+    const getStatus = (provider: IntegrationProvider): CardStatus => {
+        const integration = getIntegration(provider);
+        return normalizeStatus(integration?.status);
     };
 
     if (loading && integrations.length === 0) {
         return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <div className="flex min-h-[400px] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
             </div>
         );
     }
 
     if (error && integrations.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-                <AlertCircle className="w-12 h-12 text-rose-500" />
+            <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
+                <AlertCircle className="h-12 w-12 text-rose-500" />
                 <div className="text-center">
                     <h3 className="text-lg font-bold text-slate-900">Failed to load integrations</h3>
                     <p className="text-slate-500">We couldn't connect to the server.</p>
                 </div>
-                <Button onClick={fetchIntegrations} variant="outline" className="gap-2">
-                    <RefreshCw className="w-4 h-4" />
+                <Button onClick={handleRetry} variant="outline" className="gap-2" disabled={retrying}>
+                    {retrying ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <RefreshCw className="h-4 w-4" />
+                    )}
                     Retry
                 </Button>
             </div>
@@ -109,42 +143,42 @@ const IntegrationsPage = () => {
                 <title>Integrations | FleetManage</title>
             </Helmet>
 
-            <div className="space-y-8 max-w-7xl mx-auto">
+            <div className="mx-auto max-w-7xl space-y-8">
                 <div className="flex flex-col gap-2">
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Integrations</h1>
-                    <p className="text-slate-500 text-lg">Connect FleetManage with external systems to automate operations.</p>
+                    <h1 className="text-3xl font-black tracking-tight text-slate-900">Integrations</h1>
+                    <p className="text-lg text-slate-500">
+                        Connect FleetManage with external systems to automate operations.
+                    </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* Motive Card */}
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                     <IntegrationCard
-                        logo="https://assets.website-files.com/62a8d672221c9b68627730e6/62b4065633a6972e25902099_Motive-Logo.svg"
+                        logo="/motive-logo.png"
                         name="Motive"
                         description="Sync vehicles, locations, odometer, fuel %, engine hours, and driver assignment from Motive."
-                        status="ComingSoon"
-                        onNotifyMe={() => handleNotifyMe('Motive')}
+                        status={getStatus("Motive")}
+                        onConnect={() => handleConnect("Motive")}
+                        onManage={() => handleManage("Motive")}
+                        onNotifyMe={() => handleNotifyMe("Motive")}
                     />
 
-                    {/* TAFS Card */}
                     <IntegrationCard
-                        logo="https://tafs.com/wp-content/uploads/2020/07/TAFS-Logo-2020.png"
+                        logo="/tafs-logo.png"
                         name="TAFS"
                         description="Automatically export all invoices to TAFS."
                         status="ComingSoon"
-                        onNotifyMe={() => handleNotifyMe('TAFS')}
+                        onNotifyMe={() => handleNotifyMe("TAFS")}
                     />
 
-                    {/* WEX Card */}
                     <IntegrationCard
-                        logo="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/WEX_Inc._logo.svg/2560px-WEX_Inc._logo.svg.png"
+                        logo="/wex-logo.png"
                         name="WEX (EFS)"
                         description="Automatically import all EFS fuel transactions from WEX."
                         status="ComingSoon"
-                        onNotifyMe={() => handleNotifyMe('WEX')}
+                        onNotifyMe={() => handleNotifyMe("WEX")}
                     />
                 </div>
 
-                {/* Modals */}
                 <MotiveConnectModal
                     open={motiveConnectOpen}
                     onOpenChange={setMotiveConnectOpen}
@@ -154,7 +188,7 @@ const IntegrationsPage = () => {
                 <MotiveManageModal
                     open={motiveManageOpen}
                     onOpenChange={setMotiveManageOpen}
-                    integration={getIntegration('Motive')}
+                    integration={getIntegration("Motive")}
                     onRefresh={refreshSilent}
                 />
             </div>

@@ -1,6 +1,12 @@
 import api from "@/lib/Api";
 import { Integration } from "@/lib/types";
 
+type MotiveImportDefaults = {
+    defaultFleetCategoryId: number | null;
+    defaultEquipmentTypeId: number | null;
+    defaultOperationalStatus: number | null;
+};
+
 // Mock data as fallback
 const MOCK_INTEGRATIONS: Integration[] = [
     {
@@ -9,10 +15,10 @@ const MOCK_INTEGRATIONS: Integration[] = [
         status: "Disconnected",
         lastSync: null,
         vehicleCount: 0,
-        apiKey: "", // Start empty
+        apiKey: "",
     },
     {
-        id: "2", // Samsara
+        id: "2",
         provider: "Samsara",
         status: "Disconnected",
         lastSync: null,
@@ -24,23 +30,38 @@ const MOCK_INTEGRATIONS: Integration[] = [
 export const integrationService = {
     getIntegrations: async (): Promise<Integration[]> => {
         try {
-            const response = await api.get("/integrations");
-            // Merge generic list with our known providers to ensure UI shows available options
-            const backendIntegrations = response.data as Integration[];
+            const response = await api.get("/integrations/motive/status");
 
-            return MOCK_INTEGRATIONS.map(mock => {
-                const found = backendIntegrations.find(b => b.provider === mock.provider);
+            let backendIntegrations: any[] = [];
+            if (Array.isArray(response.data)) {
+                backendIntegrations = response.data.map((item: any) => ({
+                    ...item,
+                    provider: item.provider || "Motive",
+                }));
+            } else if (response.data && typeof response.data === "object") {
+                backendIntegrations = [
+                    {
+                        ...response.data,
+                        provider: response.data.provider || "Motive",
+                    },
+                ];
+            }
+
+            return MOCK_INTEGRATIONS.map((mock) => {
+                const found = backendIntegrations.find((b) => b.provider === mock.provider);
+
                 if (found) {
                     return {
                         ...mock,
-                        ...found,
-                        id: found.id || mock.id, // Use backend ID if available
-                        status: found.status || "Connected", // If returned, it's likely connected
-                        apiKey: found.apiKeyEncrypted ? "********" : "", // Mask key
-                        lastSync: found.lastSyncAt ? new Date(found.lastSyncAt) : null,
-                        vehicleCount: found.vehicleCount || 0
+                        id: found.id || mock.id,
+                        provider: mock.provider,
+                        status: found.isConnected ? "Connected" : "Disconnected",
+                        apiKey: found.isConnected ? "********" : "",
+                        lastSync: found.lastSyncedAt ? new Date(found.lastSyncedAt) : null,
+                        vehicleCount: found.vehicleCount || 0,
                     };
                 }
+
                 return mock;
             });
         } catch (error) {
@@ -49,56 +70,118 @@ export const integrationService = {
         }
     },
 
-    connectMotive: async (apiKey: string, accountId?: string): Promise<Integration> => {
-        // POST /integrations/connect
-        const response = await api.post("/integrations/connect", {
+    connectMotive: async (
+        apiKey: string,
+        accountId?: string
+    ): Promise<{ success: boolean }> => {
+        const response = await api.post("/integrations/motive/connect", {
             provider: "Motive",
             apiKey,
-            accountId
+            accountId,
         });
+
         return response.data;
     },
 
     disconnect: async (provider: string): Promise<void> => {
-        // Not implemented on backend yet, just mock
         console.log(`Disconnecting ${provider}...`);
     },
 
-    syncMotive: async (): Promise<{ success: boolean; vehiclesSynced: number; message?: string }> => {
+    syncMotive: async (): Promise<any> => {
         try {
-            const response = await api.post("/integrations/motive/sync");
+            const response = await api.post("/integrations/motive/sync-driver-location-odometer");
             return response.data;
         } catch (error: any) {
             console.error("Sync failed:", error);
+
             if (error.response?.data) {
-                const { errorCode, message, error: errorTitle } = error.response.data;
-                throw new Error(message || errorTitle || "Unknown sync error");
+                const { message, error: errorTitle, detail } = error.response.data;
+                throw new Error(detail || message || errorTitle || "Unknown sync error");
             }
+
             throw error;
         }
     },
 
-    // Kept for testing if needed, but syncMotive is preferred
     testMotiveConnection: async (apiKey: string, accountId?: string): Promise<boolean> => {
-        // We can reuse connect endpoint or just try to sync?
-        // Let's use connect as test.
         try {
-            await api.post("/integrations/connect", {
-                provider: 'Motive',
+            const response = await api.post("/integrations/motive/test", {
+                provider: "Motive",
                 apiKey,
-                accountId
+                accountId,
             });
-            return true;
-        } catch (e) {
+
+            return !!response.data?.success;
+        } catch {
             return false;
         }
     },
 
-    getMotiveVehicles: async () => {
-        // This is likely replaced by syncMotive which updates DB, 
-        // then we fetch from Equipment? 
-        // Or this could specific endpoint.
-        // For now, let's assume we rely on sync.
-        return [];
-    }
+    syncMotiveVehicles: async (): Promise<{ created: number; updated: number }> => {
+        try {
+            const response = await api.post("/integrations/motive/sync-vehicles");
+            return response.data;
+        } catch (error: any) {
+            console.error("Vehicle sync failed:", error);
+
+            if (error.response?.data) {
+                const { message, error: errorTitle, detail } = error.response.data;
+                throw new Error(detail || message || errorTitle || "Could not sync vehicles");
+            }
+
+            throw error;
+        }
+    },
+
+    getMotiveVehicles: async (): Promise<{ created: number; updated: number }> => {
+        return integrationService.syncMotiveVehicles();
+    },
+
+    getMotiveImportDefaults: async (): Promise<MotiveImportDefaults> => {
+        try {
+            const response = await api.get("/integrations/motive/import-defaults");
+            return {
+                defaultFleetCategoryId: response.data?.defaultFleetCategoryId ?? null,
+                defaultEquipmentTypeId: response.data?.defaultEquipmentTypeId ?? null,
+                defaultOperationalStatus: response.data?.defaultOperationalStatus ?? null,
+            };
+        } catch (error: any) {
+            console.error("Failed to load Motive import defaults:", error);
+
+            if (error.response?.data) {
+                const { message, error: errorTitle, detail } = error.response.data;
+                throw new Error(detail || message || errorTitle || "Could not load import defaults");
+            }
+
+            throw error;
+        }
+    },
+
+    saveMotiveImportDefaults: async (payload: {
+        defaultFleetCategoryId: number;
+        defaultEquipmentTypeId: number;
+        defaultOperationalStatus: number;
+    }): Promise<{ success: boolean }> => {
+        try {
+            const response = await api.post("/integrations/motive/import-defaults", payload);
+            return response.data;
+        } catch (error: any) {
+            console.error("Failed to save Motive import defaults:", error);
+
+            if (error.response?.data) {
+                const { message, error: errorTitle, detail } = error.response.data;
+                throw new Error(detail || message || errorTitle || "Could not save import defaults");
+            }
+
+            throw error;
+        }
+    },
+
+    saveMotiveMappings: async (mappings: any[]): Promise<void> => {
+        try {
+            await api.post("/integrations/motive/save-mappings", mappings);
+        } catch {
+            console.log("No backend save mapping endpoint implemented yet. Ignoring error.");
+        }
+    },
 };

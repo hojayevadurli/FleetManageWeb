@@ -10,8 +10,8 @@ import { toast } from "sonner";
 import VehicleSelector from "./VehicleSelector";
 import { useRef } from "react";
 import { Loader2, Sparkles, Upload, Trash2, X, Check, ChevronsUpDown } from "lucide-react";
-import { parseReceipt } from "@/lib/gemini";
-import { ReceiptParsedData, Vendor } from "@/lib/types";
+import { aiApi, ParsedInvoiceResult } from "@/lib/aiApi";
+import { Vendor } from "@/lib/types";
 import { shopsApi } from "@/lib/shopsApi";
 import { cn } from "@/lib/utils";
 import {
@@ -204,82 +204,100 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
     }
   };
 
-  const processAIParsing = async (file: File, base64: string) => {
+  const processAIParsing = async (file: File) => {
     setIsParsingReceipt(true);
     try {
-      const result: ReceiptParsedData | null = await parseReceipt(base64, file.type);
-      if (result && result.items) {
-        const newItems = result.items
-          .filter(it => {
-            const desc = (it.description || "").toLowerCase();
-            return !desc.includes("subtotal") &&
-              !desc.includes("total") &&
-              !desc.includes("amount due") &&
-              !desc.includes("balance due") &&
-              !desc.includes("taxable") &&
-              !desc.includes("non-taxable");
-          })
-          .map(it => ({
-            description: it.description,
-            price: it.cost || 0,
-            quantity: 1
-          }));
+      const result = await aiApi.parseInvoiceFile(file);
 
-        // Check if there is a discrepancy between items total and receipt total (usually Tax/Fees)
-        if (result.total) {
-          const itemsTotal = newItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-          const diff = result.total - itemsTotal;
+      const rawItems = result.lineItems?.length
+        ? result.lineItems.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          amount: item.amount,
+        }))
+        : []; // AI API lineItems is standard
 
-          // If difference is significant (positive), add as Tax/Fees
-          if (diff > 0.05) {
-            newItems.push({
-              description: "Tax / Fees",
-              price: parseFloat(diff.toFixed(2)),
-              quantity: 1
-            });
-          }
-        }
+      const newItems = rawItems
+        .filter((item) => {
+          const description = (item.description || "").toLowerCase();
+          return (
+            description &&
+            !description.includes("subtotal") &&
+            !description.includes("grand total") &&
+            !description.includes("total") &&
+            !description.includes("amount due") &&
+            !description.includes("balance due") &&
+            !description.includes("taxable") &&
+            !description.includes("non-taxable")
+          );
+        })
+        .map((item) => {
+          const quantity = (item.quantity || 1) as number;
+          const amount = (item.amount ?? 0) as number;
+          const unitPrice = (item.unitPrice || 0) as number;
+          const price = unitPrice || (amount && quantity ? amount / quantity : amount);
 
-        if (newItems.length === 0) {
-          toast.warning("AI Scan: No valid items found after filtering.");
-        } else {
-          setWorkOrderItems(newItems);
-          toast.success(`AI Scan: Populated ${newItems.length} items from receipt.`);
-        }
+          return {
+            description: item.description || "Invoice item",
+            price: Number((price || 0).toFixed(2)),
+            quantity,
+          };
+        });
 
-        // Optional: Auto-fill date if missing
-        if (result.date && !editData.service_date) {
-          setEditData(prev => ({ ...prev, service_date: result.date || prev.service_date }));
-        }
+      const invoiceTotal = result.total || 0;
+      if (invoiceTotal > 0 && newItems.length > 0) {
+        const itemsTotal = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const diff = invoiceTotal - itemsTotal;
 
-        // Auto-fill Vendor Name
-        if (result.businessName) {
-          const match = vendors.find(v => {
-            const includesMatch = v.name.toLowerCase().includes(result.businessName!.toLowerCase()) || result.businessName!.toLowerCase().includes(v.name.toLowerCase());
-            if (includesMatch) {
-              const parsedCity = result.businessAddress?.city?.toLowerCase()?.trim();
-              const vendorCity = v.city?.toLowerCase()?.trim();
-              if (parsedCity && vendorCity && parsedCity !== vendorCity) {
-                return false;
-              }
-              return true;
-            }
-            return false;
+        if (diff > 0.05) {
+          newItems.push({
+            description: "Tax / Fees",
+            price: Number(diff.toFixed(2)),
+            quantity: 1,
           });
-          if (match) {
-            setEditData(prev => ({ ...prev, vendor_id: match.id, vendor_name: match.name }));
-            toast.success(`AI Match: Vendor found "${match.name}"`);
-          } else {
-            // If no match, we could stick the raw name somewhere or just warn. 
-            // For now, let's just toast
-            toast.info(`AI: Extracted vendor "${result.businessName}" (No direct match)`);
-            setEditData(prev => ({ ...prev, vendor_name: result.businessName || "", vendor_id: null })); // Keep raw name
-          }
         }
-      } else {
-        toast.error("AI Scan: Could not extract data from this file.");
       }
-    } catch (err) {
+
+      if (newItems.length > 0) {
+        setWorkOrderItems(newItems);
+        toast.success(`AI Scan: ${newItems.length} line items added.`);
+      } else {
+        toast.warning("AI Scan completed, but no valid line items were found.");
+      }
+
+      const serviceDate = result.invoiceDate;
+      if (serviceDate) {
+        setEditData((prev) => ({
+          ...prev,
+          service_date: new Date(serviceDate).toISOString().slice(0, 10),
+        }));
+      }
+
+      const mileage = result.mileage;
+      if (mileage) {
+        setEditData((prev) => ({
+          ...prev,
+          odometer: String(mileage),
+        }));
+      }
+
+      if (result.vendorName) {
+        const vendorName = result.vendorName;
+        const match = vendors.find(v => {
+          const includesMatch = v.name.toLowerCase().includes(vendorName.toLowerCase()) || vendorName.toLowerCase().includes(v.name.toLowerCase());
+          return includesMatch;
+        });
+
+        if (match) {
+          setEditData(prev => ({ ...prev, vendor_id: match.id, vendor_name: match.name }));
+          toast.success(`AI Match: Vendor found "${match.name}"`);
+        } else {
+          toast.info(`AI: Extracted vendor "${vendorName}" (No direct match)`);
+          setEditData(prev => ({ ...prev, vendor_name: vendorName, vendor_id: null }));
+        }
+      }
+    } catch (err: unknown) {
       console.error(err);
       toast.error("AI parsing failed");
     } finally {
@@ -302,7 +320,7 @@ const EditWorkOrderDialog = ({ workOrder, open, onOpenChange, onWorkOrderUpdated
       setPreviewType(file.type.includes('pdf') ? 'pdf' : 'image');
 
       if (file.type.includes('image') || file.type.includes('pdf')) {
-        await processAIParsing(file, base64);
+        await processAIParsing(file);
       }
     };
     reader.readAsDataURL(file);

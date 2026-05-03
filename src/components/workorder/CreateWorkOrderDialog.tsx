@@ -9,8 +9,8 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { Loader2, Sparkles, Upload, Trash2, Check, ChevronsUpDown, Plus, CheckCircle2 } from "lucide-react";
-import { parseReceipt } from "@/lib/gemini";
-import { ReceiptParsedData, Vendor, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
+import { aiApi, ParsedInvoiceResult } from "@/lib/aiApi";
+import { Vendor, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
 import { ShopFormData } from "@/components/shops/types/ShopTypes";
 import AddShopDialog from "../shops/AddShopDialog";
 import InlineAddShopForm from "../shops/InlineAddShopForm";
@@ -266,8 +266,9 @@ export default function CreateWorkOrderDialog({
         const itemsFromLines = (existingWorkOrder.lines ?? []).map((l) => ({
           description: l.description,
           price: l.unitPrice,
-          quantity: l.qty
-        }));
+          quantity: l.qty,
+          type: (l.type as any) || "misc"
+        })) as WorkOrderItemData[];
         setWorkOrderItems(itemsFromLines);
 
         // Map existing docs to uploadedFileList for display
@@ -656,137 +657,143 @@ export default function CreateWorkOrderDialog({
     return similarity >= threshold;
   };
 
-  const processAIParsing = async (file: File, base64: string) => {
+  const processAIParsing = async (file: File) => {
     setIsParsingReceipt(true);
+
     try {
-      const result: ReceiptParsedData | null = await parseReceipt(base64, file.type);
-      if (result && result.items) {
-        const newItems = result.items
-          .filter(it => {
-            const desc = (it.description || "").toLowerCase();
-            return !desc.includes("subtotal") &&
-              !desc.includes("total") &&
-              !desc.includes("amount due") &&
-              !desc.includes("balance due") &&
-              !desc.includes("taxable") &&
-              !desc.includes("non-taxable");
-          })
-          .map(it => ({
-            description: it.description,
-            price: it.cost || 0,
-            quantity: 1
+      const result: ParsedInvoiceResult = await aiApi.parseInvoiceFile(file);
+
+      const parsedItems = result.lineItems ?? (result as any).items ?? [];
+
+      if (!result || parsedItems.length === 0) {
+        toast.error("AI Scan: Could not extract line items from this file.");
+        return;
+      }
+
+      const newItems = parsedItems
+        .filter((it: any) => {
+          const desc = (it.description || it.name || "").toLowerCase();
+
+          return (
+            desc &&
+            !desc.includes("subtotal") &&
+            !desc.includes("total") &&
+            !desc.includes("amount due") &&
+            !desc.includes("balance due") &&
+            !desc.includes("taxable") &&
+            !desc.includes("non-taxable")
+          );
+        })
+        .map((it: any) => {
+          const quantity = it.quantity ?? it.qty ?? 1;
+
+          const price =
+            it.rate ??
+            it.unitPrice ??
+            it.amount ??
+            it.total ??
+            0;
+
+          return {
+            description: it.description ?? it.name ?? "",
+            price,
+            quantity,
+            type: (it.lineType as any) || "misc",
+          };
+        }) as WorkOrderItemData[];
+
+      if (result.total) {
+        const itemsTotal = newItems.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        );
+
+        const diff = result.total - itemsTotal;
+
+        if (diff > 0.05) {
+          newItems.push({
+            description: "Tax / Fees",
+            price: parseFloat(diff.toFixed(2)),
+            quantity: 1,
+            type: "tax" as any,
+          });
+        }
+      }
+
+      if (newItems.length === 0) {
+        toast.warning("AI Scan: No valid items found after filtering.");
+      } else {
+        setWorkOrderItems(newItems);
+        toast.success(`AI Scan: Added ${newItems.length} items.`);
+      }
+
+      if (result.invoiceDate) {
+        setNewWorkOrder((prev) => ({
+          ...prev,
+          service_date: result.invoiceDate!,
+        }));
+      }
+
+      const detectedOdometer = result.mileage ?? (result as any).odometer;
+
+      if (detectedOdometer) {
+        setNewWorkOrder((prev) => ({
+          ...prev,
+          odometer: detectedOdometer.toString(),
+        }));
+      }
+
+      const detectedVendorName = result.vendorName ?? (result as any).vendor;
+
+      if (detectedVendorName) {
+        const match = vendors.find((v) => {
+          const vendorName = v.name.toLowerCase();
+          const detected = detectedVendorName.toLowerCase();
+
+          const includesMatch =
+            vendorName.includes(detected) || detected.includes(vendorName);
+
+          const isFuzzy = fuzzyMatch(detectedVendorName, v.name, 0.75);
+
+          return includesMatch || isFuzzy;
+        });
+
+        if (match) {
+          setNewWorkOrder((prev) => ({
+            ...prev,
+            vendor_id: match.id,
+            vendor_name: match.name,
           }));
 
-        // Check if there is a discrepancy between items total and receipt total (usually Tax/Fees)
-        if (result.total) {
-          const itemsTotal = newItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-          const diff = result.total - itemsTotal;
-
-          // If difference is significant (positive), add as Tax/Fees
-          if (diff > 0.05) {
-            newItems.push({
-              description: "Tax / Fees",
-              price: parseFloat(diff.toFixed(2)),
-              quantity: 1
-            });
-          }
-        }
-
-        if (newItems.length === 0) {
-          toast.warning("AI Scan: No valid items found after filtering.");
+          setParsedVendorDetails(null);
+          toast.success(`Matched existing shop: ${match.name}`);
         } else {
-          setWorkOrderItems(newItems);
-          toast.success(`AI Scan: List populated with ${newItems.length} items from receipt.`);
-        }
+          setNewWorkOrder((prev) => ({
+            ...prev,
+            vendor_id: null,
+            vendor_name: detectedVendorName,
+          }));
 
-        // Auto-fill Service Date if found
-        if (result.date) {
-          setNewWorkOrder(prev => ({ ...prev, service_date: result.date })); // Ensure format matches input type="date"
-          toast.info(`Service Date updated to ${result.date}`);
-        }
-
-        // Auto-fill Odometer if found (Less common on receipts, but possbile)
-        if (result.odometer) {
-          setNewWorkOrder(prev => ({ ...prev, odometer: result.odometer.toString() }));
-          toast.info(`Odometer detected: ${result.odometer}`);
-        }
-
-        // Auto-fill Vendor Name & Shop Matching Logic
-        if (result.businessName) {
-          const match = vendors.find(v => {
-            // 1. Direct includes match (fallback)
-            const includesMatch = v.name.toLowerCase().includes(result.businessName.toLowerCase()) ||
-              result.businessName.toLowerCase().includes(v.name.toLowerCase());
-
-            // 2. Fuzzy match
-            const isFuzzy = fuzzyMatch(result.businessName, v.name, 0.75); // 75% threshold
-
-            if (includesMatch || isFuzzy) {
-              const parsedCity = result.businessAddress?.city?.toLowerCase()?.trim();
-              const vendorCity = v.city?.toLowerCase()?.trim();
-
-              const parsedState = result.businessAddress?.state?.toLowerCase()?.trim();
-              const vendorState = v.state?.toLowerCase()?.trim();
-
-              if (parsedCity && vendorCity && parsedCity !== vendorCity) {
-                return false; // Different city
-              }
-
-              if (parsedState && vendorState && parsedState !== vendorState) {
-                return false; // Different state
-              }
-
-              // Validate street address if available
-              if (result.businessAddress?.street && v.address) {
-                const incomingStreetNum = result.businessAddress.street.replace(/\D/g, '').trim();
-                const vendorStreetNum = v.address.replace(/\D/g, '').trim();
-
-                // If we have a street number for both, and they differ, they're likely different locations.
-                if (incomingStreetNum && vendorStreetNum && incomingStreetNum !== vendorStreetNum) {
-                  // Check for substring edge cases before definitively failing it
-                  const incomingLower = result.businessAddress.street.toLowerCase();
-                  const vendorLower = v.address.toLowerCase();
-                  if (!incomingLower.includes(vendorLower) && !vendorLower.includes(incomingLower)) {
-                    return false; // Different location of the same chain
-                  }
-                }
-              }
-
-              return true;
-            }
-            return false;
+          setParsedVendorDetails({
+            name: detectedVendorName,
+            street: "",
+            city: "",
+            state: "",
+            zip: "",
+            address: "",
+            phone: "",
+            website: "",
           });
-
-          if (match) {
-            setNewWorkOrder(prev => ({ ...prev, vendor_id: match.id, vendor_name: match.name }));
-            setParsedVendorDetails(null); // Clear manual option if matched
-            toast.success(`✓ Matched existing shop: "${match.name}"`);
-          } else {
-            // 2. New Vendor Detected
-            // toast.info(`🆕 New Vendor Detected: "${result.businessName}"`);
-            setNewWorkOrder(prev => ({ ...prev, vendor_name: result.businessName || "", vendor_id: null }));
-
-            setParsedVendorDetails({
-              name: result.businessName,
-              street: result.businessAddress?.street || "",
-              city: result.businessAddress?.city || "",
-              state: result.businessAddress?.state || "",
-              zip: result.businessAddress?.zip || "",
-              address: `${result.businessAddress?.street || ""} ${result.businessAddress?.city || ""} ${result.businessAddress?.state || ""}`.trim(),
-              phone: result.businessContact?.phone,
-              website: result.businessContact?.website
-            });
-          }
         }
-
-        // Expand attachments section to show the uploaded file
-        setShowOptionalFields(prev => ({ ...prev, attachments: true }));
-      } else {
-        toast.error("AI Scan: Could not extract data from this file.");
       }
+
+      setShowOptionalFields((prev) => ({
+        ...prev,
+        attachments: true,
+      }));
     } catch (err) {
-      console.error(err);
-      toast.error("AI parsing failed");
+      console.error("Backend invoice parsing failed:", err);
+      toast.error("AI parsing failed. Please enter the details manually.");
     } finally {
       setIsParsingReceipt(false);
     }
@@ -794,25 +801,31 @@ export default function CreateWorkOrderDialog({
 
   const handleFileUploadAi = async (file: File) => {
     if (!file) return;
-    // Add to attachments
-    setSelectedFiles(prev => [...prev, file]);
-    toast.info("File uploaded and added to attachments");
 
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const dataUrl = reader.result as string;
-      const base64 = dataUrl.split(',')[1];
+    setSelectedFiles((prev) => [...prev, file]);
+    toast.info("File added to attachments");
 
-      // Set preview
-      setPreviewUrl(dataUrl);
-      setPreviewType(file.type.includes('pdf') ? 'pdf' : 'image');
-      setActivePreviewDoc({ url: dataUrl, type: file.type.includes('pdf') ? 'pdf' : 'image' });
+    const isPdf = file.type.includes("pdf");
+    const isImage = file.type.includes("image");
 
-      if (file.type.includes('image') || file.type.includes('pdf')) {
-        await processAIParsing(file, base64);
-      }
-    };
-    reader.readAsDataURL(file);
+    if (isPdf || isImage) {
+      const reader = new FileReader();
+
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+
+        setPreviewUrl(dataUrl);
+        setPreviewType(isPdf ? "pdf" : "image");
+        setActivePreviewDoc({
+          url: dataUrl,
+          type: isPdf ? "pdf" : "image",
+        });
+      };
+
+      reader.readAsDataURL(file);
+
+      await processAIParsing(file);
+    }
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -822,7 +835,11 @@ export default function CreateWorkOrderDialog({
   };
 
   const hasUnuploadedFiles = selectedFiles.length > 0;
-  const createDisabled = isSubmitting || !newWorkOrder.vehicle_id || (computedLines.length === 0 && !newWorkOrder.description?.trim()) || hasUnuploadedFiles;
+  const createDisabled =
+    isSubmitting ||
+    isUploading ||
+    !newWorkOrder.vehicle_id ||
+    (computedLines.length === 0 && !newWorkOrder.description?.trim());
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -852,7 +869,7 @@ export default function CreateWorkOrderDialog({
             <div className="space-y-6">
 
               {/* 1. QUICK ACTIONS (Upload or Success) */}
-              {(isParsingReceipt || (activePreviewDoc && isParsingReceipt)) ? ( // Show loading state strongly if parsing
+              {activePreviewDoc ? ( // Show loading state strongly if parsing
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 relative overflow-hidden animate-in fade-in slide-in-from-top-2">
                   <div className="flex items-start justify-between relative z-10">
                     <div className="flex gap-4">
@@ -861,8 +878,12 @@ export default function CreateWorkOrderDialog({
                       </div>
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-black text-slate-900 text-lg">Receipt Uploaded</h4>
-                          <Badge className="bg-emerald-200 text-emerald-800 hover:bg-emerald-300 border-0">AI Complete</Badge>
+                          <h4 className="font-black text-slate-900 text-lg">
+                            {isParsingReceipt ? "Scanning Invoice..." : "Receipt Uploaded"}
+                          </h4>
+                          <Badge className="bg-emerald-200 text-emerald-800 hover:bg-emerald-300 border-0">
+                            {isParsingReceipt ? "AI Scanning" : "AI Complete"}
+                          </Badge>
                         </div>
                         <p className="text-sm text-slate-600 font-medium mb-3">{selectedFiles[0]?.name || "Document Scanned"}</p>
 

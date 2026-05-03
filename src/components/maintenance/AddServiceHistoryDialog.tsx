@@ -1,39 +1,52 @@
-
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import AddShopDialog from "@/components/shops/AddShopDialog";
 import InvoiceUpload from "./InvoiceUpload";
 import ServiceHistoryFormFields from "./ServiceHistoryFormFields";
-import { useServiceHistoryForm } from "./hooks/useServiceHistoryForm";
+import { useServiceRecordForm } from "./hooks/useServiceRecordForm";
+import type { ServiceRecord } from "./types/ServiceHistoryTypes";
+
+import { Shop } from "@/components/shops/types/ShopTypes";
 
 interface AddServiceHistoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddRecord: (record: any) => void;
+  onAddRecord: (record: ServiceRecord) => void;
 }
 
-const AddServiceHistoryDialog = ({ open, onOpenChange, onAddRecord }: AddServiceHistoryDialogProps) => {
+const AddServiceHistoryDialog = ({
+  open,
+  onOpenChange,
+  onAddRecord,
+}: AddServiceHistoryDialogProps) => {
   const [isAddShopOpen, setIsAddShopOpen] = useState(false);
+  const [shopRefreshKey, setShopRefreshKey] = useState(0);
 
   const {
     formData,
     isLoading,
-    loadingMessage,
     handleChange,
     handleVehicleChange,
-    handleSubmit
-  } = useServiceHistoryForm(onAddRecord, () => onOpenChange(false));
+    handleSubmit,
+  } = useServiceRecordForm({
+    record: null,
+    open,
+    onUpdateRecord: onAddRecord,
+    onClose: () => onOpenChange(false),
+  });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleShopAdded = (shop?: any) => {
-    if (shop?.id) {
-      handleChange("shop_id", shop.id);
-      // Refresh shops in combobox
-      if ((window as any).refreshShops) {
-        (window as any).refreshShops();
-      }
-    }
+  const handleShopAdded = (shop?: Shop) => {
+    if (!shop?.id) return;
+
+    handleChange("shop_id", String(shop.id));
+    setShopRefreshKey((current) => current + 1);
+    setIsAddShopOpen(false);
   };
 
   return (
@@ -46,6 +59,7 @@ const AddServiceHistoryDialog = ({ open, onOpenChange, onAddRecord }: AddService
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <ServiceHistoryFormFields
+              key={shopRefreshKey}
               formData={formData}
               onFieldChange={handleChange}
               onVehicleChange={handleVehicleChange}
@@ -59,9 +73,15 @@ const AddServiceHistoryDialog = ({ open, onOpenChange, onAddRecord }: AddService
 
             <div className="flex gap-2 pt-4">
               <Button type="submit" className="flex-1" disabled={isLoading}>
-                {isLoading ? (loadingMessage || "Adding...") : "Add Service Record"}
+                {isLoading ? "Saving..." : "Add Service Record"}
               </Button>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isLoading}
+              >
                 Cancel
               </Button>
             </div>
