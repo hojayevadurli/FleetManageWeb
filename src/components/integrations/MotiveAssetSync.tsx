@@ -1,167 +1,355 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, RefreshCw, Save, Check, Link as LinkIcon, AlertCircle } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Loader2, RefreshCw, Truck, Settings2 } from "lucide-react";
 import { integrationService } from "@/services/integrationService";
 import { useToast } from "@/hooks/use-toast";
 
-interface MotiveAssetSyncProps {
-    apiKey?: string; // We might need to ask user for key again if not stored in FE? 
-    // Actually, for "Fetch" via proxy we need the key. 
-    // If backend proxy, we wouldn't. 
-    // PROXY WORKAROUND: We need the key. 
-    // Assumption: We might not have it if it's encrypted on backend.
-    // But usually "Manage" flow assumes backend handles sync.
-    // UX HACK: If we use proxy, we need the key. 
-    // Let's assume for this "Setup" flow we might need to re-enter or it's stored in session?
-    // OR: Use a mocked list if we can't get key.
-    // Wait, user said "Fetch Vehicles from Motive".
-    // If we use /motive-proxy, we need the key client-side.
-    // If the key is hidden server-side, we can't use the proxy without the key.
-    // User Request: "After Motive is connected... Fetch Vehicles".
-    // REALITY: Backend should do this.
-    // WORKAROUND: I will ask user to confirm API Key for this session if missing, 
-    // or just mock the fetch result since I can't decrypt it.
-    // actually, I'll allow inputting the key if it's missing, for the "Setup" session.
-}
+type ImportDefaults = {
+    defaultFleetCategoryId: number | null;
+    defaultEquipmentTypeId: number | null;
+    defaultOperationalStatus: number | null;
+};
+
+const OPERATIONAL_STATUS_OPTIONS = [
+    { value: 0, label: "Active" },
+    { value: 1, label: "In Shop" },
+    { value: 2, label: "Out of Service" },
+];
 
 export function MotiveAssetSync() {
-    const [vehicles, setVehicles] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [apiKey, setApiKey] = useState(""); // Temporary for proxy access
+    const [savingDefaults, setSavingDefaults] = useState(false);
+    const [showDefaultsModal, setShowDefaultsModal] = useState(false);
+
+    const [syncResult, setSyncResult] = useState<{
+        created?: number;
+        updated?: number;
+    } | null>(null);
+
+    const [defaults, setDefaults] = useState<ImportDefaults>({
+        defaultFleetCategoryId: null,
+        defaultEquipmentTypeId: null,
+        defaultOperationalStatus: null,
+    });
+
     const { toast } = useToast();
 
-    // Mock Fleet Assets for auto-linking (since I can't easily fetch them all right now without context)
-    const fleetAssets = [
-        { id: '1', name: 'Truck 101', vin: '1ABC...' }, // Mock
+    // TEMP — replace later with API
+    const fleetCategoryOptions = [
+        { id: 1, name: "Truck" },
+        { id: 2, name: "Trailer" },
+        { id: 3, name: "Bus" },
+        { id: 4, name: "Construction" },
     ];
 
+    const equipmentTypeOptions = [
+        { id: 1, name: "Power Unit" },
+        { id: 2, name: "Dry Van" },
+        { id: 3, name: "Reefer" },
+        { id: 4, name: "Flatbed" },
+    ];
+
+    const hasValidDefaults = (value: ImportDefaults | null | undefined) => {
+        return Boolean(
+            value &&
+            value.defaultFleetCategoryId &&
+            value.defaultEquipmentTypeId &&
+            value.defaultOperationalStatus !== null &&
+            value.defaultOperationalStatus !== undefined
+        );
+    };
+
+    const getErrorMessage = (e: any) => {
+        return (
+            e?.response?.data?.error ||
+            e?.response?.data?.message ||
+            e?.message ||
+            "Something went wrong"
+        );
+    };
+
+    const runVehicleSync = async () => {
+        try {
+            const result = await integrationService.syncMotiveVehicles();
+            setSyncResult(result);
+
+            toast({
+                title: "Vehicle import completed",
+                description: `${result.created ?? 0} created, ${result.updated ?? 0} updated.`,
+            });
+        } catch (e: any) {
+            toast({
+                title: "Sync failed",
+                description: getErrorMessage(e),
+                variant: "destructive",
+            });
+        }
+    };
+
     const handleFetch = async () => {
-        // if (!apiKey) {
-        //     toast({ title: "API Key needed for browser-direct sync", variant: "destructive" });
-        //     return;
-        // }
-        // For demo/prototype without key, maybe we mock the response or prompt?
-        // Let's prompt.
-        const key = prompt("Please confirm your Motive API Key to fetch vehicles (Browser Proxy Mode):");
-        if (!key) return;
+        if (loading) return; // prevent spam click
 
         setLoading(true);
         try {
-            const data = await integrationService.getMotiveVehicles(key);
+            const existingDefaults = await integrationService.getMotiveImportDefaults();
 
-            // Transform and Auto-link
-            const mapped = data.map((v: any) => {
-                const existing = fleetAssets.find(f => f.vin === v.vehicle.vin);
-                return {
-                    id: v.vehicle.id,
-                    name: v.vehicle.number,
-                    vin: v.vehicle.vin,
-                    model: `${v.vehicle.model_year} ${v.vehicle.make} ${v.vehicle.model}`,
-                    status: existing ? 'Linked' : 'Unlinked',
-                    targetAssetId: existing ? existing.id : 'new', // Default to new if unlinked
-                    lastSeen: v.vehicle.located_at
-                };
+            if (!hasValidDefaults(existingDefaults)) {
+                setDefaults({
+                    defaultFleetCategoryId: existingDefaults?.defaultFleetCategoryId ?? null,
+                    defaultEquipmentTypeId: existingDefaults?.defaultEquipmentTypeId ?? null,
+                    defaultOperationalStatus:
+                        existingDefaults?.defaultOperationalStatus ?? null,
+                });
+
+                setShowDefaultsModal(true);
+                return;
+            }
+
+            await runVehicleSync();
+        } catch (e: any) {
+            toast({
+                title: "Fetch failed",
+                description: getErrorMessage(e),
+                variant: "destructive",
             });
-
-            setVehicles(mapped);
-            toast({ title: `Fetched ${mapped.length} vehicles` });
-        } catch (e) {
-            toast({ title: "Fetch failed", variant: "destructive" });
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSave = async () => {
-        setLoading(true);
+    const handleSaveDefaultsAndImport = async () => {
+        if (!hasValidDefaults(defaults)) {
+            toast({
+                title: "Missing required fields",
+                description: "Please select Fleet Category, Equipment Type, and Operational Status.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setSavingDefaults(true);
         try {
-            await integrationService.saveMotiveMappings(vehicles);
-            toast({ title: "Mappings saved successfully" });
-        } catch (e) {
-            toast({ title: "Save failed", variant: "destructive" });
+            await integrationService.saveMotiveImportDefaults({
+                defaultFleetCategoryId: defaults.defaultFleetCategoryId!,
+                defaultEquipmentTypeId: defaults.defaultEquipmentTypeId!,
+                defaultOperationalStatus: defaults.defaultOperationalStatus!,
+            });
+
+            setShowDefaultsModal(false);
+
+            toast({
+                title: "Import defaults saved",
+                description: "Defaults saved successfully.",
+            });
+
+            await runVehicleSync();
+        } catch (e: any) {
+            toast({
+                title: "Could not save defaults",
+                description: getErrorMessage(e),
+                variant: "destructive",
+            });
         } finally {
-            setLoading(false);
+            setSavingDefaults(false);
         }
     };
 
     return (
-        <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-500">
-                    Fetch vehicles from Motive to map them to your fleet.
-                </div>
-                <Button onClick={handleFetch} disabled={loading} variant="outline" size="sm">
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                    Fetch Vehicles
-                </Button>
-            </div>
+        <>
+            <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                    <div>
+                        <div className="text-sm font-medium text-slate-900">
+                            Import Motive Vehicles
+                        </div>
+                        <div className="text-sm text-slate-500">
+                            New vehicles will use your configured defaults.
+                        </div>
+                    </div>
 
-            <div className="border rounded-md">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Vehicle / VIN</TableHead>
-                            <TableHead>Details</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Action</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {vehicles.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={4} className="text-center py-8 text-slate-500">
-                                    No vehicles fetched yet. Click "Fetch Vehicles" to start.
-                                </TableCell>
-                            </TableRow>
+                    <Button
+                        onClick={handleFetch}
+                        disabled={loading}
+                        variant="outline"
+                        size="sm"
+                    >
+                        {loading ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : (
-                            vehicles.map((v) => (
-                                <TableRow key={v.id}>
-                                    <TableCell>
-                                        <div className="font-medium">{v.name}</div>
-                                        <div className="text-xs text-slate-500 font-mono">{v.vin}</div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="text-sm">{v.model}</div>
-                                    </TableCell>
-                                    <TableCell>
-                                        {v.status === 'Linked' ? (
-                                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-                                                <Check className="w-3 h-3 mr-1" /> Linked
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="outline" className="text-slate-500">Unlinked</Badge>
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Select defaultValue={v.targetAssetId}>
-                                            <SelectTrigger className="w-[180px] h-8">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="new">Create New Asset</SelectItem>
-                                                <SelectItem value="ignore">Ignore</SelectItem>
-                                                {/* In real app, list existing assets here */}
-                                            </SelectContent>
-                                        </Select>
-                                    </TableCell>
-                                </TableRow>
-                            ))
+                            <RefreshCw className="mr-2 h-4 w-4" />
                         )}
-                    </TableBody>
-                </Table>
-            </div>
-
-            {vehicles.length > 0 && (
-                <div className="flex justify-end pt-2">
-                    <Button onClick={handleSave} disabled={loading} className="bg-blue-600 hover:bg-blue-700">
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Mappings
+                        Fetch Vehicles
                     </Button>
                 </div>
-            )}
-        </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white">
+                            <Truck className="h-5 w-5 text-slate-700" />
+                        </div>
+
+                        <div className="flex-1">
+                            <div className="font-medium text-slate-900">
+                                Vehicle Import Behavior
+                            </div>
+
+                            <div className="mt-1 text-sm text-slate-600">
+                                Existing assets are updated. New vehicles are created using your defaults.
+                            </div>
+
+                            {syncResult && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                                        Created: {syncResult.created ?? 0}
+                                    </Badge>
+                                    <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+                                        Updated: {syncResult.updated ?? 0}
+                                    </Badge>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <Dialog open={showDefaultsModal} onOpenChange={setShowDefaultsModal}>
+                <DialogContent className="sm:max-w-[560px]">
+                    <DialogHeader>
+                        <div className="flex items-center gap-2">
+                            <Settings2 className="h-5 w-5 text-slate-700" />
+                            <DialogTitle>Motive Import Defaults</DialogTitle>
+                        </div>
+
+                        <DialogDescription>
+                            Configure how new vehicles should be created.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-2">
+                        {/* Fleet Category */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700">
+                                Fleet Category
+                            </label>
+                            <Select
+                                value={defaults.defaultFleetCategoryId ? String(defaults.defaultFleetCategoryId) : undefined}
+                                onValueChange={(value) =>
+                                    setDefaults((prev) => ({
+                                        ...prev,
+                                        defaultFleetCategoryId: Number(value),
+                                    }))
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select fleet category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {fleetCategoryOptions.map((item) => (
+                                        <SelectItem key={item.id} value={String(item.id)}>
+                                            {item.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Equipment Type */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700">
+                                Equipment Type
+                            </label>
+                            <Select
+                                value={defaults.defaultEquipmentTypeId ? String(defaults.defaultEquipmentTypeId) : undefined}
+                                onValueChange={(value) =>
+                                    setDefaults((prev) => ({
+                                        ...prev,
+                                        defaultEquipmentTypeId: Number(value),
+                                    }))
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select equipment type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {equipmentTypeOptions.map((item) => (
+                                        <SelectItem key={item.id} value={String(item.id)}>
+                                            {item.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Status */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700">
+                                Operational Status
+                            </label>
+                            <Select
+                                value={
+                                    defaults.defaultOperationalStatus !== null
+                                        ? String(defaults.defaultOperationalStatus)
+                                        : undefined
+                                }
+                                onValueChange={(value) =>
+                                    setDefaults((prev) => ({
+                                        ...prev,
+                                        defaultOperationalStatus: Number(value),
+                                    }))
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select default status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {OPERATIONAL_STATUS_OPTIONS.map((item) => (
+                                        <SelectItem key={item.value} value={String(item.value)}>
+                                            {item.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowDefaultsModal(false)}
+                            disabled={savingDefaults}
+                        >
+                            Cancel
+                        </Button>
+
+                        <Button
+                            onClick={handleSaveDefaultsAndImport}
+                            disabled={savingDefaults}
+                            className="bg-blue-600 hover:bg-blue-700"
+                        >
+                            {savingDefaults && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            )}
+                            Save & Import
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }

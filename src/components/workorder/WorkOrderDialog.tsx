@@ -10,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { useRef } from "react";
 import { Loader2, Sparkles, Upload, Trash2, Check, ChevronsUpDown, Plus, CheckCircle2, FileText, Image as ImageIcon } from "lucide-react";
-import { parseReceipt } from "@/lib/gemini";
-import { ReceiptParsedData, Vendor, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
+import { aiApi, ParsedInvoiceResult } from "@/lib/aiApi";
+import { Vendor, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource } from "@/lib/types";
 import { ShopFormData } from "@/components/shops/types/ShopTypes";
 import AddShopDialog from "../shops/AddShopDialog";
 import InlineAddShopForm from "../shops/InlineAddShopForm";
@@ -641,7 +641,7 @@ export default function WorkOrderDialog({
             const mappedNewDocs = newDocs.map(d => ({
               id: d.id,
               url: d.fileUrl,
-              name: d.fileName || d.fileUrl.split('/').pop() || "Attachment"
+              name: (d as any).fileName || d.fileUrl.split('/').pop() || "Attachment"
             }));
             setExistingDocuments(prev => [...prev, ...mappedNewDocs]);
           }
@@ -745,7 +745,7 @@ export default function WorkOrderDialog({
           await shopsApi.createRating(newWorkOrder.vendor_id, {
             rating: ratingData.mainRating,
             reviewText: ratingData.comment,
-            workOrderId: savedWo?.id || editWoId,
+            workOrderId: id,
             qualityRating: ratingData.qualityRating,
             timelinessRating: ratingData.timelinessRating,
             communicationRating: ratingData.communicationRating,
@@ -818,148 +818,111 @@ export default function WorkOrderDialog({
     return similarity >= threshold;
   };
 
-  const processAIParsing = async (file: File, base64: string) => {
+  const processAIParsing = async (file: File) => {
     setIsParsingReceipt(true);
     try {
-      const result: ReceiptParsedData | null = await parseReceipt(base64, file.type);
-      if (result && result.items) {
-        const newItems = result.items
-          .filter(it => {
-            const desc = (it.description || "").toLowerCase();
-            return !desc.includes("subtotal") &&
-              !desc.includes("total") &&
-              !desc.includes("amount due") &&
-              !desc.includes("balance due") &&
-              !desc.includes("taxable") &&
-              !desc.includes("non-taxable");
-          })
-          .map(it => ({
-            description: it.description,
-            price: it.cost || 0,
+      const result = await aiApi.parseInvoiceFile(file);
+
+      const rawItems = result.lineItems?.length
+        ? result.lineItems.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          amount: item.amount,
+        }))
+        : [];
+
+      const newItems = rawItems
+        .filter((item) => {
+          const description = (item.description || "").toLowerCase();
+          return (
+            description &&
+            !description.includes("subtotal") &&
+            !description.includes("grand total") &&
+            !description.includes("total") &&
+            !description.includes("amount due") &&
+            !description.includes("balance due") &&
+            !description.includes("taxable") &&
+            !description.includes("non-taxable")
+          );
+        })
+        .map((item) => {
+          const quantity = (item.quantity || 1) as number;
+          const amount = (item.amount ?? 0) as number;
+          const unitPrice = (item.unitPrice || 0) as number;
+          const price = unitPrice || (amount && quantity ? amount / quantity : amount);
+
+          return {
+            description: item.description || "Invoice item",
+            price: Number((price || 0).toFixed(2)),
+            quantity,
+            type: "misc",
+          };
+        }) as WorkOrderItemData[];
+
+      const invoiceTotal = result.total || 0;
+      if (invoiceTotal > 0 && newItems.length > 0) {
+        const itemsTotal = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const diff = invoiceTotal - itemsTotal;
+
+        if (diff > 0.05) {
+          newItems.push({
+            description: "Tax / Fees",
+            price: Number(diff.toFixed(2)),
             quantity: 1,
-            type: (it.type === 'part' || it.type === 'labor' || it.type === 'fee' || it.type === 'tax' || it.type === 'discount' || it.type === 'misc') ? it.type : 'misc'
-          }));
-
-        // Check if there is a discrepancy between items total and receipt total (usually Tax/Fees)
-        if (result.total) {
-          const itemsTotal = newItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-          const diff = result.total - itemsTotal;
-
-          // If difference is significant (positive), add as Tax/Fees
-          if (diff > 0.05) {
-            newItems.push({
-              description: "Tax / Fees",
-              price: parseFloat(diff.toFixed(2)),
-              quantity: 1,
-              type: "tax"
-            });
-          }
-        }
-
-        if (newItems.length === 0) {
-          toast.warning("AI Scan: No valid items found after filtering.");
-        } else {
-          setWorkOrderItems(newItems);
-          toast.success(`AI Scan: List populated with ${newItems.length} items from receipt.`);
-        }
-
-        // Auto-fill Vendor Name & Shop Matching Logic
-        if (result.businessName) {
-          const match = vendors.find(v => {
-            // 1. Direct includes match (fallback)
-            const includesMatch = v.name.toLowerCase().includes(result.businessName.toLowerCase()) ||
-              result.businessName.toLowerCase().includes(v.name.toLowerCase());
-
-            // 2. Fuzzy match
-            const isFuzzy = fuzzyMatch(result.businessName, v.name, 0.75); // 75% threshold
-
-            if (includesMatch || isFuzzy) {
-              const parsedCity = result.businessAddress?.city?.toLowerCase()?.trim();
-              const vendorCity = v.city?.toLowerCase()?.trim();
-
-              const parsedState = result.businessAddress?.state?.toLowerCase()?.trim();
-              const vendorState = v.state?.toLowerCase()?.trim();
-
-              if (parsedCity && vendorCity && parsedCity !== vendorCity) {
-                return false; // Different city
-              }
-
-              if (parsedState && vendorState && parsedState !== vendorState) {
-                return false; // Different state
-              }
-
-              // Validate street address if available
-              if (result.businessAddress?.street && v.address) {
-                const incomingStreetNum = result.businessAddress.street.replace(/\D/g, '').trim();
-                const vendorStreetNum = v.address.replace(/\D/g, '').trim();
-
-                // If we have a street number for both, and they differ, they're likely different locations.
-                if (incomingStreetNum && vendorStreetNum && incomingStreetNum !== vendorStreetNum) {
-                  // Check for substring edge cases before definitively failing it
-                  const incomingLower = result.businessAddress.street.toLowerCase();
-                  const vendorLower = v.address.toLowerCase();
-                  if (!incomingLower.includes(vendorLower) && !vendorLower.includes(incomingLower)) {
-                    return false; // Different location of the same chain
-                  }
-                }
-              }
-
-              return true;
-            }
-            return false;
+            type: "tax",
           });
-
-          if (match) {
-            setNewWorkOrder(prev => ({ ...prev, vendor_id: match.id, vendor_name: match.name }));
-            setParsedVendorDetails(null); // Clear manual option if matched
-            toast.success(`✓ Matched existing shop: "${match.name}"`);
-          } else {
-            // 2. New Vendor Detected
-            // toast.info(`🆕 New Vendor Detected: "${result.businessName}"`);
-            setNewWorkOrder(prev => ({ ...prev, vendor_name: result.businessName || "", vendor_id: null }));
-
-            setParsedVendorDetails({
-              name: result.businessName,
-              street: result.businessAddress?.street || "",
-              city: result.businessAddress?.city || "",
-              state: result.businessAddress?.state || "",
-              zip: result.businessAddress?.zip || "",
-              address: `${result.businessAddress?.street || ""} ${result.businessAddress?.city || ""} ${result.businessAddress?.state || ""}`.trim(),
-              phone: result.businessContact?.phone,
-              website: result.businessContact?.website
-            });
-          }
         }
-
-        // Auto-fill Service Date (Map to eta_date)
-        if (result.date) {
-          let extractedDate = result.date;
-          try {
-            const d = new Date(result.date);
-            if (!isNaN(d.getTime())) {
-              let year = d.getFullYear();
-              if (year > 0 && year <= 99) year += 2000;
-              d.setFullYear(year);
-              extractedDate = d.toISOString().split('T')[0];
-            }
-          } catch { }
-
-          setNewWorkOrder(prev => ({ ...prev, eta_date: extractedDate }));
-          toast.info(`Service Date detected: ${extractedDate}`);
-        }
-
-        // Auto-fill Odometer
-        if (result.odometer) {
-          setNewWorkOrder(prev => ({ ...prev, odometer: result.odometer.toString() }));
-          toast.info(`Odometer detected: ${result.odometer}`);
-        }
-
-        // Expand attachments section to show the uploaded file
-        setShowOptionalFields(prev => ({ ...prev, attachments: true }));
-      } else {
-        toast.error("AI Scan: Could not extract data from this file.");
       }
-    } catch (err) {
+
+      if (newItems.length > 0) {
+        setWorkOrderItems(newItems);
+        toast.success(`AI Scan: List populated with ${newItems.length} items from receipt.`);
+      } else {
+        toast.warning("AI Scan completed, but no valid line items were found.");
+      }
+
+      if (result.vendorName) {
+        const vendorName = result.vendorName;
+        const match = vendors.find(v => {
+          const includesMatch = v.name.toLowerCase().includes(vendorName.toLowerCase()) || vendorName.toLowerCase().includes(v.name.toLowerCase());
+          return includesMatch;
+        });
+
+        if (match) {
+          setNewWorkOrder(prev => ({ ...prev, vendor_id: match.id, vendor_name: match.name }));
+          setParsedVendorDetails(null);
+          toast.success(`✓ Matched existing shop: "${match.name}"`);
+        } else {
+          setNewWorkOrder(prev => ({ ...prev, vendor_name: vendorName, vendor_id: null }));
+
+          setParsedVendorDetails({
+            name: vendorName,
+            street: "",
+            city: "",
+            state: "",
+            zip: "",
+            address: "",
+            phone: undefined,
+            website: undefined
+          });
+        }
+      }
+
+      const serviceDate = result.invoiceDate;
+      if (serviceDate) {
+        setNewWorkOrder(prev => ({ ...prev, eta_date: new Date(serviceDate).toISOString().slice(0, 10) }));
+        toast.info(`Service Date detected: ${serviceDate}`);
+      }
+
+      const mileage = result.mileage;
+      if (mileage) {
+        setNewWorkOrder(prev => ({ ...prev, odometer: String(mileage) }));
+        toast.info(`Odometer detected: ${mileage}`);
+      }
+
+      setShowOptionalFields(prev => ({ ...prev, attachments: true }));
+    } catch (err: unknown) {
       console.error(err);
       toast.error("AI parsing failed");
     } finally {
@@ -983,7 +946,7 @@ export default function WorkOrderDialog({
       setPreviewType(file.type.includes('pdf') ? 'pdf' : 'image');
 
       if (file.type.includes('image') || file.type.includes('pdf')) {
-        await processAIParsing(file, base64);
+        await processAIParsing(file);
       }
     };
     reader.readAsDataURL(file);
@@ -997,9 +960,8 @@ export default function WorkOrderDialog({
       const blob = await resp.blob();
       const reader = new FileReader();
       reader.onloadend = async () => {
-        const base64 = (reader.result as string).split(',')[1];
         const file = new File([blob], "existing_attachment", { type: blob.type || (previewUrl.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg') });
-        await processAIParsing(file, base64);
+        await processAIParsing(file);
       };
       reader.readAsDataURL(blob);
     } catch (err) {

@@ -39,7 +39,8 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useNavigate } from 'react-router-dom';
-import { parseReceipt, fetchDetailedVendorInfo, searchVendorSuggestions } from '@/lib/gemini';
+import { fetchDetailedVendorInfo, searchVendorSuggestions } from '@/lib/gemini';
+import { aiApi, ParsedInvoiceResult } from '@/lib/aiApi';
 
 interface ServiceHistoryManagerProps {
     records: WorkOrder[];
@@ -107,7 +108,7 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
     const [newItemValue, setNewItemValue] = useState('');
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
-    const [formData, setFormData] = useState<Partial<WorkOrder> & { workOrderId?: string }>({
+    const [formData, setFormData] = useState<Partial<WorkOrder> & { workOrderId?: string, vehicle_type?: string }>({
         woNumber: `SR-${Math.floor(Math.random() * 100000)}`,
         status: WorkOrderStatus.Completed,
         priority: WorkOrderPriority.Normal,
@@ -281,20 +282,36 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
         setIsParsingReceipt(true);
         setParsingError(null);
         try {
-            const result: ReceiptParsedData | null = await parseReceipt(base64, file.type);
+            const result = await aiApi.parseInvoiceFile(file);
             if (result) {
                 const newAiFields = new Set<string>();
                 const updates: Partial<WorkOrder> = {};
 
-                const searchString = `${result.businessAddress.street}, ${result.businessAddress.city}, ${result.businessAddress.state} ${result.businessAddress.zip}`;
-                const verifyResults = await searchVendorSuggestions(searchString);
+                // Map aiApi's properties to legacy ones for the existing logic
+                const legacyResult = {
+                    businessName: result.vendorName || '',
+                    businessAddress: { street: '', city: '', state: '', zip: '' }, // Fallback since aiApi doesn't split these
+                    businessContact: { phone: '', website: '', email: '' },
+                    date: result.invoiceDate || '',
+                    total: result.total || 0,
+                    notes: result.workCompleted || '',
+                    unitNumber: result.truckNumber || '',
+                    items: result.lineItems?.map(it => ({
+                        description: it.description || '',
+                        cost: it.amount || 0,
+                        type: it.lineType || 'misc'
+                    })) || []
+                };
+
+                const searchString = `${result.vendorName}`;
+                const verifyResults = searchString ? await searchVendorSuggestions(searchString) : [];
 
                 if (verifyResults && verifyResults.length > 0) {
                     const googleTop = verifyResults[0];
                     const details = await fetchDetailedVendorInfo(googleTop.title, googleTop.address);
 
                     if (details) {
-                        const confidence = calculateMatchConfidence(result, {
+                        const confidence = calculateMatchConfidence(legacyResult as any, {
                             name: details.name,
                             address: details.street + details.zip,
                             phone: details.phone
@@ -307,7 +324,7 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
                             name: details.name,
                             address: fullAddress,
                             phone: details.phone,
-                            email: result.businessContact?.email,
+                            email: legacyResult.businessContact?.email,
                             website: details.website,
                             rating: details.rating,
                             reviewCount: details.reviewCount
@@ -319,35 +336,34 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
                     }
                 } else {
                     setMatchConfidence({ score: 0, reasons: [], warnings: ["No exact location found via Google Maps"] });
-                    const extractedAddr = `${result.businessAddress.street}, ${result.businessAddress.city}, ${result.businessAddress.state} ${result.businessAddress.zip}`;
-                    updates.vendor = result.businessName;
-                    updates.vendorAddress = extractedAddr;
+                    updates.vendor = legacyResult.businessName;
+                    updates.vendorAddress = '';
                     setSelectedVendorCard({
-                        name: result.businessName,
-                        address: extractedAddr,
-                        phone: result.businessContact?.phone,
-                        email: result.businessContact?.email,
-                        website: result.businessContact?.website
+                        name: legacyResult.businessName,
+                        address: '',
+                        phone: legacyResult.businessContact?.phone,
+                        email: legacyResult.businessContact?.email,
+                        website: legacyResult.businessContact?.website
                     });
                 }
 
                 newAiFields.add('vendor');
                 newAiFields.add('vendorAddress');
 
-                if (result.date) {
-                    updates.date = normalizeDate(result.date);
+                if (legacyResult.date) {
+                    updates.date = normalizeDate(legacyResult.date);
                     newAiFields.add('date');
                 }
-                if (result.total) {
-                    updates.totalCost = result.total;
+                if (legacyResult.total) {
+                    updates.totalCost = legacyResult.total;
                     newAiFields.add('totalCost');
                 }
-                if (result.notes) {
-                    updates.notes = result.notes;
+                if (legacyResult.notes) {
+                    updates.notes = legacyResult.notes;
                     newAiFields.add('notes');
                 }
-                if (result.items && result.items.length > 0) {
-                    updates.items = result.items
+                if (legacyResult.items && legacyResult.items.length > 0) {
+                    updates.items = legacyResult.items
                         .filter(it => {
                             const desc = (it.description || "").toLowerCase();
                             // Filter out redundant summary lines from AI
@@ -363,15 +379,17 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
                             id: `ai-item-${Date.now()}-${idx}`,
                             description: it.description,
                             cost: it.cost,
+                            quantity: 1,
+                            unitPrice: it.cost,
                             type: it.type as any,
                             serviceType: 'General'
                         }));
                     newAiFields.add('items');
                 }
 
-                if (result.unitNumber) {
+                if (legacyResult.unitNumber) {
                     const matchedEquip = equipmentList.find(e =>
-                        e.unitNumber.toLowerCase().includes(result.unitNumber!.toLowerCase())
+                        e.unitNumber.toLowerCase().includes(legacyResult.unitNumber.toLowerCase())
                     );
                     if (matchedEquip) {
                         updates.equipmentId = matchedEquip.id;
@@ -452,7 +470,9 @@ const ServiceHistoryManager: React.FC<ServiceHistoryManagerProps> = ({
             id: `item-${Date.now()}`,
             serviceType: 'General',
             description: newItemValue,
-            cost: 0
+            cost: 0,
+            quantity: 1,
+            unitPrice: 0
         };
         const updatedItems = [...(formData.items || []), newItem];
         setFormData(prev => ({

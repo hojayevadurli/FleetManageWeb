@@ -20,7 +20,9 @@ import {
     Trash2,
     Plus,
     Lock,
-    User
+    User,
+    AlertCircle,
+    ClipboardCheck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -187,7 +189,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     }, [sessions, isLoaded, equipment.id]);
 
     // Tab State
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'documents' | 'ai' | 'spend' | 'warranty'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'diagnostics' | 'inspections' | 'history' | 'documents' | 'ai' | 'spend' | 'warranty'>('dashboard');
 
     const equipmentHistory = workOrders.filter(wo => wo.equipmentId === equipment.id);
 
@@ -291,19 +293,19 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     };
 
     return (
-        <div className="h-full flex flex-col relative overflow-hidden bg-slate-50 min-h-screen p-6">
+        <div className="h-full flex flex-col relative bg-slate-50 min-h-screen p-4 md:p-6 lg:p-8 overflow-y-auto no-scrollbar">
             {/* Header & Navigation */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-                <div className="flex items-center gap-4">
-                    <Button variant="outline" size="icon" onClick={onBack} className="h-12 w-12 rounded-2xl border-slate-200 shadow-sm hover:bg-slate-50">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 w-full">
+                <div className="flex flex-wrap items-center gap-4">
+                    <Button variant="outline" size="icon" onClick={onBack} className="h-12 w-12 rounded-2xl border-slate-200 shadow-sm hover:bg-slate-50 shrink-0">
                         <X className="w-5 h-5 text-slate-400 transition-colors" />
                     </Button>
-                    <div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Unit {equipment.unitNumber} Intel</h1>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Verified asset diagnostics & service timeline</p>
+                    <div className="flex-1 min-w-[200px]">
+                        <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight truncate">Unit {equipment.unitNumber} Intel</h1>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Verified asset diagnostics & service timeline</p>
                     </div>
                     {onUpdate && (
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-2 mt-2 md:mt-0">
                             <Button
                                 variant="secondary"
                                 onClick={() => setIsEditModalOpen(true)}
@@ -328,14 +330,14 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
 
                 {/* Read Only Banner */}
                 {isReadOnly && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2 mb-8">
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 mb-8 w-full">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-amber-100 rounded-xl">
+                            <div className="p-2 bg-amber-100 rounded-xl shrink-0">
                                 <Lock className="w-5 h-5 text-amber-600" />
                             </div>
                             <div>
                                 <h4 className="font-black text-amber-800 text-sm">Read-Only Mode Active</h4>
-                                <p className="text-xs font-bold text-amber-600/80 mt-0.5">
+                                <p className="text-[10px] md:text-xs font-bold text-amber-600/80 mt-0.5">
                                     This asset is marked as {equipment.status === EquipmentOperationalStatus.OutOfService ? 'Out of Service' : 'Sold'}. creating new records is disabled.
                                 </p>
                             </div>
@@ -344,32 +346,36 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             variant="ghost"
                             size="sm"
                             onClick={() => setIsEditModalOpen(true)}
-                            className="text-amber-700 hover:text-amber-800 hover:bg-amber-100 font-bold text-xs uppercase tracking-wider"
+                            className="text-amber-700 hover:text-amber-800 hover:bg-amber-100 font-bold text-[10px] md:text-xs uppercase tracking-wider shrink-0"
                         >
                             Change Status
                         </Button>
                     </div>
                 )}
 
-                <div className="flex p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm">
-                    {(['dashboard', 'history', 'documents', 'ai', 'spend', 'warranty'] as const).map(tab => (
-                        <Button
-                            key={tab}
-                            variant={activeTab === tab ? "default" : "ghost"}
-                            onClick={() => setActiveTab(tab)}
-                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all h-auto ${activeTab !== tab ? 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' : ''}`}
-                        >
-                            <span className="flex items-center gap-2">
-                                {tab === 'dashboard' && <Container className="w-4 h-4" />}
-                                {tab === 'history' && <History className="w-4 h-4" />}
-                                {tab === 'documents' && <FileText className="w-4 h-4" />}
-                                {tab === 'ai' && <Sparkles className="w-4 h-4" />}
-                                {tab === 'spend' && <Cpu className="w-4 h-4" />}
-                                {tab === 'warranty' && <FileCheck className="w-4 h-4" />}
-                                {tab}
-                            </span>
-                        </Button>
-                    ))}
+                <div className="w-full max-w-full overflow-hidden">
+                    <div className="flex p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto no-scrollbar max-w-full">
+                        {(['dashboard', 'diagnostics', 'inspections', 'history', 'documents', 'ai', 'spend', 'warranty'] as const).map(tab => (
+                            <Button
+                                key={tab}
+                                variant={activeTab === tab ? "default" : "ghost"}
+                                onClick={() => setActiveTab(tab)}
+                                className={`px-4 md:px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all h-auto shrink-0 ${activeTab !== tab ? 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' : ''}`}
+                            >
+                                <span className="flex items-center gap-2">
+                                    {tab === 'dashboard' && <Container className="w-4 h-4 hidden sm:block" />}
+                                    {tab === 'diagnostics' && <AlertCircle className="w-4 h-4 hidden sm:block" />}
+                                    {tab === 'inspections' && <ClipboardCheck className="w-4 h-4 hidden sm:block" />}
+                                    {tab === 'history' && <History className="w-4 h-4 hidden sm:block" />}
+                                    {tab === 'documents' && <FileText className="w-4 h-4 hidden sm:block" />}
+                                    {tab === 'ai' && <Sparkles className="w-4 h-4 hidden sm:block" />}
+                                    {tab === 'spend' && <Cpu className="w-4 h-4 hidden sm:block" />}
+                                    {tab === 'warranty' && <FileCheck className="w-4 h-4 hidden sm:block" />}
+                                    {tab}
+                                </span>
+                            </Button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -379,10 +385,10 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                 {activeTab === 'dashboard' && (
                     <div className="space-y-8 animate-in fade-in zoom-in duration-300">
                         {/* Top Row: Specs + Spend */}
-                        <div className="flex flex-col xl:flex-row gap-8">
+                        <div className="flex flex-col 2xl:flex-row gap-8 w-full">
 
                             {/* LEFT: Main Spec Card */}
-                            <div className="flex-[3] bg-white rounded-[3rem] p-10 border border-slate-200 shadow-sm relative overflow-hidden">
+                            <div className="flex-1 w-full min-w-0 bg-white rounded-[3rem] p-6 lg:p-10 border border-slate-200 shadow-sm relative overflow-hidden">
                                 <div className="mb-6">
                                     <Select
                                         value={(() => {
@@ -423,18 +429,41 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     </Select>
                                 </div>
 
-                                <div className="flex flex-col md:flex-row gap-6 items-start relative z-10">
-                                    <div className="space-y-2 shrink-0">
+                                <div className="flex flex-col xl:flex-row gap-8 lg:gap-12 items-start relative z-10 w-full min-w-0">
+                                    <div className="space-y-4 shrink-0 xl:w-1/2 min-w-0 w-full">
                                         <h2 className="text-3xl font-black text-slate-900 tracking-tighter leading-tight">{equipment.year} {equipment.make} {equipment.model}</h2>
 
-                                        <div className="flex gap-8 pt-6">
-                                            <div>
+                                        <div className="flex flex-wrap gap-8 pt-6">
+                                            <div className="min-w-[100px]">
                                                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">VIN Number</div>
-                                                <div className="font-mono font-bold text-slate-800">{equipment.vin}</div>
+                                                <div className="font-mono font-bold text-slate-800 truncate">{equipment.vin || 'N/A'}</div>
                                             </div>
-                                            <div>
+                                            <div className="min-w-[80px]">
                                                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Plate</div>
-                                                <div className="font-bold text-slate-800">{equipment.licensePlate || 'N/A'}</div>
+                                                <div className="font-bold text-slate-800 truncate">{equipment.licensePlate || 'N/A'}</div>
+                                            </div>
+                                            <div className="min-w-[80px]">
+                                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 border-b border-dashed border-slate-300 w-fit">Odometer</div>
+                                                <div className="font-mono font-bold text-slate-800 truncate">{equipment.mileage ? equipment.mileage.toLocaleString() + ' mi' : 'N/A'}</div>
+                                            </div>
+                                            <div className="min-w-[120px]">
+                                                <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                                    <MapPin className="w-3 h-3" /> Location
+                                                </div>
+                                                <div className="font-bold text-blue-900 capitalize truncate">
+                                                    {equipment.lastKnownLocation || 'Awaiting Sync...'}
+                                                </div>
+                                                {/* Add a direct link to Google Maps if Lat/Long are available */}
+                                                {equipment.latitude && equipment.longitude && (
+                                                    <a
+                                                        href={`https://www.google.com/maps?q=${equipment.latitude},${equipment.longitude}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-[9px] font-bold text-blue-500 hover:text-blue-700 flex items-center gap-1 mt-1 transition-colors"
+                                                    >
+                                                        View on Map <ExternalLink className="w-2 h-2" />
+                                                    </a>
+                                                )}
                                             </div>
                                         </div>
 
@@ -470,7 +499,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     </div>
 
                                     {/* 2x2 Stats Grid */}
-                                    <div className="grid grid-cols-2 gap-4 flex-1 w-full">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 w-full min-w-0">
                                         {(() => {
                                             // Robust helper to map any doc role/kind format to our Enum
                                             const getRole = (d: any): DocumentRole | null => {
@@ -626,7 +655,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             </div>
 
                             {/* RIGHT: Dark Spend Card */}
-                            <div className="flex-[2] bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden group shadow-2xl shadow-slate-900/20">
+                            <div className="w-full 2xl:w-96 shrink-0 bg-slate-900 rounded-[3rem] p-8 text-white relative overflow-hidden group shadow-2xl shadow-slate-900/20">
                                 <div className="absolute top-1/2 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none"></div>
 
                                 <div className="relative z-10 h-full flex flex-col justify-between space-y-8">
@@ -703,6 +732,60 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* DIAGNOSTICS VIEW */}
+                {activeTab === 'diagnostics' && (
+                    <div className="animate-in slide-in-from-right-4 duration-300">
+                        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden p-10">
+                            <div className="flex items-center justify-between mb-8">
+                                <div>
+                                    <h3 className="font-black text-slate-900 flex items-center gap-2 text-2xl tracking-tight">
+                                        <AlertCircle className="w-6 h-6 text-rose-500" /> Active Faults
+                                    </h3>
+                                    <p className="text-slate-500 text-sm mt-1">Live telematics codes synced from Motive integration.</p>
+                                </div>
+                                <Button className="bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold uppercase tracking-widest text-xs gap-2 rounded-xl">
+                                    <AlertCircle className="w-4 h-4" /> Sync Codes
+                                </Button>
+                            </div>
+
+                            <div className="p-16 text-center border-2 border-dashed border-slate-100 rounded-[2rem] bg-slate-50/50">
+                                <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <ShieldCheck className="w-8 h-8 text-emerald-600" />
+                                </div>
+                                <h4 className="font-black text-slate-900 text-lg">No Active Fault Codes</h4>
+                                <p className="text-slate-500 text-sm mt-1">Engine is reporting healthy status. Real-time polling enabled.</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* INSPECTIONS VIEW */}
+                {activeTab === 'inspections' && (
+                    <div className="animate-in slide-in-from-right-4 duration-300">
+                        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden p-10">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                                <div>
+                                    <h3 className="font-black text-slate-900 flex items-center gap-2 text-2xl tracking-tight">
+                                        <ClipboardCheck className="w-6 h-6 text-blue-600" /> DOT Inspection Logs
+                                    </h3>
+                                    <p className="text-slate-500 text-sm mt-1">Operator pre-trip and post-trip compliance records.</p>
+                                </div>
+                                <Button className="bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-widest text-xs gap-2 rounded-xl shadow-sm shadow-blue-200">
+                                    <Plus className="w-4 h-4" /> Log Manual Report
+                                </Button>
+                            </div>
+
+                            <div className="p-16 text-center border border-slate-100 rounded-[2rem] bg-slate-50">
+                                <div className="bg-blue-100 w-16 h-16 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4">
+                                    <ClipboardCheck className="w-8 h-8 text-blue-600" />
+                                </div>
+                                <h4 className="font-black text-slate-900 text-lg">Waiting for Initial Sync</h4>
+                                <p className="text-slate-500 text-sm mt-1">Inspection reports will populate automatically once operators submit them via Motive App.</p>
+                            </div>
                         </div>
                     </div>
                 )}

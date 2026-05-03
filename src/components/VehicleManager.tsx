@@ -12,6 +12,7 @@ import { workOrdersApi } from "@/lib/workOrdersApi";
 import { shopsApi } from "@/lib/shopsApi";
 import { Shop } from "@/components/shops/types/ShopTypes";
 import { Equipment, WorkOrder, EquipmentOperationalStatus, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource, EquipmentTypeDto } from "@/lib/types";
+import { Page } from "@/components/layout/Page";
 
 const VehicleManager = () => {
   const location = useLocation();
@@ -396,32 +397,34 @@ const VehicleManager = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center space-y-4">
+      <Page>
+        <div className="flex flex-col items-center justify-center p-20 space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <div className="text-lg font-medium text-gray-600">
             Loading your fleet...
           </div>
         </div>
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <EquipmentList
-        equipment={equipmentList}
-        initialStatusFilter={initialStatus || 'ALL'}
-        onSelect={(e) => {
-          const v = equipmentList.find(veh => veh.id === e.id);
-          if (v) setSelectedEquipment(v);
-        }}
-        onAddEquipment={handleAddEquipment}
-        onNewWorkOrder={(unitId) => console.log("New WO for", unitId)}
-        onAddWorkOrder={handleAddWorkOrder}
-        onBulkDelete={handleBulkDelete}
-      />
-    </div>
+    <Page>
+      <div className="space-y-8">
+        <EquipmentList
+          equipment={equipmentList}
+          initialStatusFilter={initialStatus || 'ALL'}
+          onSelect={(e) => {
+            const v = equipmentList.find(veh => veh.id === e.id);
+            if (v) setSelectedEquipment(v);
+          }}
+          onAddEquipment={handleAddEquipment}
+          onNewWorkOrder={(unitId) => console.log("New WO for", unitId)}
+          onAddWorkOrder={handleAddWorkOrder}
+          onBulkDelete={handleBulkDelete}
+        />
+      </div>
+    </Page>
   );
 };
 

@@ -110,11 +110,10 @@ export interface Vendor {
   googlePlaceId?: string;
   isVerified?: boolean;
 }
-
 export interface Equipment {
   id: string;
   unitNumber: string;
-  type: EquipmentType; // "Truck", "Trailer", "Forklift", etc.
+  type: EquipmentType;
   make?: string;
   model?: string;
   year?: number;
@@ -124,7 +123,6 @@ export interface Equipment {
   status: EquipmentOperationalStatus;
   lastServiceDate?: string;
   acquiredDate?: string;
-
 
   inServiceDate?: string;
   outOfServiceDate?: string;
@@ -140,6 +138,17 @@ export interface Equipment {
   purchasedAt?: string;
   notes?: string;
 
+  // Telematics / location
+  lastKnownLocation?: string;
+  latitude?: number;
+  longitude?: number;
+  lastLatitude?: number;
+  lastLongitude?: number;
+  lastLocationUpdatedAt?: string;
+  telematicsOdometerMiles?: number;
+  externalProvider?: string;
+  externalId?: string;
+
   // Flexible bag for extra properties if needed
   specs?: Record<string, string | number | boolean>;
 
@@ -147,9 +156,7 @@ export interface Equipment {
   assignedOperatorName?: string;
 
   // Categorization
-  specificType?: string; // e.g. "Sleeper Tractor", "Dry Van"
-
-  // Department/Industry links
+  specificType?: string;
   fleetCategoryId?: number;
   fleetCategoryName?: string;
   equipmentTypeId?: string;
@@ -955,4 +962,50 @@ export interface UpdateIncidentDto {
   inspectedParty?: string;
 
   documentIds?: string[];
+}
+
+export type IntegrationProvider = 'Motive' | 'Samsara' | string;
+
+export interface Integration {
+  id: string;
+  provider: IntegrationProvider;
+  status: 'Connected' | 'Disconnected' | 'ComingSoon' | 'Error' | 'Connecting';
+  lastSync?: Date | string | null;
+  vehicleCount?: number;
+  apiKey?: string;
+  apiKeyEncrypted?: boolean;
+  lastSyncAt?: string;
+  accountId?: string;
+}
+
+export type IntegrationStatus = Integration;
+
+export interface InspectionReport {
+  id: string;
+  equipmentId: string;
+  inspectorId?: string;
+  inspectionType: 'Pre-Trip' | 'Post-Trip' | 'Ad-Hoc';
+  isSafeToOperate: boolean;
+  notes?: string;
+  defects?: InspectionDefect[];
+  inspectedAt: string;
+}
+
+export interface InspectionDefect {
+  id: string;
+  part: string;
+  issue: string;
+  isResolved: boolean;
+  resolvedAt?: string;
+}
+
+export interface FaultCode {
+  id: string;
+  equipmentId: string;
+  code: string;
+  description: string;
+  status: 'Active' | 'Inactive';
+  severity: 'Critical' | 'High' | 'Medium' | 'Low';
+  occurredAt: string;
+  resolvedAt?: string;
 }

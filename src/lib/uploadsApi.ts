@@ -3,26 +3,28 @@ import api from "@/lib/Api";
 export const uploadsApi = {
   uploadWorkOrderFiles: async (files: File[]): Promise<string[]> => {
     const form = new FormData();
-    files.forEach((f) => form.append("files", f));
 
-    const res = await api.post<string[]>("/uploads/workorders", form, {
-      headers: { "Content-Type": "multipart/form-data" },
+    files.forEach((file) => {
+      form.append("files", file);
     });
 
-    return res.data;
+    const response = await api.post<string[]>("/uploads/workorders", form);
+
+    return response.data;
   },
 
   uploadDocument: async (file: File): Promise<string> => {
     const form = new FormData();
-    // The backend /uploads/workorders endpoint likely expects "files" as a collection
+
+    // Backend expects "files" as collection
     form.append("files", file);
 
-    // Using /uploads/workorders as a generic upload handler since /uploads/documents doesn't exist
-    const res = await api.post<string[]>("/uploads/workorders", form, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await api.post<string[]>("/uploads/workorders", form);
 
-    if (Array.isArray(res.data) && res.data.length > 0) return res.data[0];
+    if (Array.isArray(response.data) && response.data.length > 0) {
+      return response.data[0];
+    }
+
     throw new Error("Upload failed: No URL returned");
-  }
+  },
 };
