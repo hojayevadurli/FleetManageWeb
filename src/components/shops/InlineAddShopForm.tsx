@@ -1,3 +1,4 @@
+import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
 import {
@@ -60,7 +61,7 @@ const parseAddressComponents = (addressString: string) => {
 };
 
 const geocodeAddress = async (address: string) => {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI"; // Use fallback
+    const apiKey = await getGoogleMapsApiKey(); // Use fallback
 
     try {
         const response = await fetch(
@@ -224,7 +225,7 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
 
     useEffect(() => {
         const initMaps = async () => {
-            const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
+            const apiKey = await getGoogleMapsApiKey();
             if (!apiKey) return;
 
             const loader = new Loader({ apiKey, version: "weekly", libraries: ["places", "marker"] });

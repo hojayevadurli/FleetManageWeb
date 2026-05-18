@@ -1,3 +1,4 @@
+import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
 import {
@@ -97,6 +98,14 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
 
   // Reset state when dialog closes or shopToEdit changes
   useEffect(() => {
+    if (!open) {
+      // Clear autocomplete instances so they re-bind correctly on next open
+      shopNameAutocompleteRef.current = null;
+      addressAutocompleteRef.current = null;
+      mapInstanceRef.current = null;
+      markerRef.current = null;
+    }
+    
     console.log("AddShopDialog: Initialization Effect Triggered. Open:", open, "ShopToEdit:", shopToEdit?.id);
     if (open) {
       if (shopToEdit) {
@@ -490,10 +499,10 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
   useEffect(() => {
     if (step === "details" && mapRef.current && !mapInstanceRef.current) {
       // Delay to ensure container is rendered
-      setTimeout(() => {
+      setTimeout(async () => {
         if (!mapRef.current || mapInstanceRef.current) return;
 
-        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
+        const apiKey = await getGoogleMapsApiKey();
         if (!apiKey) return;
 
         const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
@@ -569,7 +578,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
     console.log("AddShopDialog: shopNameInputRef.current:", shopNameInputRef.current);
     console.log("AddShopDialog: addressInputRef.current:", addressInputRef.current);
 
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
+    const apiKey = await getGoogleMapsApiKey();
     if (!apiKey) {
       console.error("AddShopDialog: No API key!");
       return;
@@ -604,7 +613,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
         }));
       };
 
-      if (addressInputRef.current) {
+      if (addressInputRef.current && !addressAutocompleteRef.current) {
         console.log("AddShopDialog: Setting up ADDRESS autocomplete");
         addressAutocompleteRef.current = new window.google.maps.places.Autocomplete(addressInputRef.current, {
           types: ["address"],
@@ -616,7 +625,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
         console.error("AddShopDialog: addressInputRef.current is NULL!");
       }
 
-      if (shopNameInputRef.current) {
+      if (shopNameInputRef.current && !shopNameAutocompleteRef.current) {
         console.log("AddShopDialog: Setting up SHOP NAME autocomplete");
         shopNameAutocompleteRef.current = new window.google.maps.places.Autocomplete(shopNameInputRef.current, {
           types: ["establishment"],

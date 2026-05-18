@@ -43,6 +43,11 @@ export const navigationItems: NavigationConfig = [
     icon: Truck,
   },
   {
+    title: "Fleet Map",
+    url: "/app/equipment/map",
+    icon: MapPin,
+  },
+  {
     title: "Drivers",
     url: "/app/drivers",
     icon: User,

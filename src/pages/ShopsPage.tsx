@@ -1,3 +1,4 @@
+import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Page, PageHeader } from "@/components/layout/Page";
 import {
@@ -35,7 +36,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
 
 const ShopsPage = () => {
   const [view, setView] = useState<'list' | 'map'>('list');
@@ -176,8 +176,9 @@ const ShopsPage = () => {
 
   const initializeGoogleMaps = async () => {
     try {
+      const apiKey = await getGoogleMapsApiKey();
       const loader = new Loader({
-        apiKey: GOOGLE_MAPS_API_KEY,
+        apiKey: apiKey,
         version: "weekly",
         libraries: ["places"],
       });

@@ -1,3 +1,4 @@
+import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
@@ -8,8 +9,6 @@ interface ShopMapProps {
   shops: Shop[];
   center?: { lat: number; lng: number };
 }
-
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
 
 const ShopMap = ({ shops, center }: ShopMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -41,8 +40,9 @@ const ShopMap = ({ shops, center }: ShopMapProps) => {
     if (!mapRef.current) return;
 
     try {
+      const apiKey = await getGoogleMapsApiKey();
       const loader = new Loader({
-        apiKey: GOOGLE_MAPS_API_KEY,
+        apiKey: apiKey,
         version: "weekly",
         libraries: ["places"],
       });
