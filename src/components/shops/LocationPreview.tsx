@@ -1,3 +1,4 @@
+import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
 import React, { useEffect, useRef } from 'react';
 import { Loader } from "@googlemaps/js-api-loader";
 
@@ -16,7 +17,7 @@ const LocationPreview: React.FC<LocationPreviewProps> = ({ latitude, longitude, 
         const initMap = async () => {
             if (!mapRef.current) return;
 
-            const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
+            const apiKey = await getGoogleMapsApiKey();
             const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
 
             try {

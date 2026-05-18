@@ -1,3 +1,4 @@
+import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,8 +39,6 @@ const ShopMap = () => {
   const markersRef = useRef<google.maps.Marker[]>([]);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
 
-  const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyAeI6_E9c4EMx9T4t_FjyVUGSTN38GV69c";
-
   useEffect(() => {
     loadShops();
     getUserLocation();
@@ -60,8 +59,9 @@ const ShopMap = () => {
     if (!mapRef.current) return;
 
     try {
+      const apiKey = await getGoogleMapsApiKey();
       const loader = new Loader({
-        apiKey: GOOGLE_MAPS_API_KEY,
+        apiKey: apiKey,
         version: "weekly",
         libraries: ["places"]
       });

@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "dgSpecHash": "qU7tS56FJ0o=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\hojay\\source\\repos\\FleetManageWeb\\FleetManage.Web\\DbTest\\DbTest.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.aspnetcore.cryptography.internal\\10.0.7\\microsoft.aspnetcore.cryptography.internal.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.aspnetcore.dataprotection\\10.0.7\\microsoft.aspnetcore.dataprotection.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.aspnetcore.dataprotection.abstractions\\10.0.7\\microsoft.aspnetcore.dataprotection.abstractions.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.bcl.cryptography\\10.0.7\\microsoft.bcl.cryptography.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.extensions.configuration.abstractions\\10.0.7\\microsoft.extensions.configuration.abstractions.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.extensions.dependencyinjection\\10.0.7\\microsoft.extensions.dependencyinjection.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\10.0.7\\microsoft.extensions.dependencyinjection.abstractions.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.extensions.diagnostics.abstractions\\10.0.7\\microsoft.extensions.diagnostics.abstractions.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.extensions.fileproviders.abstractions\\10.0.7\\microsoft.extensions.fileproviders.abstractions.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.extensions.hosting.abstractions\\10.0.7\\microsoft.extensions.hosting.abstractions.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\10.0.7\\microsoft.extensions.logging.abstractions.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.extensions.options\\10.0.7\\microsoft.extensions.options.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.extensions.primitives\\10.0.7\\microsoft.extensions.primitives.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.netcore.platforms\\5.0.0\\microsoft.netcore.platforms.5.0.0.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\microsoft.win32.registry\\5.0.0\\microsoft.win32.registry.5.0.0.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\npgsql\\10.0.2\\npgsql.10.0.2.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\system.diagnostics.diagnosticsource\\10.0.7\\system.diagnostics.diagnosticsource.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\system.formats.asn1\\10.0.7\\system.formats.asn1.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\system.memory\\4.6.3\\system.memory.4.6.3.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\system.security.accesscontrol\\5.0.0\\system.security.accesscontrol.5.0.0.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\system.security.cryptography.pkcs\\10.0.7\\system.security.cryptography.pkcs.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\system.security.cryptography.xml\\10.0.7\\system.security.cryptography.xml.10.0.7.nupkg.sha512",
+    "C:\\Users\\hojay\\.nuget\\packages\\system.security.principal.windows\\5.0.0\\system.security.principal.windows.5.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

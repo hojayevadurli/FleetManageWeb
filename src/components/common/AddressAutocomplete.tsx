@@ -3,6 +3,7 @@ import { Loader } from "@googlemaps/js-api-loader";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Check, CheckCircle2 } from "lucide-react";
+import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
 
 export interface ParsedAddress {
     street: string;
@@ -40,10 +41,13 @@ export function AddressAutocomplete({
     };
 
     useEffect(() => {
-        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCCej-dqJ3vLFfiXyVC8JvNOdzNuYOpczI";
-        if (!apiKey) return;
-
         const init = async () => {
+            let apiKey: string;
+            try {
+                apiKey = await getGoogleMapsApiKey();
+            } catch {
+                return;
+            }
             const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
             await loader.load();
 

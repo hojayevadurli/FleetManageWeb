@@ -146,6 +146,8 @@ export interface Equipment {
   lastLongitude?: number;
   lastLocationUpdatedAt?: string;
   telematicsOdometerMiles?: number;
+  telematicsFuelLevel?: number;   // 0–100 percent, synced from Motive
+  telematicsSpeed?: number;       // mph, synced from Motive
   externalProvider?: string;
   externalId?: string;
 
@@ -315,8 +317,18 @@ export interface EquipmentDto {
   inServiceDate: string;
   outOfServiceDate: string;
   notes: string;
-  recalls: any[]; // Define clearer recall type later if needed
+  recalls: any[];
   documents: EquipmentDocument[];
+  // Telematics — populated by Motive sync
+  lastLatitude?: number;
+  lastLongitude?: number;
+  lastLocationAt?: string;
+  lastSpeed?: number;
+  telematicsSpeedMph?: number;
+  telematicsOdometerMiles?: number;
+  telematicsFuelLevel?: number;
+  externalProvider?: string;
+  externalId?: string;
 }
 
 export interface EquipmentTypeDto {

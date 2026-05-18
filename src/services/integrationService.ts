@@ -2,9 +2,13 @@ import api from "@/lib/Api";
 import { Integration } from "@/lib/types";
 
 type MotiveImportDefaults = {
-    defaultFleetCategoryId: number | null;
-    defaultEquipmentTypeId: number | null;
-    defaultOperationalStatus: number | null;
+    autoCreateAssets: boolean;
+    autoCreateOperators: boolean;
+    autoSyncTelemetry: boolean;
+    importInactiveVehicles: boolean;
+    defaultEquipmentStatus: string | null;
+    defaultEquipmentType: string | null;
+    defaultOperatorStatus: string | null;
 };
 
 // Mock data as fallback
@@ -103,6 +107,19 @@ export const integrationService = {
         }
     },
 
+    // Syncs fuel level (and any other telematics not covered by the location sync).
+    // Falls back silently if the endpoint doesn't exist yet on the backend.
+    syncMotiveFuel: async (): Promise<any> => {
+        try {
+            const response = await api.post("/integrations/motive/sync-fuel-level");
+            return response.data;
+        } catch (error: any) {
+            if (error.response?.status === 404) return null; // endpoint not deployed yet
+            console.error("Fuel sync failed:", error);
+            return null;
+        }
+    },
+
     testMotiveConnection: async (apiKey: string, accountId?: string): Promise<boolean> => {
         try {
             const response = await api.post("/integrations/motive/test", {
@@ -141,9 +158,13 @@ export const integrationService = {
         try {
             const response = await api.get("/integrations/motive/import-defaults");
             return {
-                defaultFleetCategoryId: response.data?.defaultFleetCategoryId ?? null,
-                defaultEquipmentTypeId: response.data?.defaultEquipmentTypeId ?? null,
-                defaultOperationalStatus: response.data?.defaultOperationalStatus ?? null,
+                autoCreateAssets: response.data?.autoCreateAssets ?? true,
+                autoCreateOperators: response.data?.autoCreateOperators ?? true,
+                autoSyncTelemetry: response.data?.autoSyncTelemetry ?? true,
+                importInactiveVehicles: response.data?.importInactiveVehicles ?? false,
+                defaultEquipmentStatus: response.data?.defaultEquipmentStatus ?? null,
+                defaultEquipmentType: response.data?.defaultEquipmentType ?? null,
+                defaultOperatorStatus: response.data?.defaultOperatorStatus ?? null,
             };
         } catch (error: any) {
             console.error("Failed to load Motive import defaults:", error);
@@ -157,11 +178,7 @@ export const integrationService = {
         }
     },
 
-    saveMotiveImportDefaults: async (payload: {
-        defaultFleetCategoryId: number;
-        defaultEquipmentTypeId: number;
-        defaultOperationalStatus: number;
-    }): Promise<{ success: boolean }> => {
+    saveMotiveImportDefaults: async (payload: MotiveImportDefaults): Promise<{ success: boolean }> => {
         try {
             const response = await api.post("/integrations/motive/import-defaults", payload);
             return response.data;
