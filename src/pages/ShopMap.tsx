@@ -1,7 +1,6 @@
-import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
+import { getGoogleMapsLoader } from "@/lib/mapsConfig";
 
 import { useEffect, useRef, useState, useMemo } from "react";
-import { Loader } from "@googlemaps/js-api-loader";
 import { Shop, VENDOR_PREFERENCE_CONFIG } from "@/components/shops/types/ShopTypes";
 import { Locate, MapPin, Star, Phone, Navigation2, AlertCircle } from "lucide-react";
 
@@ -40,14 +39,7 @@ const ShopMap = ({ shops, center }: ShopMapProps) => {
     if (!mapRef.current) return;
 
     try {
-      const apiKey = await getGoogleMapsApiKey();
-      const loader = new Loader({
-        apiKey: apiKey,
-        version: "weekly",
-        libraries: ["places"],
-      });
-
-      await loader.load();
+      await getGoogleMapsLoader();
 
       const map = new window.google.maps.Map(mapRef.current, {
         zoom: 4,

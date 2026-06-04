@@ -122,7 +122,6 @@ export default function Login() {
 
       {/* Left Panel - Animation (Hidden on Mobile) */}
       <div className="hidden lg:flex relative flex-col items-center justify-center overflow-hidden bg-[#0B1121] border-r border-white/5">
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
         <div className="z-10 w-full max-w-2xl px-12">
           <LoginActivityFeed />
           <div className="mt-8 text-center space-y-2">

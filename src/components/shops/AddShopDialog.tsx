@@ -1,6 +1,5 @@
-import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
+import { getGoogleMapsLoader } from "@/lib/mapsConfig";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Loader } from "@googlemaps/js-api-loader";
 import {
   Globe, Search, ChevronRight, X, Tag, CheckCircle2, Loader2, ShieldCheck,
   MapPin, Phone, Star, Building2, User, Sparkles
@@ -502,11 +501,7 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
       setTimeout(async () => {
         if (!mapRef.current || mapInstanceRef.current) return;
 
-        const apiKey = await getGoogleMapsApiKey();
-        if (!apiKey) return;
-
-        const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
-        loader.load().then(() => {
+        getGoogleMapsLoader().then(() => {
           const defaultCenter = { lat: 41.8781, lng: -87.6298 }; // Chicago
           mapInstanceRef.current = new window.google.maps.Map(mapRef.current!, {
             center: defaultCenter,
@@ -578,15 +573,8 @@ const AddShopDialog = ({ open, onOpenChange, onShopAdded, shopToEdit, existingSh
     console.log("AddShopDialog: shopNameInputRef.current:", shopNameInputRef.current);
     console.log("AddShopDialog: addressInputRef.current:", addressInputRef.current);
 
-    const apiKey = await getGoogleMapsApiKey();
-    if (!apiKey) {
-      console.error("AddShopDialog: No API key!");
-      return;
-    }
-
     try {
-      const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
-      await loader.load();
+      await getGoogleMapsLoader();
       console.log("AddShopDialog: Google Maps loaded");
 
       // Helper to update form with place details

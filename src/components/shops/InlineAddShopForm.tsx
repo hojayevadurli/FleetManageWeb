@@ -1,6 +1,5 @@
-import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
+import { getGoogleMapsLoader } from "@/lib/mapsConfig";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Loader } from "@googlemaps/js-api-loader";
 import {
     Globe, MapPin, CheckCircle2, Loader2, Sparkles, X, Star, DollarSign
 } from "lucide-react";
@@ -225,11 +224,7 @@ export default function InlineAddShopForm({ initialData, onSuccess, onCancel }: 
 
     useEffect(() => {
         const initMaps = async () => {
-            const apiKey = await getGoogleMapsApiKey();
-            if (!apiKey) return;
-
-            const loader = new Loader({ apiKey, version: "weekly", libraries: ["places", "marker"] });
-            await loader.load();
+            await getGoogleMapsLoader();
 
 
             // Address Autocomplete

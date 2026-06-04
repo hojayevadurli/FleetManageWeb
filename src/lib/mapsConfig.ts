@@ -1,22 +1,14 @@
-/**
- * Fetches the Google Maps API key securely from the backend.
- * The key is cached after the first fetch to avoid repeated API calls.
- */
-
 import api from "@/lib/Api";
-
-const API_URL = import.meta.env.VITE_API_URL as string;
+import { Loader } from "@googlemaps/js-api-loader";
 
 let cachedKey: string | null = null;
-let fetchPromise: Promise<string> | null = null;
+let keyFetchPromise: Promise<string> | null = null;
 
 export async function getGoogleMapsApiKey(): Promise<string> {
   if (cachedKey) return cachedKey;
+  if (keyFetchPromise) return keyFetchPromise;
 
-  // Deduplicate concurrent calls
-  if (fetchPromise) return fetchPromise;
-
-  fetchPromise = (async () => {
+  keyFetchPromise = (async () => {
     try {
       const res = await api.get<{ key: string }>("/config/maps-key");
       cachedKey = res.data.key;
@@ -25,15 +17,40 @@ export async function getGoogleMapsApiKey(): Promise<string> {
       console.error("Failed to load Google Maps API key:", error);
       throw error;
     } finally {
-      fetchPromise = null;
+      keyFetchPromise = null;
     }
   })();
 
-  return fetchPromise;
+  return keyFetchPromise;
 }
 
-/** Clear cached key (e.g. on logout) */
+// Singleton loader — all components must share this one instance so the
+// Loader class doesn't throw when re-instantiated with different options.
+let sharedLoader: Loader | null = null;
+let loaderReady: Promise<void> | null = null;
+
+export async function getGoogleMapsLoader(): Promise<Loader> {
+  const apiKey = await getGoogleMapsApiKey();
+
+  if (!sharedLoader) {
+    sharedLoader = new Loader({
+      apiKey,
+      version: "weekly",
+      libraries: ["places", "marker"],
+    });
+  }
+
+  if (!loaderReady) {
+    loaderReady = sharedLoader.load();
+  }
+  await loaderReady;
+
+  return sharedLoader;
+}
+
 export function clearMapsKeyCache() {
   cachedKey = null;
-  fetchPromise = null;
+  keyFetchPromise = null;
+  sharedLoader = null;
+  loaderReady = null;
 }

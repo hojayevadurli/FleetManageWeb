@@ -1,4 +1,4 @@
-import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
+import { getGoogleMapsLoader } from "@/lib/mapsConfig";
 import { useState, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,7 +14,6 @@ import {
   Pencil,
   Check,
 } from "lucide-react";
-import { Loader } from "@googlemaps/js-api-loader";
 import { toast } from "sonner";
 import api from "@/lib/Api";
 
@@ -85,9 +84,7 @@ const FleetMapView = ({ vehicles }: FleetMapViewProps) => {
   const initializeMap = async () => {
     if (!mapRef.current) return;
     try {
-      const apiKey = await getGoogleMapsApiKey();
-      const loader = new Loader({ apiKey, version: "weekly" });
-      await loader.load();
+      await getGoogleMapsLoader();
 
       const map = new window.google.maps.Map(mapRef.current, {
         zoom: 4,

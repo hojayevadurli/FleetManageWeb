@@ -4,7 +4,8 @@
       "Bash(dotnet run *)",
       "Read(//c/Users/hojay/source/repos/FleetManageWeb/**)",
       "Read(//c/Users/hojay/source/repos/**)",
-      "Bash(grep -E \"\\\\.cs$\")"
+      "Bash(grep -E \"\\\\.cs$\")",
+      "Bash(xargs grep *)"
     ]
   }
 }

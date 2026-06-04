@@ -1,4 +1,3 @@
-import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
