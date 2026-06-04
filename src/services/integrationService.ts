@@ -88,7 +88,15 @@ export const integrationService = {
     },
 
     disconnect: async (provider: string): Promise<void> => {
-        console.log(`Disconnecting ${provider}...`);
+        await integrationService.disconnectIntegration(provider);
+    },
+
+    disconnectIntegration: async (provider: string): Promise<void> => {
+        if (provider === 'Motive') {
+            await api.post("/integrations/motive/disconnect");
+        } else {
+            throw new Error(`Disconnect not implemented for provider: ${provider}`);
+        }
     },
 
     syncMotive: async (): Promise<any> => {
