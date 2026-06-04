@@ -185,7 +185,6 @@ export const FAQ = () => {
 // --- CTA SECTION ---
 export const CTASection = () => (
     <section className="py-24 bg-gradient-to-br from-[#4F7CFF] to-purple-600 text-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
         <div className="container mx-auto px-4 relative z-10">
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Stop Wrestling With Paperwork.</h2>
             <p className="text-white/80 text-xl mb-10 max-w-2xl mx-auto">Start talking to your fleet today. Join fleet operators who save hours every week.</p>

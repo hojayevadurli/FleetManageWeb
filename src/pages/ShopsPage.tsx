@@ -1,4 +1,4 @@
-import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
+import { getGoogleMapsLoader } from "@/lib/mapsConfig";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Page, PageHeader } from "@/components/layout/Page";
 import {
@@ -20,7 +20,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useLocation } from "react-router-dom";
 import { shopsApi } from "@/lib/shopsApi";
 import { workOrdersApi } from "@/lib/workOrdersApi";
-import { Loader } from "@googlemaps/js-api-loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -176,14 +175,7 @@ const ShopsPage = () => {
 
   const initializeGoogleMaps = async () => {
     try {
-      const apiKey = await getGoogleMapsApiKey();
-      const loader = new Loader({
-        apiKey: apiKey,
-        version: "weekly",
-        libraries: ["places"],
-      });
-
-      await loader.load();
+      await getGoogleMapsLoader();
 
       if (searchInputRef.current) {
         autocompleteRef.current = new window.google.maps.places.Autocomplete(searchInputRef.current, {

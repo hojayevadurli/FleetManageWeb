@@ -93,11 +93,14 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
         loadTenantStatus();
     }, [user]);
 
-    // Listen for the global 403 event from axios
+    // Listen for the global 403 event from axios — only open the modal when the user
+    // explicitly tries a write action that gets blocked, not on every page load.
     useEffect(() => {
         const handlePaymentRequired = () => {
-            setIsModalOpen(true);
-            setIsReadOnly(true); // Force read-only if the backend just caught it
+            setIsReadOnly(true); // ensure read-only state is set
+            // Modal is intentionally NOT auto-opened here; the header banner is enough
+            // passive awareness. The modal can be triggered via triggerPaymentModal()
+            // from specific write action handlers.
         };
 
         window.addEventListener(PAYMENT_REQUIRED_EVENT, handlePaymentRequired);
@@ -128,15 +131,14 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <DialogContent className="sm:max-w-md w-[95%] rounded-3xl overflow-hidden p-0 border-0 shadow-2xl bg-white">
                     <div className="bg-gradient-to-r from-red-500 to-rose-600 p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
-                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay pointer-events-none"></div>
                         <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-4 shadow-lg border border-white/20 relative z-10">
                             <AlertCircle className="w-8 h-8 text-white" />
                         </div>
                         <h2 className="text-2xl font-black tracking-tight text-white mb-2 relative z-10">
-                            Subscription Inactive
+                            Subscription Required
                         </h2>
                         <p className="text-red-50 font-medium text-sm leading-relaxed max-w-[260px] relative z-10 opacity-90">
-                            Your account is currently read-only. We couldn't process your last payment or your trial has expired.
+                            Your account is in read-only mode. Visit Billing to resubscribe or update your payment method.
                         </p>
                     </div>
 
@@ -146,8 +148,8 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
                                 <CreditCard className="w-5 h-5 text-rose-600" />
                             </div>
                             <div>
-                                <h4 className="text-sm font-bold text-slate-900 mb-1">Update Payment Method</h4>
-                                <p className="text-xs text-slate-500 font-medium">Please link a valid payment method to resume adding or editing data.</p>
+                                <h4 className="text-sm font-bold text-slate-900 mb-1">Action Required</h4>
+                                <p className="text-xs text-slate-500 font-medium">Resubscribe or update your payment method to resume adding and editing data.</p>
                             </div>
                         </div>
 

@@ -1,4 +1,4 @@
-import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
+import { getGoogleMapsLoader } from "@/lib/mapsConfig";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { shopsApi } from "@/lib/shopsApi";
 import { Shop } from "./types/ShopTypes";
-import { Loader } from "@googlemaps/js-api-loader";
 
 // Declare global google types to avoid TypeScript errors
 declare global {
@@ -59,14 +58,7 @@ const ShopMap = () => {
     if (!mapRef.current) return;
 
     try {
-      const apiKey = await getGoogleMapsApiKey();
-      const loader = new Loader({
-        apiKey: apiKey,
-        version: "weekly",
-        libraries: ["places"]
-      });
-
-      await loader.load();
+      await getGoogleMapsLoader();
 
       // Now we can safely use google.maps
       const map = new window.google.maps.Map(mapRef.current, {

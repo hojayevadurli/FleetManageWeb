@@ -117,7 +117,24 @@ const DashboardHeader = () => {
   // Handle potential nested user object from backend
   const user = (authUser as any)?.user || authUser;
 
+  const { isReadOnly, tenant: subTenant } = useSubscription();
+  const billingStatus = subTenant?.billingStatus?.toLowerCase();
+  const isCancelled = billingStatus === "canceled" || billingStatus === "cancelled";
+
   return (
+    <>
+    {isReadOnly && (
+      <div className="bg-amber-500 text-white px-6 py-2 flex items-center justify-between text-xs font-bold sticky top-0 z-20">
+        <span>
+          {isCancelled
+            ? "Your subscription is cancelled — you're in read-only mode. Resubscribe to make changes."
+            : "Your subscription is inactive — you're in read-only mode. Update your payment to make changes."}
+        </span>
+        <a href="/app/settings/billing" className="underline underline-offset-2 hover:text-amber-100 transition-colors shrink-0 ml-4">
+          Manage Billing →
+        </a>
+      </div>
+    )}
     <header className="flex h-20 shrink-0 items-center justify-between px-8 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-10">
       <div className="flex items-center gap-6">
         <SidebarTrigger className="-ml-2 text-slate-400 hover:text-slate-900 transition-colors" />
@@ -226,6 +243,7 @@ const DashboardHeader = () => {
         </DropdownMenu>
       </div>
     </header>
+    </>
   );
 };
 

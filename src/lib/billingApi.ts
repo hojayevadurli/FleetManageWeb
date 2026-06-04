@@ -16,6 +16,17 @@ export interface InvoiceDto {
     receiptUrl?: string;
 }
 
+export interface SubscriptionEventDto {
+    id: number;
+    eventType: string;
+    stripeSubscriptionId?: string;
+    stripePriceId?: string;
+    quantity?: number;
+    amountPaid?: number;
+    description?: string;
+    occurredAt: string;
+}
+
 export const STRIPE_PRICE_ID = "price_1T3sJpCVvDykkptYdVnyMK25";
 
 export const billingApi = {
@@ -45,7 +56,18 @@ export const billingApi = {
     async getUpcomingInvoice(): Promise<{ amountDue: number, date: string | null }> {
         const response = await api.get<{ amountDue: number, date: string | null }>("/billing/upcoming-invoice");
         return response.data;
-    }
+    },
+
+    // POST /api/billing/sync-subscription — pulls live data from Stripe, refreshes DB
+    async syncSubscription(): Promise<void> {
+        await api.post("/billing/sync-subscription");
+    },
+
+    // GET /api/billing/subscription-history
+    async getSubscriptionHistory(): Promise<SubscriptionEventDto[]> {
+        const response = await api.get<SubscriptionEventDto[]>("/billing/subscription-history");
+        return response.data;
+    },
 };
 
 export default billingApi;

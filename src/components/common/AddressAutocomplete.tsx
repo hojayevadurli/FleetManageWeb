@@ -1,9 +1,8 @@
 import { useRef, useEffect, useState } from "react";
-import { Loader } from "@googlemaps/js-api-loader";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Check, CheckCircle2 } from "lucide-react";
-import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
+import { getGoogleMapsLoader } from "@/lib/mapsConfig";
 
 export interface ParsedAddress {
     street: string;
@@ -42,14 +41,11 @@ export function AddressAutocomplete({
 
     useEffect(() => {
         const init = async () => {
-            let apiKey: string;
             try {
-                apiKey = await getGoogleMapsApiKey();
+                await getGoogleMapsLoader();
             } catch {
                 return;
             }
-            const loader = new Loader({ apiKey, version: "weekly", libraries: ["places"] });
-            await loader.load();
 
             if (inputRef.current && !autocompleteRef.current) {
                 autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {

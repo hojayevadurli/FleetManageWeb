@@ -1,4 +1,4 @@
-import { getGoogleMapsApiKey } from "@/lib/mapsConfig";
+import { getGoogleMapsLoader } from "@/lib/mapsConfig";
 
 import React, { useState, useMemo, useEffect } from 'react';
 import {
@@ -131,13 +131,8 @@ const Vendors: React.FC<VendorsProps> = ({ vendors, workOrders, onUpdateVendors,
     }, [viewMode, userLocation]);
 
     const initMap = async () => {
-        const loader = new Loader({
-            apiKey: await getGoogleMapsApiKey(),
-            version: "weekly",
-        });
-
         try {
-            await loader.load();
+            await getGoogleMapsLoader();
             if (!mapRef.current) return;
 
             const map = new google.maps.Map(mapRef.current, {
