@@ -19,9 +19,9 @@ type FleetDiagnostic = DiagnosticAlert & {
 
 const SEV_STYLE: Record<string, string> = {
     critical: 'bg-red-100 text-red-700 border-red-200',
-    high:     'bg-orange-100 text-orange-700 border-orange-200',
-    medium:   'bg-amber-100 text-amber-700 border-amber-200',
-    low:      'bg-blue-50 text-blue-700 border-blue-100',
+    high: 'bg-orange-100 text-orange-700 border-orange-200',
+    medium: 'bg-amber-100 text-amber-700 border-amber-200',
+    low: 'bg-blue-50 text-blue-700 border-blue-100',
 };
 const sevStyle = (sev?: string) =>
     SEV_STYLE[(sev || '').toLowerCase()] ?? 'bg-slate-100 text-slate-600 border-slate-200';
@@ -214,7 +214,7 @@ export default function DiagnosticsPage() {
                                 </>
                             );
                         })()}
-                        )}
+                        )
                     </div>
 
                     {/* Detail Panel */}
