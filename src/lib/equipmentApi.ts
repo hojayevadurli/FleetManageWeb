@@ -2,6 +2,23 @@ import api from "@/lib/Api";
 import { Equipment, EquipmentDto, EquipmentOperationalStatus, EquipmentDocument, DocumentRole } from "@/lib/types";
 import { uploadsApi } from "@/lib/uploadsApi";
 
+export interface DiagnosticAlert {
+  id: number;
+  code: string;
+  description?: string;
+  severity?: string;
+  status: string;
+  alertAt: string;
+  lastObservedAt?: string;
+  resolvedAt?: string;
+  occurrenceCount?: number;
+  network?: string;
+  sourceAddress?: string;
+  fmiDescription?: string;
+  faultType?: string;
+  externalProvider: string;
+}
+
 export const mapDtoToEquipment = (dto: EquipmentDto): Equipment => {
   return {
     id: dto.id,
@@ -28,6 +45,9 @@ export const mapDtoToEquipment = (dto: EquipmentDto): Equipment => {
     acquiredDate: dto.acquiredDate,
     inServiceDate: dto.inServiceDate,
     outOfServiceDate: dto.outOfServiceDate,
+    telematicsFuelLevel: dto.telematicsFuelLevel,
+    latitude: dto.lastLatitude,
+    longitude: dto.lastLongitude,
   };
 };
 
@@ -161,7 +181,13 @@ export const equipmentApi = {
   // DELETE /api/equipment/{id}/documents/{documentId}
   async deleteDocument(id: string, documentId: string): Promise<void> {
     await api.delete(`/equipment/${id}/documents/${documentId}`);
-  }
+  },
+
+  // GET /api/equipment/{id}/diagnostics
+  async getDiagnostics(id: string): Promise<DiagnosticAlert[]> {
+    const response = await api.get<DiagnosticAlert[]>(`/equipment/${id}/diagnostics`);
+    return response.data;
+  },
 };
 
 export default equipmentApi;

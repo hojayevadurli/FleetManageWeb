@@ -51,6 +51,7 @@ import DriverDetailPage from "./pages/DriverDetailPage";
 import CreateDriverPage from "./pages/CreateDriverPage";
 import EditDriverPage from "./pages/EditDriverPage";
 import SupportPage from "./pages/support/SupportPage";
+import DiagnosticsPage from "./pages/DiagnosticsPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 
 import SettingsLayout from "./pages/settings/SettingsLayout";
@@ -282,6 +283,7 @@ const App = () => (
                               <Route path="/dashboard" element={<Dashboard />} />
                               <Route path="/equipment" element={<Equipment />} />
                               <Route path="/equipment/map" element={<FleetMap />} />
+                              <Route path="/equipment/diagnostics" element={<DiagnosticsPage />} />
                               <Route path="/service" element={<WorkOrders />} />
                               <Route path="/history/trucks" element={<HistoryTrucks />} />
                               <Route path="/history/repairs" element={<RepairHistoryPage />} />

@@ -41,6 +41,9 @@ import { getEquipmentChatResponse } from '@/lib/gemini';
 import SpendAnalytics from './SpendAnalytics';
 import { getMaintenancePredictions, getRiskLevelText } from '@/lib/maintenanceApi';
 import type { PredictedMaintenanceEvent } from '@/types/maintenance';
+import equipmentApi, { DiagnosticAlert } from '@/lib/equipmentApi';
+import { integrationService } from '@/services/integrationService';
+import { toast } from 'sonner';
 
 interface ExtendedChatMessage extends ChatMessage {
     sources?: any[];
@@ -190,6 +193,49 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
 
     // Tab State
     const [activeTab, setActiveTab] = useState<'dashboard' | 'diagnostics' | 'inspections' | 'history' | 'documents' | 'ai' | 'spend' | 'warranty'>('dashboard');
+
+    // Diagnostics
+    const [diagnostics, setDiagnostics] = useState<DiagnosticAlert[]>([]);
+    const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+    const [diagnosticsSyncing, setDiagnosticsSyncing] = useState(false);
+
+    useEffect(() => {
+        if (activeTab !== 'diagnostics') return;
+        setDiagnosticsLoading(true);
+        equipmentApi.getDiagnostics(equipment.id)
+            .then(async (stored) => {
+                setDiagnostics(stored);
+                // Auto-sync on first open so the tab is never stale
+                try {
+                    await integrationService.syncFaults();
+                    const fresh = await equipmentApi.getDiagnostics(equipment.id);
+                    setDiagnostics(fresh);
+                } catch {
+                    // Motive not connected or no fault codes endpoint — silently ignore
+                }
+            })
+            .catch(() => {})
+            .finally(() => setDiagnosticsLoading(false));
+    }, [activeTab, equipment.id]);
+
+    const handleSyncFaults = async () => {
+        setDiagnosticsSyncing(true);
+        try {
+            const result = await integrationService.syncFaults();
+            const fresh = await equipmentApi.getDiagnostics(equipment.id);
+            setDiagnostics(fresh);
+            const active = fresh.filter(d => d.status === 'Active').length;
+            if (active > 0) {
+                toast.warning(`${active} active fault code${active > 1 ? 's' : ''} found.`);
+            } else {
+                toast.success('Sync complete — no active fault codes.');
+            }
+        } catch (err: any) {
+            toast.error(err?.response?.data || 'Failed to sync fault codes. Check Motive connection.');
+        } finally {
+            setDiagnosticsSyncing(false);
+        }
+    };
 
     const equipmentHistory = workOrders.filter(wo => wo.equipmentId === equipment.id);
 
@@ -446,6 +492,31 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 border-b border-dashed border-slate-300 w-fit">Odometer</div>
                                                 <div className="font-mono font-bold text-slate-800 truncate">{equipment.mileage ? equipment.mileage.toLocaleString() + ' mi' : 'N/A'}</div>
                                             </div>
+                                            {equipment.telematicsFuelLevel != null && (
+                                                <div className="min-w-[100px]">
+                                                    <div className="text-[9px] font-black uppercase tracking-widest mb-1 w-fit" style={{
+                                                        color: equipment.telematicsFuelLevel <= 15 ? '#e11d48' :
+                                                               equipment.telematicsFuelLevel <= 30 ? '#d97706' : '#64748b'
+                                                    }}>Fuel Level</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-24 h-2 rounded-full bg-slate-200 overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full ${
+                                                                    equipment.telematicsFuelLevel <= 15 ? 'bg-rose-500' :
+                                                                    equipment.telematicsFuelLevel <= 30 ? 'bg-amber-400' :
+                                                                    'bg-emerald-500'
+                                                                }`}
+                                                                style={{ width: `${Math.round(equipment.telematicsFuelLevel)}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className={`font-black text-sm ${
+                                                            equipment.telematicsFuelLevel <= 15 ? 'text-rose-600' :
+                                                            equipment.telematicsFuelLevel <= 30 ? 'text-amber-600' :
+                                                            'text-slate-800'
+                                                        }`}>{Math.round(equipment.telematicsFuelLevel)}%</span>
+                                                    </div>
+                                                </div>
+                                            )}
                                             <div className="min-w-[120px]">
                                                 <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1 flex items-center gap-1">
                                                     <MapPin className="w-3 h-3" /> Location
@@ -747,18 +818,65 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     </h3>
                                     <p className="text-slate-500 text-sm mt-1">Live telematics codes synced from Motive integration.</p>
                                 </div>
-                                <Button className="bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold uppercase tracking-widest text-xs gap-2 rounded-xl">
-                                    <AlertCircle className="w-4 h-4" /> Sync Codes
+                                <Button
+                                    onClick={handleSyncFaults}
+                                    disabled={diagnosticsSyncing}
+                                    className="bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold uppercase tracking-widest text-xs gap-2 rounded-xl"
+                                >
+                                    {diagnosticsSyncing
+                                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Syncing...</>
+                                        : <><AlertCircle className="w-4 h-4" /> Sync Codes</>
+                                    }
                                 </Button>
                             </div>
 
-                            <div className="p-16 text-center border-2 border-dashed border-slate-100 rounded-[2rem] bg-slate-50/50">
-                                <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <ShieldCheck className="w-8 h-8 text-emerald-600" />
+                            {diagnosticsLoading ? (
+                                <div className="p-16 text-center">
+                                    <Loader2 className="w-8 h-8 animate-spin text-slate-300 mx-auto mb-3" />
+                                    <p className="text-slate-400 text-sm font-bold">Loading fault codes...</p>
                                 </div>
-                                <h4 className="font-black text-slate-900 text-lg">No Active Fault Codes</h4>
-                                <p className="text-slate-500 text-sm mt-1">Engine is reporting healthy status. Real-time polling enabled.</p>
-                            </div>
+                            ) : diagnostics.filter(d => d.status === 'Active').length > 0 ? (
+                                <div className="space-y-3">
+                                    {diagnostics.filter(d => d.status === 'Active').map(fault => {
+                                        const sev = (fault.severity || '').toLowerCase();
+                                        const sevStyle = sev === 'critical' ? 'bg-red-100 text-red-700 border-red-200'
+                                            : sev === 'high' ? 'bg-orange-100 text-orange-700 border-orange-200'
+                                            : sev === 'medium' ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                            : 'bg-slate-100 text-slate-600 border-slate-200';
+                                        return (
+                                            <div key={fault.id} className="flex items-start gap-4 p-5 rounded-2xl border border-rose-100 bg-rose-50/40">
+                                                <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+                                                    <AlertCircle className="w-5 h-5 text-rose-600" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-black text-slate-900 font-mono">{fault.code}</span>
+                                                        {fault.severity && (
+                                                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${sevStyle}`}>
+                                                                {fault.severity}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {fault.description && (
+                                                        <p className="text-sm text-slate-600 mt-1">{fault.description}</p>
+                                                    )}
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1.5">
+                                                        Detected {format(parseISO(fault.alertAt), "MMM d, yyyy h:mm a")}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="p-16 text-center border-2 border-dashed border-slate-100 rounded-[2rem] bg-slate-50/50">
+                                    <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <ShieldCheck className="w-8 h-8 text-emerald-600" />
+                                    </div>
+                                    <h4 className="font-black text-slate-900 text-lg">No Active Fault Codes</h4>
+                                    <p className="text-slate-500 text-sm mt-1">Engine is reporting healthy status. Click Sync Codes to pull latest from Motive.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

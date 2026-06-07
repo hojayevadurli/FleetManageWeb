@@ -25,6 +25,7 @@ import {
     User
 } from 'lucide-react';
 import { equipmentApi, EquipmentCreatePayload } from '@/lib/equipmentApi';
+import { useNavigate } from 'react-router-dom';
 import { fleetCategoriesApi, FleetCategory } from '@/lib/fleetCategoriesApi';
 import { equipmentTypesApi } from '@/lib/equipmentTypesApi';
 import { tenantsApi } from '@/lib/tenantsApi';
@@ -68,6 +69,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [categories, setCategories] = useState<FleetCategory[]>([]);
     const [companyName, setCompanyName] = useState("Fleet Company");
+    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchCategoriesAndTenant = async () => {
@@ -256,6 +258,14 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
             >
                 <div className="flex gap-3">
                     <Button
+                        onClick={() => navigate('/app/equipment/diagnostics')}
+                        variant="outline"
+                        className="h-10 px-4 rounded-lg flex items-center gap-2 font-bold text-sm border border-slate-200 bg-white text-slate-600 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 transition-all"
+                    >
+                        <AlertCircle className="w-4 h-4" />
+                        Diagnostics
+                    </Button>
+                    <Button
                         onClick={() => setIsAddModalOpen(true)}
                         className="bg-blue-600 text-white h-10 px-6 rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition-all font-bold shadow-sm active:scale-95"
                     >
@@ -276,63 +286,42 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                     />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4">
-                    {/* Type Filters */}
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="ghost"
-                            onClick={() => setTypeFilter('ALL')}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${typeFilter === 'ALL'
-                                ? "bg-blue-600 text-white border-blue-600 shadow-sm hover:bg-blue-700 hover:text-white"
-                                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                                }`}
-                        >
-                            All Types
-                        </Button>
-                        {categories.map(cat => {
-                            const displayName = cat.name === 'School Bus' ? 'Bus' : cat.name;
-                            const isActive = typeFilter === cat.id;
-                            return (
-                                <Button
-                                    key={cat.id}
-                                    variant="ghost"
-                                    onClick={() => setTypeFilter(cat.id)}
-                                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${isActive
-                                        ? "bg-blue-600 text-white border-blue-600 shadow-sm hover:bg-blue-700 hover:text-white"
-                                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                                        }`}
-                                >
-                                    {displayName}
-                                </Button>
-                            );
-                        })}
-                    </div>
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Type Dropdown */}
+                    <Select
+                        value={String(typeFilter)}
+                        onValueChange={(v) => setTypeFilter(v === 'ALL' ? 'ALL' : isNaN(Number(v)) ? v : Number(v))}
+                    >
+                        <SelectTrigger className="h-10 w-[140px] bg-white border-slate-200 text-sm font-medium rounded-lg">
+                            <SelectValue placeholder="All Types" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">All Types</SelectItem>
+                            {categories.map(cat => (
+                                <SelectItem key={cat.id} value={String(cat.id)}>
+                                    {cat.name === 'School Bus' ? 'Bus' : cat.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
 
-                    <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
-
-                    {/* Status Filters */}
-                    <div className="flex items-center gap-2">
-                        {(['ALL', ...Object.values(EquipmentOperationalStatus).filter(v => typeof v === 'number')] as const).map(status => {
-                            const isActive = statusFilter === status;
-
-                            // Status Display Name logic
-                            const label = status === 'ALL' ? 'All Status' : EquipmentOperationalStatus[status as number].replace(/([A-Z])/g, ' $1').trim();
-
-                            return (
-                                <Button
-                                    key={status}
-                                    variant="ghost"
-                                    onClick={() => setStatusFilter(status as any)}
-                                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all h-8 ${isActive
-                                        ? "bg-blue-600 text-white border-blue-600 shadow-sm hover:bg-blue-700 hover:text-white"
-                                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                                        }`}
-                                >
-                                    {label}
-                                </Button>
-                            );
-                        })}
-                    </div>
+                    {/* Status Dropdown */}
+                    <Select
+                        value={String(statusFilter)}
+                        onValueChange={(v) => setStatusFilter(v === 'ALL' ? 'ALL' : Number(v) as EquipmentOperationalStatus)}
+                    >
+                        <SelectTrigger className="h-10 w-[150px] bg-white border-slate-200 text-sm font-medium rounded-lg">
+                            <SelectValue placeholder="All Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">All Status</SelectItem>
+                            {(Object.values(EquipmentOperationalStatus).filter(v => typeof v === 'number') as number[]).map(status => (
+                                <SelectItem key={status} value={String(status)}>
+                                    {EquipmentOperationalStatus[status].replace(/([A-Z])/g, ' $1').trim()}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
             </div>
 
@@ -393,11 +382,33 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                                             )}
                                         </div>
 
-                                        <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 flex flex-col gap-1.5">
+                                        <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 flex flex-col gap-2.5">
                                             <div className="flex items-center justify-between text-[10px] text-slate-400 font-black uppercase tracking-widest">
                                                 <span>Last Service</span>
                                                 <span className="text-slate-600">{e.lastServiceDate?.split('T')[0] || 'N/A'}</span>
                                             </div>
+                                            {e.telematicsFuelLevel != null && (
+                                                <div>
+                                                    <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest mb-1">
+                                                        <span className="text-slate-400">Fuel</span>
+                                                        <span className={
+                                                            e.telematicsFuelLevel <= 15 ? 'text-rose-600' :
+                                                            e.telematicsFuelLevel <= 30 ? 'text-amber-600' :
+                                                            'text-emerald-600'
+                                                        }>{Math.round(e.telematicsFuelLevel)}%</span>
+                                                    </div>
+                                                    <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all ${
+                                                                e.telematicsFuelLevel <= 15 ? 'bg-rose-500' :
+                                                                e.telematicsFuelLevel <= 30 ? 'bg-amber-400' :
+                                                                'bg-emerald-500'
+                                                            }`}
+                                                            style={{ width: `${Math.round(e.telematicsFuelLevel)}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 

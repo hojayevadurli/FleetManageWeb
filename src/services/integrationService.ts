@@ -202,6 +202,11 @@ export const integrationService = {
         }
     },
 
+    syncFaults: async (): Promise<{ synced: number }> => {
+        const response = await api.post<{ synced: number }>("/integrations/motive/sync-faults");
+        return response.data;
+    },
+
     saveMotiveMappings: async (mappings: any[]): Promise<void> => {
         try {
             await api.post("/integrations/motive/save-mappings", mappings);
