@@ -327,6 +327,7 @@ export interface EquipmentDto {
   telematicsSpeedMph?: number;
   telematicsOdometerMiles?: number;
   telematicsFuelLevel?: number;
+  lastLocationAddress?: string;
   externalProvider?: string;
   externalId?: string;
 }

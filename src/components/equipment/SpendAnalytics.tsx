@@ -125,19 +125,19 @@ const SpendAnalytics: React.FC<SpendAnalyticsProps> = ({ data, equipmentInServic
     // 3. Empty State Handling
     if (!data || data.length === 0) {
         return (
-            <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm p-16 text-center animate-in fade-in zoom-in duration-300">
-                <div className="bg-slate-50 w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-inner">
-                    <BarChart3 className="w-10 h-10 text-slate-300" />
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-10 md:p-12 text-center animate-in fade-in zoom-in duration-300">
+                <div className="bg-slate-50 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-5 shadow-inner">
+                    <BarChart3 className="w-8 h-8 text-slate-300" />
                 </div>
-                <h3 className="text-2xl font-black text-slate-900 mb-2">No Spend Data Yet</h3>
-                <p className="text-slate-500 font-medium max-w-md mx-auto mb-8 leading-relaxed">
+                <h3 className="text-xl font-black text-slate-900 mb-2">No Spend Data Yet</h3>
+                <p className="text-slate-500 font-medium max-w-md mx-auto mb-6 leading-relaxed text-sm">
                     Add your first work order or service record to unlock powerful financial insights and tracking for this unit.
                 </p>
                 {onAddRecord && (
                     <Button
-                        size="lg"
+                        size="default"
                         onClick={onAddRecord}
-                        className="h-14 px-8 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl bg-blue-600 hover:bg-blue-700 text-white"
+                        className="h-11 px-6 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg bg-blue-600 hover:bg-blue-700 text-white"
                     >
                         <Plus className="w-4 h-4 mr-2" /> Add First Record
                     </Button>
@@ -152,7 +152,7 @@ const SpendAnalytics: React.FC<SpendAnalyticsProps> = ({ data, equipmentInServic
             {/* Top Metrics Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Total Spend */}
-                <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden group">
+                <div className="bg-slate-900 rounded-2xl p-6 md:p-8 text-white relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 rounded-bl-full blur-2xl pointer-events-none group-hover:bg-blue-500/30 transition-all"></div>
                     <div className="relative z-10">
                         <div className="flex items-center gap-3 mb-4">
@@ -161,7 +161,7 @@ const SpendAnalytics: React.FC<SpendAnalyticsProps> = ({ data, equipmentInServic
                             </div>
                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lifetime Spend</span>
                         </div>
-                        <div className="text-4xl font-black tracking-tighter mb-1">
+                        <div className="text-3xl md:text-4xl font-black tracking-tighter mb-1">
                             ${metrics.totalSpend.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </div>
                         <p className="text-xs text-slate-400 font-medium">Total cost of ownership</p>
@@ -169,28 +169,28 @@ const SpendAnalytics: React.FC<SpendAnalyticsProps> = ({ data, equipmentInServic
                 </div>
 
                 {/* L30D Spend */}
-                <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="p-2 bg-emerald-50 rounded-xl">
                             <Calendar className="w-5 h-5 text-emerald-500" />
                         </div>
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Last 30 Days</span>
                     </div>
-                    <div className="text-4xl font-black tracking-tighter mb-1 text-slate-900">
+                    <div className="text-3xl md:text-4xl font-black tracking-tighter mb-1 text-slate-900">
                         ${metrics.last30DaysSpend.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </div>
                     <p className="text-xs text-slate-500 font-medium">Recent maintenance activity</p>
                 </div>
 
                 {/* Avg Monthly */}
-                <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="p-2 bg-purple-50 rounded-xl">
                             <TrendingUp className="w-5 h-5 text-purple-500" />
                         </div>
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Monthly Avg</span>
                     </div>
-                    <div className="text-4xl font-black tracking-tighter mb-1 text-slate-900">
+                    <div className="text-3xl md:text-4xl font-black tracking-tighter mb-1 text-slate-900">
                         ${metrics.avgMonthly.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </div>
                     <p className="text-xs text-slate-500 font-medium">Estimated burn rate</p>
@@ -201,7 +201,7 @@ const SpendAnalytics: React.FC<SpendAnalyticsProps> = ({ data, equipmentInServic
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
                 {/* Monthly Trend (Line Chart) */}
-                <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm xl:col-span-2">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm xl:col-span-2">
                     <div className="flex items-center justify-between mb-8">
                         <div>
                             <h3 className="text-lg font-black text-slate-900">Spending Trend</h3>
@@ -248,7 +248,7 @@ const SpendAnalytics: React.FC<SpendAnalyticsProps> = ({ data, equipmentInServic
                 </div>
 
                 {/* Category Breakdown (Bar Chart) */}
-                <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm">
                     <h3 className="text-lg font-black text-slate-900 mb-1">Spend by Category</h3>
                     <p className="text-xs text-slate-500 font-medium mb-8">Cost distribution across service types</p>
                     <div className="h-[300px] w-full">
@@ -280,7 +280,7 @@ const SpendAnalytics: React.FC<SpendAnalyticsProps> = ({ data, equipmentInServic
                 </div>
 
                 {/* Vendor Breakdown (Pie Chart) */}
-                <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm">
                     <h3 className="text-lg font-black text-slate-900 mb-1">Top Vendors</h3>
                     <p className="text-xs text-slate-500 font-medium mb-8">Highest spend service providers</p>
                     <div className="h-[300px] w-full relative">

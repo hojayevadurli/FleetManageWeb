@@ -95,18 +95,30 @@ const FleetMap = () => {
         setSyncing(true);
 
         try {
-            // Fuel is synced inside syncMotive() — no separate fuel call needed
-            const [motiveResult] = await Promise.allSettled([
+            // Try both providers in parallel — whichever is connected will succeed.
+            // If neither is connected both will reject with a 400; that's not an error,
+            // just means we'll show the last-known positions from the database.
+            const [motiveResult, samsaraResult] = await Promise.allSettled([
                 integrationService.syncMotive(),
+                integrationService.syncSamsara(),
             ]);
 
-            const locationSyncOk = motiveResult.status === 'fulfilled';
+            const locationSyncOk = motiveResult.status === 'fulfilled' || samsaraResult.status === 'fulfilled';
+            if (samsaraResult.status === 'fulfilled') {
+                console.log('[Samsara sync]', samsaraResult.value);
+            }
             if (!locationSyncOk) {
-                console.warn("Location sync failed:", (motiveResult as PromiseRejectedResult).reason);
+                console.debug("Location sync skipped — no connected integration responded.");
             }
 
             const { data } = await api.get("/equipment");
             const equipmentList: any[] = data || [];
+
+            // Log first vehicle to verify telematicsFuelLevel is present in API response
+            if (equipmentList.length > 0) {
+                const sample = equipmentList.find(e => e.telematicsFuelLevel != null) ?? equipmentList[0];
+                console.log('[Equipment sample]', { id: sample.id, unitNumber: sample.unitNumber, telematicsFuelLevel: sample.telematicsFuelLevel });
+            }
 
             // Build vehicles using the previous snapshot for comparison
             const mapped = equipmentList.map(e =>

@@ -244,23 +244,23 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-            <div className="bg-white rounded-[3rem] w-full max-w-xl shadow-2xl flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-300">
-                <div className="flex-none flex items-center justify-between px-10 py-8 border-b border-slate-100 bg-slate-50/50">
+            <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-300">
+                <div className="flex-none flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
                     <div className="flex items-center gap-3">
-                        <div className={`${mode === 'create' ? 'bg-blue-600' : 'bg-amber-500'} p-2.5 rounded-2xl shadow-lg`}>
-                            {mode === 'create' ? <TruckIcon className="w-6 h-6 text-white" /> : <Pencil className="w-6 h-6 text-white" />}
+                        <div className={`${mode === 'create' ? 'bg-blue-600' : 'bg-amber-500'} p-2.5 rounded-xl shadow-md`}>
+                            {mode === 'create' ? <TruckIcon className="w-5 h-5 text-white" /> : <Pencil className="w-5 h-5 text-white" />}
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-slate-800 tracking-tight">{mode === 'create' ? 'Onboard Asset' : 'Edit Asset'}</h2>
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">
+                            <h2 className="text-xl font-bold text-slate-800 tracking-tight">{mode === 'create' ? 'Onboard Asset' : 'Edit Asset'}</h2>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
                                 {mode === 'create' ? 'Register new unit to fleet' : `Update details for ${formData.unitNumber}`}
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-all"><X className="w-6 h-6" /></button>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-all"><X className="w-5 h-5" /></button>
                 </div>
                 <div className="overflow-y-auto flex-1">
-                    <form className="p-10 space-y-6" onSubmit={handleSubmit}>
+                    <form className="p-6 space-y-5" onSubmit={handleSubmit}>
                         <style>{`
                             .auto-filled-field {
                                 background: linear-gradient(to right, #F0F4FF 0%, transparent 100%);
@@ -275,15 +275,15 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                 }
                         `}</style>
 
-                        <div className="space-y-6">
+                        <div className="space-y-5">
                             {/* 1. Unit Number */}
-                            <div className="space-y-1.5">
+                            <div className="space-y-1">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit Number</label>
-                                <input required type="text" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="T-100" value={formData.unitNumber} onChange={e => setFormData({ ...formData, unitNumber: e.target.value })} />
+                                <input required type="text" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="T-100" value={formData.unitNumber} onChange={e => setFormData({ ...formData, unitNumber: e.target.value })} />
                             </div>
 
                             {/* 2. VIN with Decoder */}
-                            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 space-y-3 relative overflow-hidden">
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 relative overflow-hidden">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
 
                                 <div className="space-y-2 relative">
@@ -296,16 +296,16 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                         <input
                                             required
                                             type="text"
-                                            className={`w-full px-5 py-4 bg-white border rounded-2xl text-sm font-mono font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none uppercase pr-12 transition-all shadow-sm group-hover:border-blue-300 ${decodeError ? 'border-rose-300 focus:ring-rose-200 bg-rose-50/30' : 'border-slate-200'} ${autoFilledFields.length > 0 ? 'border-emerald-500/50 bg-emerald-50/10' : ''}`}
+                                            className={`w-full px-4 py-2.5 bg-white border rounded-xl text-sm font-mono font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none uppercase pr-12 transition-all shadow-sm group-hover:border-blue-300 ${decodeError ? 'border-rose-300 focus:ring-rose-200 bg-rose-50/30' : 'border-slate-200'} ${autoFilledFields.length > 0 ? 'border-emerald-500/50 bg-emerald-50/10' : ''}`}
                                             placeholder="ENTER 17-DIGIT VIN"
                                             value={formData.vin}
                                             maxLength={17}
                                             onChange={e => handleVinChange(e.target.value)}
                                         />
                                         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                            {isDecoding && <Loader2 className="w-5 h-5 animate-spin text-blue-600" />}
-                                            {!isDecoding && autoFilledFields.length > 0 && <div className="bg-emerald-100 text-emerald-700 p-1 rounded-full"><CheckCircle2 className="w-4 h-4" /></div>}
-                                            {!isDecoding && decodeError && <div className="bg-rose-100 text-rose-600 p-1 rounded-full"><AlertCircle className="w-4 h-4" /></div>}
+                                            {isDecoding && <Loader2 className="w-4.5 h-4.5 animate-spin text-blue-600" />}
+                                            {!isDecoding && autoFilledFields.length > 0 && <div className="bg-emerald-100 text-emerald-700 p-0.5 rounded-full"><CheckCircle2 className="w-3.5 h-3.5" /></div>}
+                                            {!isDecoding && decodeError && <div className="bg-rose-100 text-rose-600 p-0.5 rounded-full"><AlertCircle className="w-3.5 h-3.5" /></div>}
                                         </div>
                                     </div>
 
@@ -319,9 +319,9 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             </div>
 
                             {/* 3. Fleet Classification */}
-                            <div className="space-y-4 pt-2">
+                            <div className="space-y-3 pt-2">
                                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fleet Classification</h3>
-                                <div className="grid grid-cols-4 gap-4">
+                                <div className="grid grid-cols-4 gap-3">
                                     {categories.map(cat => {
                                         const displayName = cat.name === 'School Bus' ? 'Bus' : cat.name;
 
@@ -329,7 +329,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                             <div
                                                 key={cat.id}
                                                 onClick={() => setFormData({ ...formData, fleetCategoryId: cat.id, specificType: '', equipmentTypeId: '', make: '' })}
-                                                className={`cursor-pointer rounded-2xl border-2 p-4 text-center transition-all ${formData.fleetCategoryId === cat.id ? 'border-blue-600 bg-blue-50/50' : 'border-slate-100 hover:border-slate-200'}`}
+                                                className={`cursor-pointer rounded-xl border-2 p-3 text-center transition-all ${formData.fleetCategoryId === cat.id ? 'border-blue-600 bg-blue-50/50' : 'border-slate-100 hover:border-slate-200'}`}
                                             >
                                                 <div className="text-xs font-black text-slate-800">{displayName}</div>
                                             </div>
@@ -339,7 +339,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             </div>
 
                             {/* 4. Specific Type & Make */}
-                            <div className="grid grid-cols-2 gap-6">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <div className="min-h-[15px] px-1 flex items-center">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Specific Type <span className="text-red-500">*</span></label>
@@ -356,10 +356,10 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                             });
                                         }}
                                     >
-                                        <SelectTrigger className="w-full bg-slate-50 border-slate-200 px-5 py-4 h-auto text-sm font-bold rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <SelectTrigger className="w-full bg-slate-50 border-slate-200 px-4 py-2.5 h-auto text-sm font-bold rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
                                             <SelectValue placeholder="Select Type" />
                                         </SelectTrigger>
-                                        <SelectContent className="z-[200] max-h-[300px] rounded-2xl">
+                                        <SelectContent className="z-[200] max-h-[300px] rounded-xl">
                                             {equipmentTypes.length > 0 ? equipmentTypes.map(t => (
                                                 <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
                                             )) : (
@@ -380,7 +380,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                     <div className="relative">
                                         <input
                                             list="make-suggestions"
-                                            className={`w-full bg-slate-50 border border-slate-200 px-5 py-4 h-auto text-sm font-bold rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all ${autoFilledFields.includes('make') ? 'auto-filled-field' : ''}`}
+                                            className={`w-full bg-slate-50 border border-slate-200 px-4 py-2.5 h-auto text-sm font-bold rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all ${autoFilledFields.includes('make') ? 'auto-filled-field' : ''}`}
                                             placeholder="Select or Type Make"
                                             value={formData.make}
                                             onChange={(e) => setFormData({ ...formData, make: e.target.value })}
@@ -399,13 +399,13 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             </div>
 
                             {/* 5. Status, Model, Year */}
-                            <div className="grid grid-cols-3 gap-6">
+                            <div className="grid grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
                                     <div className="flex justify-between items-center min-h-[15px] px-1">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Status</label>
                                     </div>
                                     <select
-                                        className={`w-full px-5 py-4 border rounded-2xl text-sm font-black outline-none appearance-none cursor-pointer transition-all bg-slate-50 ${getStatusColor(formData.operationalStatus || EquipmentOperationalStatus.Active)}`}
+                                        className={`w-full px-4 py-2.5 border rounded-xl text-sm font-black outline-none appearance-none cursor-pointer transition-all bg-slate-50 ${getStatusColor(formData.operationalStatus || EquipmentOperationalStatus.Active)}`}
                                         value={formData.status}
                                         onChange={e => {
                                             const newStatus = Number(e.target.value);
@@ -442,7 +442,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                         <input
                                             required
                                             type="text"
-                                            className={`w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all ${autoFilledFields.includes('model') ? 'auto-filled-field' : ''}`}
+                                            className={`w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all ${autoFilledFields.includes('model') ? 'auto-filled-field' : ''}`}
                                             placeholder="Model"
                                             value={formData.model}
                                             onChange={e => setFormData({ ...formData, model: e.target.value })}
@@ -463,7 +463,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                         <input
                                             required
                                             type="number"
-                                            className={`w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all ${autoFilledFields.includes('year') ? 'auto-filled-field' : ''}`}
+                                            className={`w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all ${autoFilledFields.includes('year') ? 'auto-filled-field' : ''}`}
                                             placeholder="Year"
                                             value={formData.year}
                                             onChange={e => setFormData({ ...formData, year: parseInt(e.target.value) || new Date().getFullYear() })}
@@ -474,14 +474,14 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             </div>
 
                             {/* Service Dates - Added */}
-                            <div className="grid grid-cols-2 gap-6 pt-2">
+                            <div className="grid grid-cols-2 gap-4 pt-2">
                                 <div className="space-y-1.5">
                                     <div className="min-h-[15px] px-1 flex items-center">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Start Date</label>
                                     </div>
                                     <input
                                         type="date"
-                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                         value={formData.inServiceDate ? formData.inServiceDate.split('T')[0] : ''}
                                         disabled={mode === 'edit' && !!initialData?.inServiceDate && initialData.inServiceDate !== '0001-01-01'}
                                         onChange={e => setFormData({ ...formData, inServiceDate: e.target.value })}
@@ -493,7 +493,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                     </div>
                                     <input
                                         type="date"
-                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
                                         value={formData.outOfServiceDate ? formData.outOfServiceDate.split('T')[0] : ''}
                                         onChange={e => setFormData({ ...formData, outOfServiceDate: e.target.value })}
                                     />
@@ -501,14 +501,14 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             </div>
 
                             {/* 6. Usage Metrics (Added) */}
-                            <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-100/50">
+                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100/50">
                                 <div className="space-y-1.5">
                                     <div className="min-h-[15px] px-1 flex items-center">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Odometer (Miles)</label>
                                     </div>
                                     <input
                                         type="number"
-                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                         placeholder="0"
                                         value={formData.mileage ?? ''}
                                         onChange={e => {
@@ -523,7 +523,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                     </div>
                                     <input
                                         type="number"
-                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                         placeholder="0"
                                         value={formData.hours ?? ''}
                                         onChange={e => {
@@ -535,14 +535,14 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             </div>
 
                             {/* 7. License Details */}
-                            <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-100/50">
+                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100/50">
                                 <div className="space-y-1.5">
                                     <div className="min-h-[15px] px-1 flex items-center">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">License Number (Optional)</label>
                                     </div>
                                     <input
                                         type="text"
-                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none uppercase placeholder:text-slate-300 transition-all font-mono"
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none uppercase placeholder:text-slate-300 transition-all font-mono"
                                         placeholder="ABC-1234"
                                         value={formData.licensePlate}
                                         onChange={e => setFormData({ ...formData, licensePlate: e.target.value.toUpperCase() })}
@@ -556,7 +556,7 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                                         value={formData.licenseState}
                                         onValueChange={(val) => setFormData({ ...formData, licenseState: val })}
                                     >
-                                        <SelectTrigger className="w-full bg-slate-50 border-slate-200 rounded-2xl px-5 py-4 h-auto text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <SelectTrigger className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-2.5 h-auto text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none">
                                             <SelectValue placeholder="Select State" />
                                         </SelectTrigger>
                                         <SelectContent className="z-[200] max-h-[300px]">
@@ -572,12 +572,12 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-4 pt-8 border-t border-slate-100">
-                            <button type="button" onClick={onClose} className="px-8 py-4 text-sm font-black text-slate-400 hover:text-slate-800 transition-colors">Cancel</button>
-                            <button type="submit" disabled={isSubmitting} className="px-12 py-4 text-sm font-black text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-xl shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <div className="flex justify-end gap-3 pt-5 border-t border-slate-100">
+                            <button type="button" onClick={onClose} className="px-6 py-2.5 text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">Cancel</button>
+                            <button type="submit" disabled={isSubmitting} className="px-8 py-2.5 text-sm font-black text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
                                 {isSubmitting ? (
                                     <span className="flex items-center gap-2">
-                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <Loader2 className="w-4.5 h-4.5 animate-spin" />
                                         Saving...
                                     </span>
                                 ) : (

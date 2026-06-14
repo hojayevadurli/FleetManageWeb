@@ -46,6 +46,8 @@ export const mapDtoToEquipment = (dto: EquipmentDto): Equipment => {
     inServiceDate: dto.inServiceDate,
     outOfServiceDate: dto.outOfServiceDate,
     telematicsFuelLevel: dto.telematicsFuelLevel,
+    telematicsOdometerMiles: dto.telematicsOdometerMiles,
+    lastKnownLocation: dto.lastLocationAddress,
     latitude: dto.lastLatitude,
     longitude: dto.lastLongitude,
   };
