@@ -366,98 +366,113 @@ const FleetMapView = ({ vehicles }: FleetMapViewProps) => {
           const v = vehicles.find(x => x.id === selectedVehicleId);
           if (!v) return null;
           const cfg = getStatusConfig(v.status);
+          const fuelPct = localFuelLevels[v.id] ?? v.fuel_level;
+          const isEditing = fuelEdit?.vehicleId === v.id;
           return (
             <div className="absolute bottom-6 left-6 right-6 animate-in slide-in-from-bottom duration-500">
-              <div className="bg-white/95 backdrop-blur rounded-[2.5rem] p-5 shadow-2xl border border-white max-w-2xl mx-auto flex items-center gap-6">
-                <div
-                  className="w-16 h-16 rounded-[1.5rem] flex flex-col items-center justify-center shrink-0"
-                  style={{ backgroundColor: cfg.color + '15', border: `2px solid ${cfg.color}40` }}
-                >
-                  <div className="text-[9px] font-black uppercase mb-0.5" style={{ color: cfg.color }}>Unit</div>
-                  <div className="text-lg font-black text-slate-900">{v.vehicle_id || v.unitNumber}</div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h4 className="text-base font-black text-slate-900 truncate">{v.year} {v.make} {v.model}</h4>
-                    <Badge className={`text-[9px] font-black uppercase border shrink-0 ${cfg.badge}`}>
-                      <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${cfg.dot} ${v.status === 'driving' ? 'animate-pulse' : ''}`} />
-                      {cfg.label}
-                    </Badge>
+              <div className="bg-white/97 backdrop-blur-md rounded-3xl shadow-2xl border border-slate-100 max-w-lg mx-auto overflow-hidden">
+                {/* Status accent bar */}
+                <div className="h-1 w-full" style={{ backgroundColor: cfg.color }} />
+
+                <div className="p-5">
+                  {/* Header: icon + info + actions */}
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-0.5"
+                      style={{ backgroundColor: cfg.color + '18' }}>
+                      <Truck className="w-5 h-5" style={{ color: cfg.color }} />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          Unit {v.unitNumber}
+                        </span>
+                        <Badge className={`text-[9px] font-black uppercase border ${cfg.badge}`}>
+                          <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${cfg.dot} ${v.status === 'driving' ? 'animate-pulse' : ''}`} />
+                          {cfg.label}
+                        </Badge>
+                      </div>
+                      <h4 className="text-sm font-black text-slate-900 leading-tight">
+                        {v.year} {v.make} {v.model}
+                      </h4>
+                      {v.driver_assigned && (
+                        <p className="text-xs text-slate-500 font-semibold mt-0.5 truncate">{v.driver_assigned}</p>
+                      )}
+                    </div>
+
+                    <div className="flex gap-1.5 shrink-0">
+                      <button className="bg-slate-900 text-white p-2.5 rounded-xl hover:bg-slate-700 transition-all shadow-sm">
+                        <Navigation className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setSelectedVehicleId(null)}
+                        className="bg-slate-100 text-slate-400 p-2.5 rounded-xl hover:bg-rose-50 hover:text-rose-500 transition-all"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                  {v.driver_assigned && (
-                    <p className="text-xs font-bold text-slate-500 mb-1 truncate">{v.driver_assigned}</p>
-                  )}
-                  <p className="text-xs font-bold text-slate-400 truncate">{v.current_location?.address || 'Unknown Region'}</p>
-                  <div className="flex items-center gap-4 mt-2">
-                    {(() => {
-                      const fuelPct = localFuelLevels[v.id] ?? v.fuel_level;
-                      const isEditing = fuelEdit?.vehicleId === v.id;
-                      return (
-                        <div className="flex items-center gap-2 flex-1">
-                          <Droplets className={`w-3.5 h-3.5 shrink-0 ${fuelPct == null ? 'text-slate-300' : fuelPct < 25 ? 'text-red-500' : fuelPct < 50 ? 'text-amber-500' : 'text-blue-500'}`} />
-                          {isEditing ? (
-                            <div className="flex items-center gap-1.5 flex-1">
-                              <input
-                                autoFocus
-                                type="number"
-                                min={0}
-                                max={100}
-                                value={fuelEdit.value}
-                                onChange={e => setFuelEdit({ vehicleId: v.id, value: e.target.value })}
-                                onKeyDown={e => { if (e.key === 'Enter') saveFuelLevel(v.id); if (e.key === 'Escape') setFuelEdit(null); }}
-                                className="w-16 text-xs font-black text-slate-900 border border-blue-300 rounded-lg px-2 py-0.5 outline-none focus:ring-2 focus:ring-blue-400/30"
-                              />
-                              <span className="text-xs text-slate-400 font-bold">%</span>
-                              <button onClick={() => saveFuelLevel(v.id)} className="p-1 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors">
-                                <Check className="w-3 h-3" />
-                              </button>
-                              <button onClick={() => setFuelEdit(null)} className="p-1 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors">
-                                <X className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ) : fuelPct != null ? (
-                            <div className="flex-1">
-                              <div className="flex justify-between mb-0.5 items-center">
-                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide">Fuel</span>
-                                <div className="flex items-center gap-1">
-                                  <span className={`text-[10px] font-black ${fuelPct < 25 ? 'text-red-600' : fuelPct < 50 ? 'text-amber-600' : 'text-slate-900'}`}>
-                                    {Math.round(fuelPct)}%
-                                  </span>
-                                  <button onClick={() => setFuelEdit({ vehicleId: v.id, value: String(Math.round(fuelPct)) })} className="p-0.5 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors">
-                                    <Pencil className="w-2.5 h-2.5" />
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all ${fuelPct < 25 ? 'bg-red-500' : fuelPct < 50 ? 'bg-amber-500' : 'bg-blue-500'}`}
-                                  style={{ width: `${fuelPct}%` }}
-                                />
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5 flex-1">
-                              <span className="text-xs font-bold text-slate-400">Fuel N/A</span>
-                              <button onClick={() => setFuelEdit({ vehicleId: v.id, value: '' })} className="p-0.5 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors">
-                                <Pencil className="w-2.5 h-2.5" />
-                              </button>
-                            </div>
-                          )}
+
+                  {/* Location */}
+                  <div className="flex items-start gap-2 mb-3 bg-slate-50 rounded-2xl px-3 py-2.5">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                    <p className="text-xs font-medium text-slate-600 leading-snug line-clamp-2">
+                      {v.current_location?.address || 'Location unknown'}
+                    </p>
+                  </div>
+
+                  {/* Fuel */}
+                  <div className="flex items-center gap-2">
+                    <Droplets className={`w-3.5 h-3.5 shrink-0 ${fuelPct == null ? 'text-slate-300' : fuelPct < 25 ? 'text-red-500' : fuelPct < 50 ? 'text-amber-500' : 'text-blue-500'}`} />
+                    {isEditing ? (
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <input
+                          autoFocus
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={fuelEdit.value}
+                          onChange={e => setFuelEdit({ vehicleId: v.id, value: e.target.value })}
+                          onKeyDown={e => { if (e.key === 'Enter') saveFuelLevel(v.id); if (e.key === 'Escape') setFuelEdit(null); }}
+                          className="w-16 text-xs font-black text-slate-900 border border-blue-300 rounded-lg px-2 py-0.5 outline-none focus:ring-2 focus:ring-blue-400/30"
+                        />
+                        <span className="text-xs text-slate-400 font-bold">%</span>
+                        <button onClick={() => saveFuelLevel(v.id)} className="p-1 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors">
+                          <Check className="w-3 h-3" />
+                        </button>
+                        <button onClick={() => setFuelEdit(null)} className="p-1 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : fuelPct != null ? (
+                      <div className="flex-1">
+                        <div className="flex justify-between mb-1 items-center">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fuel</span>
+                          <div className="flex items-center gap-1">
+                            <span className={`text-xs font-black ${fuelPct < 25 ? 'text-red-600' : fuelPct < 50 ? 'text-amber-600' : 'text-slate-800'}`}>
+                              {Math.round(fuelPct)}%
+                            </span>
+                            <button onClick={() => setFuelEdit({ vehicleId: v.id, value: String(Math.round(fuelPct)) })} className="p-0.5 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors">
+                              <Pencil className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
                         </div>
-                      );
-                    })()}
+                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${fuelPct < 25 ? 'bg-red-500' : fuelPct < 50 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                            style={{ width: `${fuelPct}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <span className="text-xs font-bold text-slate-400">Fuel N/A</span>
+                        <button onClick={() => setFuelEdit({ vehicleId: v.id, value: '' })} className="p-0.5 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors">
+                          <Pencil className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="flex flex-col gap-2 shrink-0">
-                  <button className="bg-slate-900 text-white p-3.5 rounded-2xl shadow-lg hover:bg-slate-800 transition-all">
-                    <Navigation className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setSelectedVehicleId(null)}
-                    className="bg-slate-100 text-slate-400 p-3.5 rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
             </div>

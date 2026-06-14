@@ -277,7 +277,7 @@ const App = () => (
                         <AppSidebar />
                         <SidebarInset>
                           <DashboardHeader />
-                          <div className="flex flex-1 flex-col gap-4 p-4">
+                          <div className="flex flex-1 flex-col min-h-0">
                             <Routes>
                               <Route path="/" element={<Dashboard />} />
                               <Route path="/dashboard" element={<Dashboard />} />

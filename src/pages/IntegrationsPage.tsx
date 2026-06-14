@@ -3,8 +3,10 @@ import { Helmet } from "react-helmet-async";
 import { IntegrationCard } from "@/components/integrations/IntegrationCard";
 import { MotiveConnectModal } from "@/components/integrations/MotiveConnectModal";
 import { MotiveManageModal } from "@/components/integrations/MotiveManageModal";
+import { SamsaraConnectModal } from "@/components/integrations/SamsaraConnectModal";
+import { SamsaraManageModal } from "@/components/integrations/SamsaraManageModal";
 import { integrationService } from "@/services/integrationService";
-import { IntegrationStatus, IntegrationProvider } from "@/lib/types";
+import { Integration, IntegrationProvider } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,13 +14,15 @@ import { Button } from "@/components/ui/button";
 type CardStatus = "Connected" | "Disconnected" | "ComingSoon" | "Error" | "Connecting";
 
 const IntegrationsPage = () => {
-    const [integrations, setIntegrations] = useState<IntegrationStatus[]>([]);
+    const [integrations, setIntegrations] = useState<Integration[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [retrying, setRetrying] = useState(false);
 
     const [motiveConnectOpen, setMotiveConnectOpen] = useState(false);
     const [motiveManageOpen, setMotiveManageOpen] = useState(false);
+    const [samsaraConnectOpen, setSamsaraConnectOpen] = useState(false);
+    const [samsaraManageOpen, setSamsaraManageOpen] = useState(false);
 
     const { toast } = useToast();
 
@@ -34,11 +38,7 @@ const IntegrationsPage = () => {
             setError(true);
 
             if (showToastOnError) {
-                toast({
-                    title: "Error",
-                    description: "Failed to load integration status.",
-                    variant: "destructive",
-                });
+                toast({ title: "Error", description: "Failed to load integration status.", variant: "destructive" });
             }
         } finally {
             setLoading(false);
@@ -69,27 +69,21 @@ const IntegrationsPage = () => {
     }, [fetchIntegrations]);
 
     const handleConnect = (provider: IntegrationProvider) => {
-        if (provider === "Motive") {
-            setMotiveConnectOpen(true);
-        }
+        if (provider === "Motive") setMotiveConnectOpen(true);
+        if (provider === "Samsara") setSamsaraConnectOpen(true);
     };
 
     const handleManage = (provider: IntegrationProvider) => {
-        if (provider === "Motive") {
-            setMotiveManageOpen(true);
-        }
+        if (provider === "Motive") setMotiveManageOpen(true);
+        if (provider === "Samsara") setSamsaraManageOpen(true);
     };
 
     const handleNotifyMe = (provider: string) => {
-        toast({
-            title: "Subscribed",
-            description: `We'll notify you when ${provider} integration is available.`,
-        });
+        toast({ title: "Subscribed", description: `We'll notify you when ${provider} integration is available.` });
     };
 
-    const getIntegration = (provider: IntegrationProvider) => {
-        return integrations.find((i) => i.provider === provider);
-    };
+    const getIntegration = (provider: IntegrationProvider) =>
+        integrations.find((i) => i.provider === provider);
 
     const normalizeStatus = (status?: string): CardStatus => {
         switch (status) {
@@ -104,10 +98,8 @@ const IntegrationsPage = () => {
         }
     };
 
-    const getStatus = (provider: IntegrationProvider): CardStatus => {
-        const integration = getIntegration(provider);
-        return normalizeStatus(integration?.status);
-    };
+    const getStatus = (provider: IntegrationProvider): CardStatus =>
+        normalizeStatus(getIntegration(provider)?.status);
 
     if (loading && integrations.length === 0) {
         return (
@@ -126,11 +118,7 @@ const IntegrationsPage = () => {
                     <p className="text-slate-500">We couldn't connect to the server.</p>
                 </div>
                 <Button onClick={handleRetry} variant="outline" className="gap-2" disabled={retrying}>
-                    {retrying ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                        <RefreshCw className="h-4 w-4" />
-                    )}
+                    {retrying ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                     Retry
                 </Button>
             </div>
@@ -163,6 +151,24 @@ const IntegrationsPage = () => {
                     />
 
                     <IntegrationCard
+                        logo={
+                            <div className="flex items-center gap-2">
+                                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="16" cy="16" r="16" fill="#00B388"/>
+                                    <text x="16" y="21" textAnchor="middle" fill="white" fontSize="16" fontWeight="bold" fontFamily="sans-serif">S</text>
+                                </svg>
+                                <span className="text-xl font-bold text-slate-800">samsara</span>
+                            </div>
+                        }
+                        name="Samsara"
+                        description="Sync vehicles, GPS locations, odometer, fuel %, engine hours, and DTC fault codes from Samsara."
+                        status={getStatus("Samsara")}
+                        onConnect={() => handleConnect("Samsara")}
+                        onManage={() => handleManage("Samsara")}
+                        onNotifyMe={() => handleNotifyMe("Samsara")}
+                    />
+
+                    <IntegrationCard
                         logo="/tafs-logo.png"
                         name="TAFS"
                         description="Automatically export all invoices to TAFS."
@@ -189,6 +195,19 @@ const IntegrationsPage = () => {
                     open={motiveManageOpen}
                     onOpenChange={setMotiveManageOpen}
                     integration={getIntegration("Motive")}
+                    onRefresh={refreshSilent}
+                />
+
+                <SamsaraConnectModal
+                    open={samsaraConnectOpen}
+                    onOpenChange={setSamsaraConnectOpen}
+                    onSuccess={refreshSilent}
+                />
+
+                <SamsaraManageModal
+                    open={samsaraManageOpen}
+                    onOpenChange={setSamsaraManageOpen}
+                    integration={getIntegration("Samsara")}
                     onRefresh={refreshSilent}
                 />
             </div>

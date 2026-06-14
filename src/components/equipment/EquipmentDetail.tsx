@@ -205,23 +205,34 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
         equipmentApi.getDiagnostics(equipment.id)
             .then(async (stored) => {
                 setDiagnostics(stored);
-                // Auto-sync on first open so the tab is never stale
+                // Auto-sync on first open — only call the provider this equipment belongs to
                 try {
-                    await integrationService.syncFaults();
+                    await syncFaultsForEquipment();
                     const fresh = await equipmentApi.getDiagnostics(equipment.id);
                     setDiagnostics(fresh);
                 } catch {
-                    // Motive not connected or no fault codes endpoint — silently ignore
+                    // Provider not connected — silently ignore
                 }
             })
             .catch(() => {})
             .finally(() => setDiagnosticsLoading(false));
     }, [activeTab, equipment.id]);
 
+    const syncFaultsForEquipment = () => {
+        const provider = equipment.externalProvider;
+        if (provider === 'Samsara') return integrationService.syncSamsaraFaults();
+        if (provider === 'Motive')  return integrationService.syncFaults();
+        // No provider linked — try both silently
+        return Promise.allSettled([
+            integrationService.syncFaults(),
+            integrationService.syncSamsaraFaults(),
+        ]);
+    };
+
     const handleSyncFaults = async () => {
         setDiagnosticsSyncing(true);
         try {
-            const result = await integrationService.syncFaults();
+            await syncFaultsForEquipment();
             const fresh = await equipmentApi.getDiagnostics(equipment.id);
             setDiagnostics(fresh);
             const active = fresh.filter(d => d.status === 'Active').length;
@@ -230,8 +241,9 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
             } else {
                 toast.success('Sync complete — no active fault codes.');
             }
-        } catch (err: any) {
-            toast.error(err?.response?.data || 'Failed to sync fault codes. Check Motive connection.');
+        } catch {
+            const provider = equipment.externalProvider ?? 'integration';
+            toast.error(`Failed to sync fault codes. Check ${provider} connection.`);
         } finally {
             setDiagnosticsSyncing(false);
         }
@@ -339,15 +351,15 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     };
 
     return (
-        <div className="h-full flex flex-col relative bg-slate-50 min-h-screen p-4 md:p-6 lg:p-8 overflow-y-auto no-scrollbar">
+        <div className="flex flex-col flex-1 min-h-0 bg-slate-50 p-4 md:p-6 lg:p-8 overflow-y-auto">
             {/* Header & Navigation */}
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-8 w-full">
-                <div className="flex flex-wrap items-center gap-4">
-                    <Button variant="outline" size="icon" onClick={onBack} className="h-12 w-12 rounded-2xl border-slate-200 shadow-sm hover:bg-slate-50 shrink-0">
-                        <X className="w-5 h-5 text-slate-400 transition-colors" />
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8 w-full">
+                <div className="flex flex-wrap items-center gap-3 min-w-0">
+                    <Button variant="outline" size="icon" onClick={onBack} className="h-10 w-10 rounded-2xl border-slate-200 shadow-sm hover:bg-slate-50 shrink-0">
+                        <X className="w-4 h-4 text-slate-400 transition-colors" />
                     </Button>
-                    <div className="flex-1 min-w-[200px]">
-                        <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight truncate">Unit {equipment.unitNumber} Intel</h1>
+                    <div className="flex-1 min-w-0">
+                        <h1 className="text-xl md:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight break-words">Unit {equipment.unitNumber} Intel</h1>
                         <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Verified asset diagnostics & service timeline</p>
                     </div>
                     {onUpdate && (
@@ -399,24 +411,24 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                     </div>
                 )}
 
-                <div className="w-full max-w-full overflow-hidden">
-                    <div className="flex p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto no-scrollbar max-w-full">
+                <div className="w-full min-w-0">
+                    <div className="flex p-1 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto">
                         {(['dashboard', 'diagnostics', 'inspections', 'history', 'documents', 'ai', 'spend', 'warranty'] as const).map(tab => (
                             <Button
                                 key={tab}
                                 variant={activeTab === tab ? "default" : "ghost"}
                                 onClick={() => setActiveTab(tab)}
-                                className={`px-4 md:px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all h-auto shrink-0 ${activeTab !== tab ? 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' : ''}`}
+                                className={`px-3 md:px-5 py-2 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all h-auto shrink-0 ${activeTab !== tab ? 'text-slate-500 hover:bg-slate-50 hover:text-slate-900' : ''}`}
                             >
-                                <span className="flex items-center gap-2">
-                                    {tab === 'dashboard' && <Container className="w-4 h-4 hidden sm:block" />}
-                                    {tab === 'diagnostics' && <AlertCircle className="w-4 h-4 hidden sm:block" />}
-                                    {tab === 'inspections' && <ClipboardCheck className="w-4 h-4 hidden sm:block" />}
-                                    {tab === 'history' && <History className="w-4 h-4 hidden sm:block" />}
-                                    {tab === 'documents' && <FileText className="w-4 h-4 hidden sm:block" />}
-                                    {tab === 'ai' && <Sparkles className="w-4 h-4 hidden sm:block" />}
-                                    {tab === 'spend' && <Cpu className="w-4 h-4 hidden sm:block" />}
-                                    {tab === 'warranty' && <FileCheck className="w-4 h-4 hidden sm:block" />}
+                                <span className="flex items-center gap-1.5">
+                                    {tab === 'dashboard' && <Container className="w-3.5 h-3.5 hidden md:block" />}
+                                    {tab === 'diagnostics' && <AlertCircle className="w-3.5 h-3.5 hidden md:block" />}
+                                    {tab === 'inspections' && <ClipboardCheck className="w-3.5 h-3.5 hidden md:block" />}
+                                    {tab === 'history' && <History className="w-3.5 h-3.5 hidden md:block" />}
+                                    {tab === 'documents' && <FileText className="w-3.5 h-3.5 hidden md:block" />}
+                                    {tab === 'ai' && <Sparkles className="w-3.5 h-3.5 hidden md:block" />}
+                                    {tab === 'spend' && <Cpu className="w-3.5 h-3.5 hidden md:block" />}
+                                    {tab === 'warranty' && <FileCheck className="w-3.5 h-3.5 hidden md:block" />}
                                     {tab}
                                 </span>
                             </Button>
@@ -425,16 +437,16 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-8">
+            <div className="flex-1 min-h-0 space-y-6 md:space-y-8">
 
                 {/* DASHBOARD VIEW */}
                 {activeTab === 'dashboard' && (
                     <div className="space-y-8 animate-in fade-in zoom-in duration-300">
                         {/* Top Row: Specs + Spend */}
-                        <div className="flex flex-col 2xl:flex-row gap-8 w-full">
+                        <div className="flex flex-col xl:flex-row gap-5 lg:gap-6 w-full">
 
                             {/* LEFT: Main Spec Card */}
-                            <div className="flex-1 w-full min-w-0 bg-white rounded-[3rem] p-6 lg:p-10 border border-slate-200 shadow-sm relative overflow-hidden">
+                            <div className="flex-1 w-full min-w-0 bg-white rounded-2xl p-5 md:p-6 lg:p-8 border border-slate-200 shadow-sm relative overflow-hidden">
                                 <div className="mb-6">
                                     <Select
                                         value={(() => {
@@ -475,11 +487,11 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     </Select>
                                 </div>
 
-                                <div className="flex flex-col xl:flex-row gap-8 lg:gap-12 items-start relative z-10 w-full min-w-0">
-                                    <div className="space-y-4 shrink-0 xl:w-1/2 min-w-0 w-full">
-                                        <h2 className="text-3xl font-black text-slate-900 tracking-tighter leading-tight">{equipment.year} {equipment.make} {equipment.model}</h2>
+                                <div className="flex flex-col gap-6 items-start relative z-10 w-full min-w-0">
+                                    <div className="space-y-4 min-w-0 w-full">
+                                        <h2 className="text-lg md:text-xl lg:text-2xl font-extrabold text-slate-900 tracking-tight leading-snug break-words">{equipment.year} {equipment.make} {equipment.model}</h2>
 
-                                        <div className="flex flex-wrap gap-8 pt-6">
+                                        <div className="flex flex-wrap gap-4 md:gap-6 pt-4">
                                             <div className="min-w-[100px]">
                                                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">VIN Number</div>
                                                 <div className="font-mono font-bold text-slate-800 truncate">{equipment.vin || 'N/A'}</div>
@@ -490,7 +502,13 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                             </div>
                                             <div className="min-w-[80px]">
                                                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 border-b border-dashed border-slate-300 w-fit">Odometer</div>
-                                                <div className="font-mono font-bold text-slate-800 truncate">{equipment.mileage ? equipment.mileage.toLocaleString() + ' mi' : 'N/A'}</div>
+                                                <div className="font-mono font-bold text-slate-800 truncate">
+                                                    {equipment.telematicsOdometerMiles != null
+                                                        ? Math.round(equipment.telematicsOdometerMiles).toLocaleString() + ' mi'
+                                                        : equipment.mileage
+                                                            ? equipment.mileage.toLocaleString() + ' mi'
+                                                            : 'N/A'}
+                                                </div>
                                             </div>
                                             {equipment.telematicsFuelLevel != null && (
                                                 <div className="min-w-[100px]">
@@ -538,30 +556,30 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                             </div>
                                         </div>
 
-                                        <div className="pt-6">
-                                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Assigned Operator</div>
+                                        <div className="pt-4">
+                                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Assigned Operator</div>
                                             {equipment.assignedOperatorId ? (
                                                 <div
                                                     onClick={() => navigate(`/app/drivers/${equipment.assignedOperatorId}`)}
-                                                    className="flex items-center gap-4 bg-blue-50/50 p-3 rounded-2xl border border-blue-100/50 cursor-pointer hover:bg-blue-100/50 transition-all group w-fit pr-8"
+                                                    className="flex items-center gap-3 bg-blue-50/50 p-2.5 rounded-xl border border-blue-100/50 cursor-pointer hover:bg-blue-100/50 transition-all group w-fit pr-6"
                                                 >
-                                                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform shadow-sm shadow-blue-200">
-                                                        <User className="w-5 h-5" />
+                                                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 group-hover:scale-105 transition-transform shadow-sm shadow-blue-200">
+                                                        <User className="w-4 h-4" />
                                                     </div>
                                                     <div>
-                                                        <div className="text-sm font-black text-slate-900">{equipment.assignedOperatorName}</div>
+                                                        <div className="text-xs font-bold text-slate-900">{equipment.assignedOperatorName}</div>
                                                         <div className="text-[9px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1">
-                                                            View Profile <ExternalLink className="w-3 h-3" />
+                                                            View Profile <ExternalLink className="w-2.5 h-2.5" />
                                                         </div>
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100 w-fit pr-8">
-                                                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 border-dashed">
-                                                        <User className="w-5 h-5" />
+                                                <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100 w-fit pr-6">
+                                                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 border-dashed">
+                                                        <User className="w-4 h-4" />
                                                     </div>
                                                     <div>
-                                                        <div className="text-sm font-black text-slate-400">Unassigned</div>
+                                                        <div className="text-xs font-bold text-slate-400">Unassigned</div>
                                                         <div className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">No Operator</div>
                                                     </div>
                                                 </div>
@@ -698,10 +716,10 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                     bg: 'bg-amber-50'
                                                 }
                                             ].map((s, i) => (
-                                                <div key={i} className={`${s.bg} p-5 rounded-[2rem] border border-slate-200 shadow-sm`}>
-                                                    <s.icon className={`w-6 h-6 ${s.color} mb-3`} />
+                                                <div key={i} className={`${s.bg} p-4 rounded-xl border border-slate-200 shadow-sm`}>
+                                                    <s.icon className={`w-5 h-5 ${s.color} mb-2`} />
                                                     <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{s.label}</div>
-                                                    <div className="text-xl font-black text-slate-900 tracking-tight">{s.val}</div>
+                                                    <div className="text-lg font-bold text-slate-900 tracking-tight">{s.val}</div>
                                                 </div>
                                             ));
                                         })()}
@@ -726,20 +744,17 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             </div>
 
                             {/* RIGHT: Dark Spend Card */}
-                            <div className="w-full 2xl:w-96 shrink-0 bg-slate-900 rounded-[3rem] p-8 text-white relative overflow-hidden group shadow-2xl shadow-slate-900/20">
-                                <div className="absolute top-1/2 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none"></div>
-
-                                <div className="relative z-10 h-full flex flex-col justify-between space-y-8">
-                                    <div className="text-center space-y-2">
-                                        <div className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Life-to-Date Spend</div>
-                                        <div className="text-6xl font-black tracking-tighter text-blue-100">
+                            <div className="w-full xl:w-80 2xl:w-96 shrink-0 bg-slate-900 rounded-2xl p-6 text-white relative overflow-hidden group shadow-xl">
+                                <div className="relative z-10 h-full flex flex-col justify-between gap-6">
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Life-to-Date Spend</div>
+                                        <div className="text-4xl font-extrabold tracking-tight text-white">
                                             ${equipmentHistory.reduce((sum, wo) => sum + (wo.totalCost || 0), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                         </div>
                                     </div>
-
-                                    <div className="bg-slate-800/50 rounded-[2rem] p-6 text-center border border-slate-700/50 backdrop-blur-sm">
+                                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700/50">
                                         <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Maintenance Events</div>
-                                        <div className="text-3xl font-white font-black">{equipmentHistory.length}</div>
+                                        <div className="text-2xl font-black text-white">{equipmentHistory.length}</div>
                                     </div>
                                 </div>
                             </div>
@@ -749,14 +764,14 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                         {/* Left as placeholder/commented out to match original file state if desired, or kept simplified */}
 
                         {/* Bottom Row: Predictive */}
-                        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm p-10 mt-8">
-                            <div className="flex items-center gap-4 mb-8">
-                                <div className="bg-blue-50 w-12 h-12 rounded-[1rem] flex items-center justify-center shadow-inner">
-                                    <Cpu className="w-6 h-6 text-blue-600" />
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 mt-6">
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="bg-blue-50 w-10 h-10 rounded-lg flex items-center justify-center shadow-inner">
+                                    <Cpu className="w-5 h-5 text-blue-600" />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-black text-slate-900">Predictive Uptime Metrics</h3>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">AI-driven maintenance forecasting</p>
+                                    <h3 className="text-lg font-black text-slate-900">Predictive Uptime Metrics</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">AI-driven maintenance forecasting</p>
                                 </div>
                             </div>
 
@@ -766,9 +781,9 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     <p className="text-xs font-bold text-slate-400">Calibrating models...</p>
                                 </div>
                             ) : predictions.length === 0 ? (
-                                <div className="text-center py-10 opacity-50">
-                                    <div className="bg-emerald-50 w-16 h-16 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4">
-                                        <ShieldCheck className="w-8 h-8 text-emerald-400" />
+                                <div className="text-center py-8 opacity-50">
+                                    <div className="bg-emerald-50 w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3">
+                                        <ShieldCheck className="w-6 h-6 text-emerald-400" />
                                     </div>
                                     <p className="text-sm font-bold text-slate-500">No predictions found.</p>
                                     <p className="text-xs text-slate-400 mt-1">This unit is currently operating without any high-risk forecast patterns.</p>
@@ -810,30 +825,30 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                 {/* DIAGNOSTICS VIEW */}
                 {activeTab === 'diagnostics' && (
                     <div className="animate-in slide-in-from-right-4 duration-300">
-                        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden p-10">
-                            <div className="flex items-center justify-between mb-8">
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 md:p-8">
+                            <div className="flex items-center justify-between mb-6">
                                 <div>
-                                    <h3 className="font-black text-slate-900 flex items-center gap-2 text-2xl tracking-tight">
-                                        <AlertCircle className="w-6 h-6 text-rose-500" /> Active Faults
+                                    <h3 className="font-black text-slate-900 flex items-center gap-2 text-xl tracking-tight">
+                                        <AlertCircle className="w-5 h-5 text-rose-500" /> Active Faults
                                     </h3>
-                                    <p className="text-slate-500 text-sm mt-1">Live telematics codes synced from Motive integration.</p>
+                                    <p className="text-slate-500 text-xs mt-1">Live telematics codes synced from Motive & Samsara.</p>
                                 </div>
                                 <Button
                                     onClick={handleSyncFaults}
                                     disabled={diagnosticsSyncing}
-                                    className="bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold uppercase tracking-widest text-xs gap-2 rounded-xl"
+                                    className="bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold uppercase tracking-widest text-[10px] gap-2 rounded-xl h-9 px-4"
                                 >
                                     {diagnosticsSyncing
-                                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Syncing...</>
-                                        : <><AlertCircle className="w-4 h-4" /> Sync Codes</>
+                                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Syncing...</>
+                                        : <><AlertCircle className="w-3.5 h-3.5" /> Sync Codes</>
                                     }
                                 </Button>
                             </div>
 
                             {diagnosticsLoading ? (
-                                <div className="p-16 text-center">
-                                    <Loader2 className="w-8 h-8 animate-spin text-slate-300 mx-auto mb-3" />
-                                    <p className="text-slate-400 text-sm font-bold">Loading fault codes...</p>
+                                <div className="p-10 text-center">
+                                    <Loader2 className="w-6 h-6 animate-spin text-slate-300 mx-auto mb-2" />
+                                    <p className="text-slate-400 text-xs font-bold">Loading fault codes...</p>
                                 </div>
                             ) : diagnostics.filter(d => d.status === 'Active').length > 0 ? (
                                 <div className="space-y-3">
@@ -844,13 +859,13 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                             : sev === 'medium' ? 'bg-amber-100 text-amber-700 border-amber-200'
                                             : 'bg-slate-100 text-slate-600 border-slate-200';
                                         return (
-                                            <div key={fault.id} className="flex items-start gap-4 p-5 rounded-2xl border border-rose-100 bg-rose-50/40">
-                                                <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
-                                                    <AlertCircle className="w-5 h-5 text-rose-600" />
+                                            <div key={fault.id} className="flex items-start gap-4 p-4 rounded-xl border border-rose-100 bg-rose-50/40">
+                                                <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center shrink-0">
+                                                    <AlertCircle className="w-4 h-4 text-rose-600" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="font-black text-slate-900 font-mono">{fault.code}</span>
+                                                        <span className="font-black text-slate-900 font-mono text-xs">{fault.code}</span>
                                                         {fault.severity && (
                                                             <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${sevStyle}`}>
                                                                 {fault.severity}
@@ -858,9 +873,9 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                         )}
                                                     </div>
                                                     {fault.description && (
-                                                        <p className="text-sm text-slate-600 mt-1">{fault.description}</p>
+                                                        <p className="text-xs text-slate-600 mt-1">{fault.description}</p>
                                                     )}
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1.5">
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1.5">
                                                         Detected {format(parseISO(fault.alertAt), "MMM d, yyyy h:mm a")}
                                                     </p>
                                                 </div>
@@ -869,12 +884,12 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     })}
                                 </div>
                             ) : (
-                                <div className="p-16 text-center border-2 border-dashed border-slate-100 rounded-[2rem] bg-slate-50/50">
+                                <div className="p-10 text-center border-2 border-dashed border-slate-100 rounded-xl bg-slate-50/50">
                                     <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                         <ShieldCheck className="w-8 h-8 text-emerald-600" />
                                     </div>
                                     <h4 className="font-black text-slate-900 text-lg">No Active Fault Codes</h4>
-                                    <p className="text-slate-500 text-sm mt-1">Engine is reporting healthy status. Click Sync Codes to pull latest from Motive.</p>
+                                    <p className="text-slate-500 text-sm mt-1">Engine is reporting healthy status. Click Sync Codes to pull latest from Motive & Samsara.</p>
                                 </div>
                             )}
                         </div>
@@ -884,25 +899,25 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                 {/* INSPECTIONS VIEW */}
                 {activeTab === 'inspections' && (
                     <div className="animate-in slide-in-from-right-4 duration-300">
-                        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden p-10">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 md:p-8">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                                 <div>
-                                    <h3 className="font-black text-slate-900 flex items-center gap-2 text-2xl tracking-tight">
-                                        <ClipboardCheck className="w-6 h-6 text-blue-600" /> DOT Inspection Logs
+                                    <h3 className="font-black text-slate-900 flex items-center gap-2 text-xl tracking-tight">
+                                        <ClipboardCheck className="w-5 h-5 text-blue-600" /> DOT Inspection Logs
                                     </h3>
-                                    <p className="text-slate-500 text-sm mt-1">Operator pre-trip and post-trip compliance records.</p>
+                                    <p className="text-slate-500 text-xs mt-1">Operator pre-trip and post-trip compliance records.</p>
                                 </div>
-                                <Button className="bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-widest text-xs gap-2 rounded-xl shadow-sm shadow-blue-200">
-                                    <Plus className="w-4 h-4" /> Log Manual Report
+                                <Button className="bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-widest text-[10px] gap-2 rounded-xl h-9 px-4 shadow-sm shadow-blue-200">
+                                    <Plus className="w-3.5 h-3.5" /> Log Manual Report
                                 </Button>
                             </div>
 
-                            <div className="p-16 text-center border border-slate-100 rounded-[2rem] bg-slate-50">
-                                <div className="bg-blue-100 w-16 h-16 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4">
-                                    <ClipboardCheck className="w-8 h-8 text-blue-600" />
+                            <div className="p-10 text-center border border-slate-100 rounded-xl bg-slate-50">
+                                <div className="bg-blue-100 w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3">
+                                    <ClipboardCheck className="w-6 h-6 text-blue-600" />
                                 </div>
-                                <h4 className="font-black text-slate-900 text-lg">Waiting for Initial Sync</h4>
-                                <p className="text-slate-500 text-sm mt-1">Inspection reports will populate automatically once operators submit them via Motive App.</p>
+                                <h4 className="font-black text-slate-900 text-base">Waiting for Initial Sync</h4>
+                                <p className="text-slate-500 text-xs mt-1">Inspection reports will populate automatically once operators submit them via Motive App.</p>
                             </div>
                         </div>
                     </div>
@@ -912,10 +927,10 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                 {activeTab === 'history' && (
                     <div className="animate-in slide-in-from-right-4 duration-300">
                         {/* Audit History Timeline */}
-                        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
-                            <div className="px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                                <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-xs tracking-widest">
-                                    <History className="w-4 h-4 text-slate-400" /> Verified Maintenance Audit History
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-[10px] tracking-widest">
+                                    <History className="w-3.5 h-3.5 text-slate-400" /> Verified Maintenance Audit History
                                 </h3>
                                 <div className="flex items-center gap-2 px-2">
                                     <input
@@ -923,17 +938,17 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                         id="historyWarrantyFilter"
                                         checked={historyWarrantyFilter}
                                         onChange={(e) => setHistoryWarrantyFilter(e.target.checked)}
-                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                     />
-                                    <label htmlFor="historyWarrantyFilter" className="text-xs font-black uppercase tracking-widest text-slate-500 cursor-pointer">
+                                    <label htmlFor="historyWarrantyFilter" className="text-[10px] font-black uppercase tracking-widest text-slate-500 cursor-pointer">
                                         Has Warranty
                                     </label>
                                 </div>
                             </div>
-                            <div className="divide-y divide-slate-100 max-h-[800px] overflow-y-auto custom-scrollbar">
+                            <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto custom-scrollbar">
                                 {filteredHistory.length > 0 ? (
                                     filteredHistory.map(wo => (
-                                        <div key={wo.id} className="p-10 flex items-start justify-between hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/app/service/${wo.id}`)}>
+                                        <div key={wo.id} className="p-5 md:p-6 flex items-start justify-between hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => navigate(`/app/service/${wo.id}`)}>
                                             <div className="space-y-3 flex-1 pr-12">
                                                 <div className="flex items-center gap-4">
                                                     <div className="text-base font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">{wo.woNumber || 'Draft'}</div>
@@ -959,11 +974,11 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="p-24 text-center">
-                                        <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                                            <History className="w-10 h-10 text-slate-200" />
+                                    <div className="p-12 text-center">
+                                        <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+                                            <History className="w-8 h-8 text-slate-200" />
                                         </div>
-                                        <p className="text-slate-400 font-black uppercase text-xs tracking-widest">No verified maintenance logs for this unit.</p>
+                                        <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">No verified maintenance logs for this unit.</p>
                                     </div>
                                 )}
                             </div>
@@ -998,8 +1013,8 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                 {activeTab === 'ai' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in zoom-in-95 duration-200">
                         {/* Session History List */}
-                        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col max-h-[600px]">
-                            <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50">
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col max-h-[600px]">
+                            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
                                 <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest flex items-center gap-2">
                                     <History className="w-4 h-4 text-slate-400" /> Recent Consultations
                                 </h3>
@@ -1013,7 +1028,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                 setCurrentSessionId(session.id);
                                                 setIsAiPanelOpen(true);
                                             }}
-                                            className="group p-5 bg-white border border-slate-100 rounded-2xl hover:bg-blue-50 hover:border-blue-200 cursor-pointer transition-all shadow-sm flex justify-between items-start"
+                                            className="group p-4 bg-white border border-slate-100 rounded-xl hover:bg-blue-50 hover:border-blue-200 cursor-pointer transition-all shadow-sm flex justify-between items-start"
                                         >
                                             <div className="space-y-1">
                                                 <div className="font-bold text-slate-800 group-hover:text-blue-700 text-sm line-clamp-1">{session.title}</div>
@@ -1042,18 +1057,18 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                         </div>
 
                         {/* New Chat CTA */}
-                        <div className="bg-blue-600 p-10 rounded-[2.5rem] shadow-xl shadow-blue-500/20 text-center flex flex-col items-center justify-center text-white h-full min-h-[400px]">
-                            <div className="bg-white/10 w-24 h-24 rounded-full flex items-center justify-center mb-8 backdrop-blur-md">
-                                <Sparkles className="w-12 h-12 text-white" />
+                        <div className="bg-blue-600 p-6 md:p-8 rounded-2xl shadow-xl shadow-blue-500/20 text-center flex flex-col items-center justify-center text-white h-full min-h-[400px]">
+                            <div className="bg-white/10 w-20 h-20 rounded-full flex items-center justify-center mb-6 backdrop-blur-md">
+                                <Sparkles className="w-10 h-10 text-white" />
                             </div>
-                            <h3 className="text-2xl font-black mb-4">Start New Analysis</h3>
-                            <p className="text-blue-100 text-sm font-medium mb-8 max-w-xs leading-relaxed">
+                            <h3 className="text-xl font-bold mb-3">Start New Analysis</h3>
+                            <p className="text-blue-100 text-sm font-medium mb-6 max-w-xs leading-relaxed">
                                 Initialize a fresh diagnostic session with the Unit Intelligence Expert.
                             </p>
                             <Button
-                                size="lg"
+                                size="default"
                                 disabled={isReadOnly}
-                                className={`h-14 px-8 rounded-2xl font-black text-blue-600 bg-white hover:bg-blue-50 shadow-lg border-0 ${isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`h-11 px-6 rounded-xl font-black text-blue-600 bg-white hover:bg-blue-50 shadow-lg border-0 ${isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 onClick={() => {
                                     if (isReadOnly) return;
                                     handleNewChat();
@@ -1068,24 +1083,24 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
 
                 {/* WARRANTY VIEW */}
                 {activeTab === 'warranty' && (
-                    <div className="space-y-8 animate-in fade-in zoom-in duration-300">
+                    <div className="space-y-6 animate-in fade-in zoom-in duration-300">
                         {warranties.length === 0 ? (
-                            <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm p-24 text-center">
-                                <div className="bg-slate-50 w-24 h-24 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
-                                    <FileCheck className="w-10 h-10 text-slate-300" />
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 md:p-16 text-center">
+                                <div className="bg-slate-50 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4">
+                                    <FileCheck className="w-8 h-8 text-slate-300" />
                                 </div>
-                                <h3 className="text-xl font-black text-slate-900 mb-2">No Warranty Records</h3>
-                                <p className="text-slate-500 font-medium max-w-md mx-auto mb-8">
+                                <h3 className="text-lg font-black text-slate-900 mb-2">No Warranty Records</h3>
+                                <p className="text-slate-500 font-medium max-w-md mx-auto mb-6 text-sm">
                                     Upload written warranties, extended coverage docs, or capture policy details for AI analysis.
                                 </p>
 
                                 <Button
-                                    size="lg"
+                                    size="default"
                                     disabled={isReadOnly}
                                     onClick={() => !isReadOnly && setIsAddWarrantyOpen(true)}
-                                    className="h-14 px-8 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl"
+                                    className="h-11 px-6 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg"
                                 >
-                                    {isReadOnly ? <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> Read Only</span> : '+ Add Warranty Record'}
+                                    {isReadOnly ? <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> Disabled</span> : '+ Add Warranty Record'}
                                 </Button>
                             </div>
                         ) : (
@@ -1102,10 +1117,10 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {warranties.map(w => (
-                                        <div key={w.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-all group">
-                                            <div className="flex items-start justify-between mb-6">
+                                        <div key={w.id} className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
+                                            <div className="flex items-start justify-between mb-4">
                                                 <div>
-                                                    <span className={`inline-block px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border mb-3 ${w.startDate && w.endDate && new Date() > new Date(w.endDate)
+                                                    <span className={`inline-block px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border mb-2 ${w.startDate && w.endDate && new Date() > new Date(w.endDate)
                                                         ? 'bg-rose-50 text-rose-600 border-rose-100'
                                                         : 'bg-emerald-50 text-emerald-600 border-emerald-100'
                                                         }`}>
@@ -1113,8 +1128,8 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                                     </span>
                                                     <h3 className="font-black text-xl text-slate-900">{w.description}</h3>
                                                 </div>
-                                                <div className="bg-slate-50 p-3 rounded-2xl">
-                                                    <ShieldCheck className="w-6 h-6 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                                                <div className="bg-slate-50 p-2.5 rounded-xl">
+                                                    <ShieldCheck className="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
                                                 </div>
                                             </div>
 
@@ -1178,14 +1193,14 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
             {/* AI Chat Expert Panel */}
             <div className={`fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-[150] transform transition-transform duration-700 ease-[cubic-bezier(0.19,1,0.22,1)] border-l border-slate-200 ${isAiPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                 <div className="h-full flex flex-col">
-                    <div className="p-10 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shadow-lg">
-                        <div className="flex items-center gap-5">
-                            <div className="bg-blue-600 p-3 rounded-2xl shadow-xl shadow-blue-500/20">
-                                <Bot className="w-8 h-8" />
+                    <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shadow-lg">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-blue-600 p-2.5 rounded-xl shadow-md">
+                                <Bot className="w-5 h-5" />
                             </div>
                             <div>
-                                <h3 className="font-black text-2xl tracking-tight">Unit {equipment.unitNumber} Intel</h3>
-                                <p className="text-[10px] text-blue-400 font-black tracking-[0.2em] uppercase">Autonomous Fleet Advisor</p>
+                                <h3 className="font-black text-lg tracking-tight">Unit {equipment.unitNumber} Intel</h3>
+                                <p className="text-[10px] text-blue-400 font-black tracking-widest uppercase">Autonomous Fleet Advisor</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1195,38 +1210,38 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                 onClick={handleNewChat}
                                 disabled={isReadOnly}
                                 title={isReadOnly ? "New Chat Disabled" : "New Chat"}
-                                className={`hover:bg-slate-800 text-slate-400 hover:text-white rounded-2xl h-12 w-12 ${isReadOnly ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                className={`hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl h-9 w-9 ${isReadOnly ? 'opacity-30 cursor-not-allowed' : ''}`}
                             >
-                                <Plus className="w-6 h-6" />
+                                <Plus className="w-4.5 h-4.5" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => setIsAiPanelOpen(false)} className="hover:bg-slate-800 text-white hover:text-white rounded-2xl h-12 w-12">
-                                <X className="w-8 h-8" />
+                            <Button variant="ghost" size="icon" onClick={() => setIsAiPanelOpen(false)} className="hover:bg-slate-800 text-white hover:text-white rounded-xl h-9 w-9">
+                                <X className="w-5 h-5" />
                             </Button>
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-slate-50/50 custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50 custom-scrollbar">
                         {messages.length === 0 && (
                             <div className="text-center py-10 px-6">
-                                <div className="bg-blue-50 w-28 h-28 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 shadow-inner border border-blue-100">
-                                    <Sparkles className="w-14 h-14 text-blue-500 animate-pulse" />
+                                <div className="bg-blue-50 w-20 h-20 rounded-xl flex items-center justify-center mx-auto mb-6 shadow-inner border border-blue-100">
+                                    <Sparkles className="w-10 h-10 text-blue-500 animate-pulse" />
                                 </div>
-                                <h4 className="font-black text-slate-900 text-3xl mb-4 tracking-tighter">Consult Unit Intelligence</h4>
-                                <p className="text-sm text-slate-500 mb-12 font-bold leading-relaxed max-w-sm mx-auto italic">"I have synthesized all repair records and OEM specifications for this asset. How can I help you today?"</p>
+                                <h4 className="font-black text-slate-900 text-xl mb-2 tracking-tight">Consult Unit Intelligence</h4>
+                                <p className="text-sm text-slate-500 mb-8 font-medium leading-relaxed max-w-xs mx-auto italic">"I have synthesized all repair records and OEM specifications for this asset. How can I help you today?"</p>
 
-                                <div className="grid grid-cols-1 gap-4 max-w-md mx-auto">
+                                <div className="grid grid-cols-1 gap-3 max-w-md mx-auto">
                                     {suggestedPrompts.map((p, idx) => (
                                         <Button
                                             key={idx}
                                             variant="outline"
                                             onClick={() => handleSendMessage(undefined, p.text)}
-                                            className="w-full h-auto p-6 flex items-center justify-between rounded-[2rem] border-slate-200 hover:border-blue-500 hover:text-blue-600 text-slate-700 whitespace-normal text-left"
+                                            className="w-full h-auto p-4 flex items-center justify-between rounded-xl border-slate-200 hover:border-blue-500 hover:text-blue-600 text-slate-700 whitespace-normal text-left"
                                         >
-                                            <div className="flex items-center gap-4">
-                                                <p.icon className="w-5 h-5 text-slate-300" />
+                                            <div className="flex items-center gap-3">
+                                                <p.icon className="w-4 h-4 text-slate-300" />
                                                 <span className="text-xs font-black">{p.text}</span>
                                             </div>
-                                            <ChevronRight className="w-5 h-5 text-slate-100" />
+                                            <ChevronRight className="w-4 h-4 text-slate-100" />
                                         </Button>
                                     ))}
                                 </div>
@@ -1235,18 +1250,18 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
 
                         {messages.map((m) => (
                             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
-                                <div className={`flex gap-5 max-w-[92%] ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                                    <div className={`p-8 rounded-[2.5rem] text-sm leading-relaxed shadow-sm ${m.role === 'user' ? 'bg-blue-600 text-white font-bold' : 'bg-white border border-slate-200 text-slate-800 font-medium'}`}>
+                                <div className={`flex gap-4 max-w-[92%] ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                                    <div className={`p-5 rounded-2xl text-sm leading-relaxed shadow-sm ${m.role === 'user' ? 'bg-blue-600 text-white font-bold' : 'bg-white border border-slate-200 text-slate-800 font-medium'}`}>
                                         <div className="whitespace-pre-wrap">{m.content}</div>
 
                                         {m.sources && m.sources.length > 0 && (
-                                            <div className="mt-8 pt-6 border-t border-slate-100 flex flex-wrap gap-3">
+                                            <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-2">
                                                 {m.sources.map((chunk: any, ci: number) => {
                                                     const link = chunk.web?.uri || chunk.maps?.uri;
                                                     const title = chunk.web?.title || chunk.maps?.title || "Reference";
                                                     return link ? (
-                                                        <a key={ci} href={link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[10px] bg-slate-50 hover:bg-blue-50 px-5 py-3 rounded-2xl text-blue-600 font-black border border-slate-100 transition-all shadow-inner">
-                                                            <ExternalLink className="w-4 h-4" /> {title}
+                                                        <a key={ci} href={link} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[10px] bg-slate-50 hover:bg-blue-50 px-3 py-1.5 rounded-xl text-blue-600 font-black border border-slate-100 transition-all shadow-inner">
+                                                            <ExternalLink className="w-3.5 h-3.5" /> {title}
                                                         </a>
                                                     ) : null;
                                                 })}
@@ -1258,8 +1273,8 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                         ))}
                         {isTyping && (
                             <div className="flex justify-start">
-                                <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] flex items-center gap-5 shadow-sm animate-pulse">
-                                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                                <div className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center gap-3 shadow-sm animate-pulse">
+                                    <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
                                     <span className="text-sm font-black text-slate-400 tracking-tighter uppercase">Reasoning Engines Active...</span>
                                 </div>
                             </div>
@@ -1267,21 +1282,21 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                         <div ref={chatEndRef} />
                     </div>
 
-                    <div className="p-10 border-t border-slate-100 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.02)]">
-                        <form onSubmit={handleSendMessage} className="flex gap-5">
+                    <div className="p-5 border-t border-slate-100 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.02)]">
+                        <form onSubmit={handleSendMessage} className="flex gap-4">
                             <input
                                 value={input}
                                 onChange={e => setInput(e.target.value)}
                                 placeholder="Message Unit Intelligence Expert..."
-                                className="flex-1 bg-slate-50 border border-slate-200 rounded-[2rem] px-10 py-5 text-sm font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 focus:bg-white outline-none transition-all placeholder-slate-400 shadow-inner"
+                                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 text-sm font-bold text-slate-900 focus:ring-4 focus:ring-blue-500/10 focus:bg-white outline-none transition-all placeholder-slate-400 shadow-inner"
                             />
                             <Button
                                 type="submit"
                                 disabled={!input.trim() || isTyping}
                                 size="icon"
-                                className="h-20 w-20 rounded-[2rem] shadow-2xl shadow-blue-500/40"
+                                className="h-11 w-11 rounded-xl shadow-lg"
                             >
-                                <Send className="w-8 h-8" />
+                                <Send className="w-5 h-5" />
                             </Button>
                         </form>
                     </div>

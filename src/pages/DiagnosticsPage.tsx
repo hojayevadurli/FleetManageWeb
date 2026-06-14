@@ -8,6 +8,7 @@ import api from '@/lib/Api';
 import { integrationService } from '@/services/integrationService';
 import { DiagnosticAlert } from '@/lib/equipmentApi';
 import { toast } from 'sonner';
+import { useConnectedProviders } from '@/hooks/useConnectedProviders';
 
 type FleetDiagnostic = DiagnosticAlert & {
     unitNumber?: string;
@@ -32,7 +33,9 @@ export default function DiagnosticsPage() {
     const navigate = useNavigate();
     const [alerts, setAlerts] = useState<FleetDiagnostic[]>([]);
     const [loading, setLoading] = useState(true);
-    const [syncing, setSyncing] = useState(false);
+    const { providers: connectedProviders } = useConnectedProviders();
+    const [syncingMotive, setSyncingMotive] = useState(false);
+    const [syncingSamsara, setSyncingSamsara] = useState(false);
     const [statusFilter, setStatusFilter] = useState<'Active' | 'All'>('Active');
     const [selected, setSelected] = useState<FleetDiagnostic | null>(null);
 
@@ -48,19 +51,35 @@ export default function DiagnosticsPage() {
         }
     };
 
-    const handleSync = async () => {
-        setSyncing(true);
+    const handleSyncMotive = async () => {
+        setSyncingMotive(true);
         try {
             await integrationService.syncFaults();
             await fetchAlerts();
             const active = alerts.filter(a => a.status === 'Active').length;
             active > 0
                 ? toast.warning(`${active} active fault code${active > 1 ? 's' : ''} found.`)
-                : toast.success('Sync complete — no active fault codes.');
+                : toast.success('Motive sync complete — no active fault codes.');
         } catch {
             toast.error('Sync failed. Check Motive connection.');
         } finally {
-            setSyncing(false);
+            setSyncingMotive(false);
+        }
+    };
+
+    const handleSyncSamsara = async () => {
+        setSyncingSamsara(true);
+        try {
+            await integrationService.syncSamsaraFaults();
+            await fetchAlerts();
+            const active = alerts.filter(a => a.status === 'Active').length;
+            active > 0
+                ? toast.warning(`${active} active fault code${active > 1 ? 's' : ''} found.`)
+                : toast.success('Samsara sync complete — no active fault codes.');
+        } catch {
+            toast.error('Sync failed. Check Samsara connection.');
+        } finally {
+            setSyncingSamsara(false);
         }
     };
 
@@ -86,7 +105,13 @@ export default function DiagnosticsPage() {
                             <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
                                 <AlertCircle className="w-6 h-6 text-rose-500" /> Fleet Diagnostics
                             </h1>
-                            <p className="text-sm text-slate-500 mt-1">Active fault codes synced from Motive across all vehicles</p>
+                            <p className="text-sm text-slate-500 mt-1">
+                                Active fault codes synced from{' '}
+                                {connectedProviders.size === 0
+                                    ? 'telematics integrations'
+                                    : [...connectedProviders].join(' & ')}{' '}
+                                across all vehicles
+                            </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -98,10 +123,18 @@ export default function DiagnosticsPage() {
                                 </button>
                             ))}
                         </div>
-                        <Button onClick={handleSync} disabled={syncing}
-                            className="bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-bold text-xs uppercase tracking-widest rounded-xl h-9 px-4 flex items-center gap-2">
-                            {syncing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Syncing...</> : <><RefreshCw className="w-3.5 h-3.5" /> Sync Motive</>}
-                        </Button>
+                        {connectedProviders.has('Motive') && (
+                            <Button onClick={handleSyncMotive} disabled={syncingMotive || syncingSamsara}
+                                className="bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-bold text-xs uppercase tracking-widest rounded-xl h-9 px-4 flex items-center gap-2">
+                                {syncingMotive ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Syncing...</> : <><RefreshCw className="w-3.5 h-3.5" /> Sync Motive</>}
+                            </Button>
+                        )}
+                        {connectedProviders.has('Samsara') && (
+                            <Button onClick={handleSyncSamsara} disabled={syncingMotive || syncingSamsara}
+                                className="bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 font-bold text-xs uppercase tracking-widest rounded-xl h-9 px-4 flex items-center gap-2">
+                                {syncingSamsara ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Syncing...</> : <><RefreshCw className="w-3.5 h-3.5" /> Sync Samsara</>}
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -121,7 +154,9 @@ export default function DiagnosticsPage() {
                                 </div>
                                 <h3 className="font-black text-slate-900 text-lg">No Fault Codes</h3>
                                 <p className="text-slate-500 text-sm mt-1">
-                                    {statusFilter === 'Active' ? 'All vehicles reporting healthy. Click Sync Motive to refresh.' : 'No fault codes recorded yet.'}
+                                    {statusFilter === 'Active'
+                                        ? `All vehicles reporting healthy. ${connectedProviders.size > 0 ? `Sync ${[...connectedProviders].join(' or ')} to refresh.` : 'Connect an integration to pull fault codes.'}`
+                                        : 'No fault codes recorded yet.'}
                                 </p>
                             </div>
                         ) : (() => {

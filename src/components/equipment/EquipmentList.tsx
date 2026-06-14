@@ -333,7 +333,7 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                             return (
                                 <div
                                     key={e.id}
-                                    className="group relative bg-white rounded-[2rem] border transition-all cursor-pointer flex flex-col overflow-hidden border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300"
+                                    className="group relative bg-white rounded-2xl border transition-all cursor-pointer flex flex-col overflow-hidden border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300"
                                     onClick={() => onSelect(e)}
                                 >
 
@@ -448,12 +448,12 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                         })}
                     </div>
                 ) : (
-                    <div className="bg-white p-20 rounded-[3rem] border border-slate-200 shadow-sm text-center">
-                        <div className="bg-slate-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                            <Layers className="w-12 h-12 text-slate-200" />
+                     <div className="bg-white p-10 md:p-16 rounded-2xl border border-slate-200 shadow-sm text-center">
+                        <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+                            <Layers className="w-10 h-10 text-slate-200" />
                         </div>
-                        <h3 className="text-xl font-black text-slate-900 mb-2">No assets found</h3>
-                        <p className="text-slate-500 font-medium">Try adjusting your filters or search query.</p>
+                        <h3 className="text-lg font-black text-slate-900 mb-2">No assets found</h3>
+                        <p className="text-slate-500 text-sm font-medium">Try adjusting your filters or search query.</p>
                     </div>
                 )
             }

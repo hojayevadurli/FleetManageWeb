@@ -5,6 +5,7 @@ import api from "@/lib/Api";
 import { toast } from "sonner";
 import { Loader2, RefreshCw } from "lucide-react";
 import { integrationService } from "@/services/integrationService";
+import { useConnectedProviders } from "@/hooks/useConnectedProviders";
 
 // Sync every 2 min — Motive's location endpoint is a single API call for all vehicles.
 // With 2-min windows, a moving vehicle's Motive timestamp will always have changed
@@ -66,9 +67,11 @@ const buildVehicle = (e: any, prev: LocSnap | undefined) => ({
     current_location: e.lastLatitude != null && e.lastLongitude != null ? {
         latitude: e.lastLatitude,
         longitude: e.lastLongitude,
-        address: e.lastLocationAt
-            ? `Last located at ${new Date(e.lastLocationAt).toLocaleString()}`
-            : 'Unknown Location',
+        address: e.lastLocationAddress
+            || e.lastKnownLocation
+            || (e.lastLocationAt
+                ? `Last located at ${new Date(e.lastLocationAt).toLocaleString()}`
+                : 'Unknown Location'),
     } : undefined,
     last_location_update: e.lastLocationAt,
     fuel_level: e.telematicsFuelLevel ?? e.fuelLevel ?? e.fuelLevelPercent ?? undefined,
@@ -78,6 +81,7 @@ const buildVehicle = (e: any, prev: LocSnap | undefined) => ({
 
 // ── Component ─────────────────────────────────────────────────────────────────
 const FleetMap = () => {
+    const { providers: connectedProviders } = useConnectedProviders();
     const [vehicles, setVehicles] = useState<any[]>([]);
     const [loading, setLoading]   = useState(true);
     const [syncing, setSyncing]   = useState(false);
@@ -95,18 +99,28 @@ const FleetMap = () => {
         setSyncing(true);
 
         try {
-            // Fuel is synced inside syncMotive() — no separate fuel call needed
-            const [motiveResult] = await Promise.allSettled([
-                integrationService.syncMotive(),
-            ]);
+            // Only sync providers that are actually connected.
+            const syncTasks: Promise<any>[] = [];
+            if (connectedProviders.has('Motive'))  syncTasks.push(integrationService.syncMotive());
+            if (connectedProviders.has('Samsara')) syncTasks.push(integrationService.syncSamsara());
 
-            const locationSyncOk = motiveResult.status === 'fulfilled';
-            if (!locationSyncOk) {
-                console.warn("Location sync failed:", (motiveResult as PromiseRejectedResult).reason);
+            let locationSyncOk = false;
+            if (syncTasks.length > 0) {
+                const results = await Promise.allSettled(syncTasks);
+                locationSyncOk = results.some(r => r.status === 'fulfilled');
+                if (!locationSyncOk) {
+                    console.debug("Location sync failed — showing last known positions.");
+                }
             }
 
             const { data } = await api.get("/equipment");
             const equipmentList: any[] = data || [];
+
+            // Log first vehicle to verify telematicsFuelLevel is present in API response
+            if (equipmentList.length > 0) {
+                const sample = equipmentList.find(e => e.telematicsFuelLevel != null) ?? equipmentList[0];
+                console.log('[Equipment sample]', { id: sample.id, unitNumber: sample.unitNumber, telematicsFuelLevel: sample.telematicsFuelLevel });
+            }
 
             // Build vehicles using the previous snapshot for comparison
             const mapped = equipmentList.map(e =>
