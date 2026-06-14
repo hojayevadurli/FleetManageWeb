@@ -205,23 +205,34 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
         equipmentApi.getDiagnostics(equipment.id)
             .then(async (stored) => {
                 setDiagnostics(stored);
-                // Auto-sync on first open so the tab is never stale
+                // Auto-sync on first open — only call the provider this equipment belongs to
                 try {
-                    await integrationService.syncFaults();
+                    await syncFaultsForEquipment();
                     const fresh = await equipmentApi.getDiagnostics(equipment.id);
                     setDiagnostics(fresh);
                 } catch {
-                    // Motive not connected or no fault codes endpoint — silently ignore
+                    // Provider not connected — silently ignore
                 }
             })
             .catch(() => {})
             .finally(() => setDiagnosticsLoading(false));
     }, [activeTab, equipment.id]);
 
+    const syncFaultsForEquipment = () => {
+        const provider = equipment.externalProvider;
+        if (provider === 'Samsara') return integrationService.syncSamsaraFaults();
+        if (provider === 'Motive')  return integrationService.syncFaults();
+        // No provider linked — try both silently
+        return Promise.allSettled([
+            integrationService.syncFaults(),
+            integrationService.syncSamsaraFaults(),
+        ]);
+    };
+
     const handleSyncFaults = async () => {
         setDiagnosticsSyncing(true);
         try {
-            const result = await integrationService.syncFaults();
+            await syncFaultsForEquipment();
             const fresh = await equipmentApi.getDiagnostics(equipment.id);
             setDiagnostics(fresh);
             const active = fresh.filter(d => d.status === 'Active').length;
@@ -230,8 +241,9 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
             } else {
                 toast.success('Sync complete — no active fault codes.');
             }
-        } catch (err: any) {
-            toast.error(err?.response?.data || 'Failed to sync fault codes. Check Motive connection.');
+        } catch {
+            const provider = equipment.externalProvider ?? 'integration';
+            toast.error(`Failed to sync fault codes. Check ${provider} connection.`);
         } finally {
             setDiagnosticsSyncing(false);
         }
@@ -819,7 +831,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     <h3 className="font-black text-slate-900 flex items-center gap-2 text-xl tracking-tight">
                                         <AlertCircle className="w-5 h-5 text-rose-500" /> Active Faults
                                     </h3>
-                                    <p className="text-slate-500 text-xs mt-1">Live telematics codes synced from Motive integration.</p>
+                                    <p className="text-slate-500 text-xs mt-1">Live telematics codes synced from Motive & Samsara.</p>
                                 </div>
                                 <Button
                                     onClick={handleSyncFaults}
@@ -877,7 +889,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                         <ShieldCheck className="w-8 h-8 text-emerald-600" />
                                     </div>
                                     <h4 className="font-black text-slate-900 text-lg">No Active Fault Codes</h4>
-                                    <p className="text-slate-500 text-sm mt-1">Engine is reporting healthy status. Click Sync Codes to pull latest from Motive.</p>
+                                    <p className="text-slate-500 text-sm mt-1">Engine is reporting healthy status. Click Sync Codes to pull latest from Motive & Samsara.</p>
                                 </div>
                             )}
                         </div>

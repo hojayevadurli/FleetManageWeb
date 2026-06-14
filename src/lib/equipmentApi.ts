@@ -50,6 +50,7 @@ export const mapDtoToEquipment = (dto: EquipmentDto): Equipment => {
     lastKnownLocation: dto.lastLocationAddress,
     latitude: dto.lastLatitude,
     longitude: dto.lastLongitude,
+    externalProvider: dto.externalProvider,
   };
 };
 

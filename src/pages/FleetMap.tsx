@@ -5,6 +5,7 @@ import api from "@/lib/Api";
 import { toast } from "sonner";
 import { Loader2, RefreshCw } from "lucide-react";
 import { integrationService } from "@/services/integrationService";
+import { useConnectedProviders } from "@/hooks/useConnectedProviders";
 
 // Sync every 2 min — Motive's location endpoint is a single API call for all vehicles.
 // With 2-min windows, a moving vehicle's Motive timestamp will always have changed
@@ -66,9 +67,11 @@ const buildVehicle = (e: any, prev: LocSnap | undefined) => ({
     current_location: e.lastLatitude != null && e.lastLongitude != null ? {
         latitude: e.lastLatitude,
         longitude: e.lastLongitude,
-        address: e.lastLocationAt
-            ? `Last located at ${new Date(e.lastLocationAt).toLocaleString()}`
-            : 'Unknown Location',
+        address: e.lastLocationAddress
+            || e.lastKnownLocation
+            || (e.lastLocationAt
+                ? `Last located at ${new Date(e.lastLocationAt).toLocaleString()}`
+                : 'Unknown Location'),
     } : undefined,
     last_location_update: e.lastLocationAt,
     fuel_level: e.telematicsFuelLevel ?? e.fuelLevel ?? e.fuelLevelPercent ?? undefined,
@@ -78,6 +81,7 @@ const buildVehicle = (e: any, prev: LocSnap | undefined) => ({
 
 // ── Component ─────────────────────────────────────────────────────────────────
 const FleetMap = () => {
+    const { providers: connectedProviders } = useConnectedProviders();
     const [vehicles, setVehicles] = useState<any[]>([]);
     const [loading, setLoading]   = useState(true);
     const [syncing, setSyncing]   = useState(false);
@@ -95,20 +99,18 @@ const FleetMap = () => {
         setSyncing(true);
 
         try {
-            // Try both providers in parallel — whichever is connected will succeed.
-            // If neither is connected both will reject with a 400; that's not an error,
-            // just means we'll show the last-known positions from the database.
-            const [motiveResult, samsaraResult] = await Promise.allSettled([
-                integrationService.syncMotive(),
-                integrationService.syncSamsara(),
-            ]);
+            // Only sync providers that are actually connected.
+            const syncTasks: Promise<any>[] = [];
+            if (connectedProviders.has('Motive'))  syncTasks.push(integrationService.syncMotive());
+            if (connectedProviders.has('Samsara')) syncTasks.push(integrationService.syncSamsara());
 
-            const locationSyncOk = motiveResult.status === 'fulfilled' || samsaraResult.status === 'fulfilled';
-            if (samsaraResult.status === 'fulfilled') {
-                console.log('[Samsara sync]', samsaraResult.value);
-            }
-            if (!locationSyncOk) {
-                console.debug("Location sync skipped — no connected integration responded.");
+            let locationSyncOk = false;
+            if (syncTasks.length > 0) {
+                const results = await Promise.allSettled(syncTasks);
+                locationSyncOk = results.some(r => r.status === 'fulfilled');
+                if (!locationSyncOk) {
+                    console.debug("Location sync failed — showing last known positions.");
+                }
             }
 
             const { data } = await api.get("/equipment");
