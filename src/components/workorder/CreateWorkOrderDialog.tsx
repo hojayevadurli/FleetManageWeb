@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,6 +95,7 @@ export default function CreateWorkOrderDialog({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const wasSubmittedRef = useRef(false);
 
   const [showOptionalFields, setShowOptionalFields] = useState({
     eta: false,
@@ -600,6 +601,7 @@ export default function CreateWorkOrderDialog({
       }
 
       await onAfterCreated?.();
+      wasSubmittedRef.current = true;
       resetForm();
       onOpenChange(false);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -829,8 +831,15 @@ export default function CreateWorkOrderDialog({
   };
 
   const handleOpenChange = (isOpen: boolean) => {
-
-    if (!isOpen) resetForm();
+    if (!isOpen) {
+      if (!existingWorkOrder && draftWorkOrderId && !wasSubmittedRef.current) {
+        workOrdersApi.delete(draftWorkOrderId).catch(err =>
+          console.error("Failed to clean up draft WO on cancel:", err)
+        );
+      }
+      wasSubmittedRef.current = false;
+      resetForm();
+    }
     onOpenChange(isOpen);
   };
 
@@ -1382,7 +1391,7 @@ export default function CreateWorkOrderDialog({
                 </div>
               )}
               <div className="flex items-center justify-end gap-3 pt-6 pb-2">
-                <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold text-slate-500">Cancel</Button>
+                <Button variant="ghost" onClick={() => handleOpenChange(false)} className="font-bold text-slate-500">Cancel</Button>
                 <Button
                   disabled={createDisabled}
                   onClick={handleCreate}
