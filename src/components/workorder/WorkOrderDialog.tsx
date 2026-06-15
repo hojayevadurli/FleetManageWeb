@@ -97,6 +97,7 @@ export default function WorkOrderDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const wasSubmittedRef = useRef(false);
 
   // For Edit Mode: Existing Documents for Preview
   const [existingDocuments, setExistingDocuments] = useState<{ id: string; url: string; name: string }[]>([]);
@@ -767,6 +768,7 @@ export default function WorkOrderDialog({
       await onAfterCreated?.();
 
       if (!editWoId) {
+        wasSubmittedRef.current = true;
         resetForm();
       }
       onOpenChange(false);
@@ -972,8 +974,15 @@ export default function WorkOrderDialog({
   };
 
   const handleOpenChange = (isOpen: boolean) => {
-
-    if (!isOpen) resetForm();
+    if (!isOpen) {
+      if (!editWoId && draftWorkOrderId && !wasSubmittedRef.current) {
+        workOrdersApi.delete(draftWorkOrderId).catch(err =>
+          console.error("Failed to clean up draft WO on cancel:", err)
+        );
+      }
+      wasSubmittedRef.current = false;
+      resetForm();
+    }
     onOpenChange(isOpen);
   };
 
@@ -1716,7 +1725,7 @@ export default function WorkOrderDialog({
                 </div>
               )}
               <div className="flex items-center justify-end gap-3 pt-6 pb-2">
-                <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold text-slate-500">Cancel</Button>
+                <Button variant="ghost" onClick={() => handleOpenChange(false)} className="font-bold text-slate-500">Cancel</Button>
                 <Button
                   disabled={createDisabled}
                   onClick={handleCreate}
