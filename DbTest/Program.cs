@@ -57,3 +57,8 @@ class Program
         Console.WriteLine("  3. UPDATE Equipment SET TelematicsFuelLevel = fuel_percentage WHERE ExternalId = id");
     }
 }
+
+
+
+
+

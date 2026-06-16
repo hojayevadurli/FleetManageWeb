@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { workOrdersApi, WorkOrderUpsertDto } from '@/lib/workOrdersApi';
 import { shopsApi } from '@/lib/shopsApi';
+import { Shop } from '@/components/shops/types/ShopTypes';
 import { WorkOrderDto, Equipment, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderCostSource, DocumentRole } from '@/lib/types';
 import { equipmentApi } from '@/lib/equipmentApi';
 import { useToast } from "@/hooks/use-toast";
@@ -50,6 +51,7 @@ const ServiceRecordDetailPage = () => {
     const [record, setRecord] = useState<WorkOrder | null>(null);
     const [rawDto, setRawDto] = useState<WorkOrderDto | null>(null); // Store raw DTO for editing
     const [equipment, setEquipment] = useState<Equipment | null>(null);
+    const [vendorShop, setVendorShop] = useState<Shop | null>(null);
     const [loading, setLoading] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -80,12 +82,15 @@ const ServiceRecordDetailPage = () => {
                 } catch (e) { console.warn("Could not load equipment details"); }
             }
 
-            // Fetch vendor details if vendorId is present but vendorName is missing
+            // Fetch vendor details if vendorId is present
             let fetchedVendorName = (wo as any).vendorName;
-            if (wo.vendorId && !fetchedVendorName) {
+            if (wo.vendorId) {
                 try {
                     const shop = await shopsApi.get(wo.vendorId);
-                    if (shop) fetchedVendorName = shop.shop_name;
+                    if (shop) {
+                        fetchedVendorName = shop.shop_name;
+                        setVendorShop(shop);
+                    }
                 } catch (e) {
                     console.warn("Could not load shop details", e);
                 }
@@ -180,10 +185,6 @@ const ServiceRecordDetailPage = () => {
             setNotes(wo.notes || "");
             setActiveMediaIndex(0);
 
-            setRecord(mapped);
-            setNotes(wo.notes || "");
-            setActiveMediaIndex(0);
-
             // ALWAYS try to fetch latest rating from ShopsAPI if we have a vendor
             // This mirrors WorkOrderDialog logic and ensures we get the rating even if WO table is out of sync
             if (mapped.vendorId) {
@@ -192,7 +193,9 @@ const ServiceRecordDetailPage = () => {
                     // Match loosely on ID (string vs number)
                     const match = shopRatings.find(r =>
                         String(r.work_order_id) === String(mapped.id) ||
-                        String(r.workOrderId) === String(mapped.id)
+                        String(r.workOrderId) === String(mapped.id) ||
+                        String(r.work_order_id) === String((wo as any).Id) ||
+                        String(r.workOrderId) === String((wo as any).Id)
                     );
 
                     if (match) {
@@ -452,11 +455,13 @@ const ServiceRecordDetailPage = () => {
 
                                 <InfoItem icon={<Store className="w-4 h-4" />} label="Service Provider">
                                     <div className="text-blue-600 font-bold">{vendorName}</div>
-                                    <div className="flex items-center gap-1 text-xs text-amber-500 mt-1">
-                                        <Star className="w-3 h-3 fill-current" />
-                                        <span>4.8</span>
-                                        <span className="text-slate-400">(12 reviews)</span>
-                                    </div>
+                                    {record.vendorId && vendorShop && (
+                                        <div className="flex items-center gap-1 text-xs text-amber-500 mt-1">
+                                            <Star className="w-3 h-3 fill-current" />
+                                            <span>{vendorShop.average_rating > 0 ? vendorShop.average_rating.toFixed(1) : 'No Rating'}</span>
+                                            <span className="text-slate-400">({vendorShop.total_reviews} {vendorShop.total_reviews === 1 ? 'review' : 'reviews'})</span>
+                                        </div>
+                                    )}
                                 </InfoItem>
 
                                 <InfoItem icon={<AlertCircle className="w-4 h-4" />} label="Priority">

@@ -392,7 +392,10 @@ export default function WorkOrderDialog({
           // Normalize matching: simpler check now that API normalizes keys
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const match = ratings.find((r: any) =>
-            String(r.work_order_id) === String(wo.id)
+            String(r.work_order_id) === String(wo.id) ||
+            String(r.work_order_id) === String(wo.Id) ||
+            String(r.workOrderId) === String(wo.id) ||
+            String(r.workOrderId) === String(wo.Id)
           );
 
           console.log("[WorkOrderDialog] Matched rating:", match);
@@ -746,7 +749,7 @@ export default function WorkOrderDialog({
           await shopsApi.createRating(newWorkOrder.vendor_id, {
             rating: ratingData.mainRating,
             reviewText: ratingData.comment,
-            workOrderId: id,
+            workOrderId: String(currentWo.Id || currentWo.id),
             qualityRating: ratingData.qualityRating,
             timelinessRating: ratingData.timelinessRating,
             communicationRating: ratingData.communicationRating,
