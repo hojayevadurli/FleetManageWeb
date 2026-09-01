@@ -1,6 +1,7 @@
 import { getGoogleMapsLoader } from "@/lib/mapsConfig";
 import { useState, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   MapPin,
   Truck,
@@ -13,6 +14,7 @@ import {
   Droplets,
   Pencil,
   Check,
+  Menu,
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/Api";
@@ -60,6 +62,7 @@ const FleetMapView = ({ vehicles }: FleetMapViewProps) => {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [fuelEdit, setFuelEdit] = useState<{ vehicleId: string; value: string } | null>(null);
   const [localFuelLevels, setLocalFuelLevels] = useState<Record<string, number>>({});
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
@@ -206,6 +209,7 @@ const FleetMapView = ({ vehicles }: FleetMapViewProps) => {
 
   const focusVehicle = (v: Vehicle) => {
     setSelectedVehicleId(v.id);
+    setMobileSidebarOpen(false);
     if (v.current_location?.latitude && v.current_location?.longitude && mapInstanceRef.current) {
       mapInstanceRef.current.panTo({ lat: v.current_location.latitude, lng: v.current_location.longitude });
       mapInstanceRef.current.setZoom(14);
@@ -219,10 +223,8 @@ const FleetMapView = ({ vehicles }: FleetMapViewProps) => {
     return acc;
   }, {});
 
-  return (
-    <div className="flex h-full w-full relative overflow-hidden bg-slate-50">
-      {/* Sidebar */}
-      <div className="w-80 h-full border-r border-slate-200 bg-white shadow-xl z-20 flex flex-col">
+  const sidebarBody = (
+    <>
         {/* Search */}
         <div className="p-4 border-b border-slate-100">
           <div className="relative">
@@ -326,10 +328,33 @@ const FleetMapView = ({ vehicles }: FleetMapViewProps) => {
             <div className="text-xs font-bold text-emerald-400">{statusCounts['driving'] || 0} Moving</div>
           </div>
         </div>
+    </>
+  );
+
+  return (
+    <div className="flex h-full w-full relative overflow-hidden bg-slate-50">
+      {/* Sidebar — desktop */}
+      <div className="hidden md:flex w-80 h-full border-r border-slate-200 bg-white shadow-xl z-20 flex-col">
+        {sidebarBody}
       </div>
 
+      {/* Sidebar — mobile drawer */}
+      <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+        <SheetContent side="left" className="w-[85vw] max-w-sm p-0 flex flex-col gap-0 bg-white">
+          <SheetTitle className="sr-only">Fleet Assets</SheetTitle>
+          {sidebarBody}
+        </SheetContent>
+      </Sheet>
+
       {/* Map */}
-      <div className="flex-1 h-full relative">
+      <div className="flex-1 h-full relative min-w-0">
+        {/* Mobile sidebar toggle */}
+        <button
+          onClick={() => setMobileSidebarOpen(true)}
+          className="md:hidden absolute top-6 left-6 z-10 bg-white/90 backdrop-blur p-3.5 rounded-2xl shadow-xl border border-slate-200 text-slate-600 hover:text-blue-600 transition-all"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
         {mapLoading && (
           <div className="absolute inset-0 bg-slate-100 flex flex-col items-center justify-center z-10">
             <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
