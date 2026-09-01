@@ -22,7 +22,9 @@ import {
     Zap,
     Map as MapIcon,
     Bus,
-    User
+    User,
+    Trash2,
+    CheckSquare
 } from 'lucide-react';
 import { equipmentApi, EquipmentCreatePayload } from '@/lib/equipmentApi';
 import { useNavigate } from 'react-router-dom';
@@ -38,6 +40,7 @@ import { verifyVendorAddress, searchVendorSuggestions } from '@/lib/gemini';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import EquipmentFormModal from './EquipmentFormModal';
 import WorkOrderDialog from "@/components/workorder/WorkOrderDialog";
@@ -70,6 +73,39 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
     const [categories, setCategories] = useState<FleetCategory[]>([]);
     const [companyName, setCompanyName] = useState("Fleet Company");
     const navigate = useNavigate();
+
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+    const toggleSelected = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const exitSelectionMode = () => {
+        setSelectionMode(false);
+        setSelectedIds(new Set());
+    };
+
+    const handleBulkDeleteClick = async () => {
+        if (!onBulkDelete || selectedIds.size === 0) return;
+        const count = selectedIds.size;
+        if (!window.confirm(`Are you sure you want to delete ${count} selected asset${count > 1 ? 's' : ''}? This action cannot be undone.`)) {
+            return;
+        }
+        setIsBulkDeleting(true);
+        try {
+            await onBulkDelete(Array.from(selectedIds));
+            exitSelectionMode();
+        } finally {
+            setIsBulkDeleting(false);
+        }
+    };
 
     useEffect(() => {
         const fetchCategoriesAndTenant = async () => {
@@ -265,6 +301,20 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                         <AlertCircle className="w-4 h-4" />
                         Diagnostics
                     </Button>
+                    {onBulkDelete && (
+                        <Button
+                            onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
+                            variant="outline"
+                            className={`h-10 px-4 rounded-lg flex items-center gap-2 font-bold text-sm border transition-all ${
+                                selectionMode
+                                    ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            }`}
+                        >
+                            <CheckSquare className="w-4 h-4" />
+                            {selectionMode ? 'Cancel' : 'Select'}
+                        </Button>
+                    )}
                     <Button
                         onClick={() => setIsAddModalOpen(true)}
                         className="bg-blue-600 text-white h-10 px-6 rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition-all font-bold shadow-sm active:scale-95"
@@ -273,6 +323,22 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                     </Button>
                 </div>
             </PageHeader>
+
+            {selectionMode && (
+                <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                    <span className="text-sm font-bold text-blue-800">
+                        {selectedIds.size} asset{selectedIds.size === 1 ? '' : 's'} selected
+                    </span>
+                    <Button
+                        onClick={handleBulkDeleteClick}
+                        disabled={selectedIds.size === 0 || isBulkDeleting}
+                        className="bg-rose-600 text-white h-9 px-4 rounded-lg flex items-center gap-2 hover:bg-rose-700 transition-all font-bold text-sm disabled:opacity-50"
+                    >
+                        {isBulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        Delete Selected
+                    </Button>
+                </div>
+            )}
 
             <div className="flex flex-col lg:flex-row gap-4">
                 <div className="relative flex-1 min-w-[320px]">
@@ -330,12 +396,25 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                 filteredEquipment.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {filteredEquipment.map((e) => {
+                            const isSelected = selectedIds.has(e.id);
                             return (
                                 <div
                                     key={e.id}
-                                    className="group relative bg-white rounded-2xl border transition-all cursor-pointer flex flex-col overflow-hidden border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300"
-                                    onClick={() => onSelect(e)}
+                                    className={`group relative bg-white rounded-2xl border transition-all cursor-pointer flex flex-col overflow-hidden shadow-sm hover:shadow-xl ${
+                                        selectionMode && isSelected
+                                            ? 'border-blue-400 ring-2 ring-blue-200'
+                                            : 'border-slate-300 hover:border-blue-300'
+                                    }`}
+                                    onClick={() => selectionMode ? toggleSelected(e.id) : onSelect(e)}
                                 >
+                                    {selectionMode && (
+                                        <div
+                                            className="absolute top-4 left-4 z-10"
+                                            onClick={(evt) => { evt.stopPropagation(); toggleSelected(e.id); }}
+                                        >
+                                            <Checkbox checked={isSelected} className="w-5 h-5 bg-white shadow-sm" />
+                                        </div>
+                                    )}
 
                                     <div className="p-6 pb-2 flex justify-between items-start">
                                         <div className="flex items-center gap-3">
@@ -412,10 +491,10 @@ const EquipmentList: React.FC<EquipmentListProps> = ({
                                         </div>
                                     </div>
 
-                                    <div className="mt-auto p-3 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-2">
+                                    <div className={`mt-auto p-3 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-2 ${selectionMode ? 'pointer-events-none opacity-40' : ''}`}>
                                         <Button
                                             variant="outline"
-                                            disabled={e.status === EquipmentOperationalStatus.OutOfService || e.status === EquipmentOperationalStatus.Sold}
+                                            disabled={selectionMode || e.status === EquipmentOperationalStatus.OutOfService || e.status === EquipmentOperationalStatus.Sold}
                                             onClick={(evt) => {
                                                 evt.stopPropagation();
                                                 if (e.status !== EquipmentOperationalStatus.OutOfService && e.status !== EquipmentOperationalStatus.Sold) {

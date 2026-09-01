@@ -329,12 +329,12 @@ const WorkOrderList = ({
                   )}
                 </div>
 
-                {/* Desktop Actions - Added relative z-10 to ensure clickable */}
+                {/* Actions - Added relative z-10 to ensure clickable */}
                 <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0 relative z-10">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="hidden md:flex"
+                    className="flex-1 md:flex-none"
                     onClick={(e) => {
                       e.stopPropagation();
                       onViewDetails?.(wo.id);
@@ -345,7 +345,7 @@ const WorkOrderList = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="hidden md:flex"
+                    className="flex-1 md:flex-none"
                     onClick={(e) => {
                       e.stopPropagation();
                       onEditWorkOrder(wo);

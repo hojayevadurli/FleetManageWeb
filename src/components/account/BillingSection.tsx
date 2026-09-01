@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import tenantsApi, { Tenant } from "@/lib/tenantsApi";
 import billingApi, { STRIPE_PRICE_ID, InvoiceDto, SubscriptionEventDto } from "@/lib/billingApi";
 import equipmentApi from "@/lib/equipmentApi";
-import { differenceInDays, format, parseISO, endOfMonth, startOfDay } from "date-fns";
+import { differenceInDays, differenceInMonths, format, parseISO, endOfMonth, startOfDay } from "date-fns";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EquipmentOperationalStatus } from "@/lib/types";
@@ -139,6 +139,29 @@ const BillingSection = () => {
   // Whether to show the portal (existing customer) vs. checkout (new)
   const hasPortalAccess = !!tenant?.stripeCustomerId && (isActive || isTrialing || isCancelled || isPastDue);
 
+  // Cancellation details derived from subscription history (newest-first)
+  const cancelledEvent = subscriptionHistory.find(e => e.eventType === 'cancelled');
+  const cancelledAt = cancelledEvent ? parseISO(cancelledEvent.occurredAt) : null;
+
+  // Most recent subscription start before the cancellation
+  const subscribedEvent = subscriptionHistory.find(e =>
+    (e.eventType === 'subscribed' || e.eventType === 'resubscribed' || e.eventType === 'reactivated') &&
+    (!cancelledAt || parseISO(e.occurredAt) <= cancelledAt)
+  );
+  const subscribedAt = subscribedEvent ? parseISO(subscribedEvent.occurredAt) : null;
+
+  const activeDurationStr = (() => {
+    if (!subscribedAt || !cancelledAt) return null;
+    const months = differenceInMonths(cancelledAt, subscribedAt);
+    const days = differenceInDays(cancelledAt, subscribedAt) - months * 30;
+    if (months === 0 && days < 1) return 'Less than a day';
+    if (months === 0) return `${days} day${days !== 1 ? 's' : ''}`;
+    if (months < 12) return `${months} month${months !== 1 ? 's' : ''}${days > 0 ? `, ${days} day${days !== 1 ? 's' : ''}` : ''}`;
+    const years = Math.floor(months / 12);
+    const remMonths = months % 12;
+    return `${years} year${years !== 1 ? 's' : ''}${remMonths > 0 ? `, ${remMonths} month${remMonths !== 1 ? 's' : ''}` : ''}`;
+  })();
+
   const eventLabel = (type: string) => {
     switch (type) {
       case "subscribed":         return { label: "Subscribed",         cls: "bg-green-100 text-green-700" };
@@ -200,24 +223,39 @@ const BillingSection = () => {
 
         {/* Cancelled Banner */}
         {isCancelled && (
-          <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
+          <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
                 <Ban className="w-5 h-5 text-amber-600" />
                 <h3 className="font-bold text-amber-900">Subscription Cancelled</h3>
               </div>
-              <p className="text-amber-800 font-medium">
-                Your subscription has been cancelled.
-              </p>
-              {periodEndFormatted && (
-                <p className="text-sm text-amber-700 font-medium mt-1">
-                  Full access continues until <strong>{periodEndFormatted}</strong>.
-                </p>
-              )}
+              <div className="bg-white/60 px-3 py-1.5 rounded-xl border border-amber-200 shrink-0">
+                <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">Status</p>
+                <p className="font-black text-amber-600 text-sm">Cancelled</p>
+              </div>
             </div>
-            <div className="bg-white/60 px-4 py-2 rounded-xl border border-amber-200 shrink-0">
-              <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">Status</p>
-              <p className="font-black text-amber-600">Cancelled</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-white/60 rounded-xl p-4 border border-amber-100">
+                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1.5">Cancelled On</p>
+                <p className="font-bold text-slate-800">
+                  {cancelledAt ? format(cancelledAt, "MMMM d, yyyy") : "—"}
+                </p>
+                {cancelledAt && (
+                  <p className="text-xs text-slate-500 mt-0.5">{format(cancelledAt, "h:mm a")}</p>
+                )}
+              </div>
+              <div className="bg-white/60 rounded-xl p-4 border border-amber-100">
+                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1.5">Access Ends</p>
+                <p className="font-bold text-slate-800">{periodEndFormatted ?? "—"}</p>
+                <p className="text-xs text-slate-500 mt-0.5">Full access until this date</p>
+              </div>
+              <div className="bg-white/60 rounded-xl p-4 border border-amber-100">
+                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1.5">Was Active For</p>
+                <p className="font-bold text-slate-800">{activeDurationStr ?? "—"}</p>
+                {subscribedAt && (
+                  <p className="text-xs text-slate-500 mt-0.5">Since {format(subscribedAt, "MMM d, yyyy")}</p>
+                )}
+              </div>
             </div>
           </div>
         )}
