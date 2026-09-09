@@ -1,86 +1,59 @@
-// src/lib/fuelApi.ts
-import { getToken, logout } from "../components/auth/Auth";
+import api from "@/lib/Api";
 
-const API_BASE = (import.meta.env.VITE_API_URL || "https://localhost:5001").replace(/\/+$/, "");
-
-function joinUrl(base: string, path: string) {
-    return `${base}${path.startsWith("/") ? "" : "/"}${path}`;
+export interface FuelRecordDto {
+  id: string;
+  equipmentId: string;
+  assetNumber: string;
+  date: string;
+  vendorName: string;
+  vendorAddress?: string;
+  fuelType: string;
+  gallons: number;
+  unitPrice: number;
+  totalAmount: number;
+  odometer?: number;
+  state?: string;
+  documentUrl?: string;
+  documentFileName?: string;
+  notes?: string;
+  createdAt: string;
 }
 
-type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
-
-export type FuelUpsertDto = {
-    assetId: string;
-    assetType?: string;
-    date: string;
-    vendorName: string;
-    vendorAddress?: string;
-    fuelType: string;
-    gallons: number;
-    unitPrice: number;
-    totalAmount: number;
-    odometer?: number;
-    state?: string;
-    documentUrl?: string;
-    documentFileName?: string;
-    notes?: string;
-};
-
-export type FuelDto = FuelUpsertDto & {
-    id: string;
-    assetNumber?: string;
-    createdAt?: string;
-};
-
-async function request<T>(
-    path: string,
-    method: HttpMethod,
-    options?: {
-        body?: any;
-        headers?: Record<string, string>;
-        query?: Record<string, string | number | boolean | undefined | null>;
-    }
-): Promise<T> {
-    const token = getToken();
-    const url = new URL(joinUrl(API_BASE, path));
-
-    if (options?.query) {
-        for (const [k, v] of Object.entries(options.query)) {
-            if (v === undefined || v === null || v === "") continue;
-            url.searchParams.set(k, String(v));
-        }
-    }
-
-    const headers: Record<string, string> = { ...(options?.headers || {}) };
-    if (token) headers.Authorization = `Bearer ${token}`;
-
-    let body: BodyInit | undefined = undefined;
-    if (options?.body !== undefined) {
-        headers["Content-Type"] = "application/json";
-        body = JSON.stringify(options.body);
-    }
-
-    const res = await fetch(url.toString(), { method, headers, body });
-
-    if (res.status === 401 || res.status === 403) {
-        try { logout(); } catch { }
-    }
-
-    if (!res.ok) {
-        const details = await res.json().catch(() => ({}));
-        throw new Error(details.message || `Fuel API Error (${res.status})`);
-    }
-
-    if (res.status === 204) return undefined as unknown as T;
-    return res.json();
+export interface FuelUpsertDto {
+  assetId: string;
+  assetType?: string;
+  date: string;
+  vendorName: string;
+  vendorAddress?: string;
+  fuelType: string;
+  gallons: number;
+  unitPrice: number;
+  totalAmount: number;
+  odometer?: number;
+  state?: string;
+  documentUrl?: string;
+  documentFileName?: string;
+  notes?: string;
 }
 
-const FUEL_BASE = "/fuel";
+// Keep backwards-compat alias used by FuelManager
+export type FuelDto = FuelRecordDto & { assetId: string };
+
+export const FUEL_TYPES = ["Diesel", "Gasoline", "DEF", "E85", "CNG", "LNG", "Electric"];
 
 export const fuelApi = {
-    list: (params?: any) => request<FuelDto[]>(FUEL_BASE, "GET", { query: params }),
-    get: (id: string) => request<FuelDto>(`${FUEL_BASE}/${id}`, "GET"),
-    create: (dto: FuelUpsertDto) => request<FuelDto>(FUEL_BASE, "POST", { body: dto }),
-    update: (id: string, dto: Partial<FuelUpsertDto>) => request<FuelDto>(`${FUEL_BASE}/${id}`, "PUT", { body: dto }),
-    remove: (id: string) => request<void>(`${FUEL_BASE}/${id}`, "DELETE"),
+  list: (params?: { assetId?: string; page?: number; pageSize?: number }) =>
+    api.get<FuelRecordDto[]>("/fuel", { params }).then(r => r.data),
+
+  get: (id: string) =>
+    api.get<FuelRecordDto>(`/fuel/${id}`).then(r => r.data),
+
+  create: (dto: FuelUpsertDto) =>
+    api.post<FuelRecordDto>("/fuel", dto).then(r => r.data),
+
+  update: (id: string, dto: Partial<FuelUpsertDto>) =>
+    api.put<FuelRecordDto>(`/fuel/${id}`, dto).then(r => r.data),
+
+  remove: (id: string) =>
+    api.delete(`/fuel/${id}`).then(() => undefined),
 };

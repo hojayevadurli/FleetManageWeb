@@ -22,11 +22,17 @@ import {
     Lock,
     User,
     AlertCircle,
-    ClipboardCheck
+    ClipboardCheck,
+    Receipt,
+    Fuel
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import AddWarrantyDialog from './AddWarrantyDialog';
+import TollsEquipmentTab from '@/components/tolls/TollsEquipmentTab';
+import FuelEquipmentTab from '@/components/fuel/FuelEquipmentTab';
+import { fuelApi, FuelRecordDto } from '@/lib/fuelApi';
+import ExpenseReportModal from './ExpenseReportModal';
 import EquipmentFormModal from './EquipmentFormModal';
 import EquipmentDocumentsTab from './EquipmentDocumentsTab';
 import {
@@ -39,6 +45,7 @@ import {
 import { Equipment, EquipmentOperationalStatus, WorkOrder, ChatMessage, Warranty, EquipmentDocRole, DocumentRole } from '@/lib/types';
 import { getEquipmentChatResponse } from '@/lib/gemini';
 import SpendAnalytics from './SpendAnalytics';
+import { tollsApi, TollRecord } from '@/lib/tollsApi';
 import { getMaintenancePredictions, getRiskLevelText } from '@/lib/maintenanceApi';
 import type { PredictedMaintenanceEvent } from '@/types/maintenance';
 import equipmentApi, { DiagnosticAlert } from '@/lib/equipmentApi';
@@ -72,6 +79,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     const navigate = useNavigate();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAddWarrantyOpen, setIsAddWarrantyOpen] = useState(false);
+    const [isExpenseReportOpen, setIsExpenseReportOpen] = useState(false);
 
     const isReadOnly = equipment.status === EquipmentOperationalStatus.OutOfService || equipment.status === EquipmentOperationalStatus.Sold;
 
@@ -192,7 +200,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     }, [sessions, isLoaded, equipment.id]);
 
     // Tab State
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'diagnostics' | 'inspections' | 'history' | 'documents' | 'ai' | 'spend' | 'warranty'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'diagnostics' | 'inspections' | 'history' | 'documents' | 'ai' | 'spend' | 'warranty' | 'tolls' | 'fuel'>('dashboard');
 
     // Diagnostics
     const [diagnostics, setDiagnostics] = useState<DiagnosticAlert[]>([]);
@@ -250,6 +258,18 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     };
 
     const equipmentHistory = workOrders.filter(wo => wo.equipmentId === equipment.id);
+
+    const [tollRecords, setTollRecords] = useState<TollRecord[]>([]);
+    useEffect(() => {
+        if (activeTab !== 'spend') return;
+        tollsApi.getByEquipment(equipment.id, 1, 500).then(setTollRecords).catch(() => {});
+    }, [activeTab, equipment.id]);
+
+    const [fuelRecords, setFuelRecords] = useState<FuelRecordDto[]>([]);
+    useEffect(() => {
+        if (activeTab !== 'spend' && activeTab !== 'fuel') return;
+        fuelApi.list({ assetId: equipment.id, pageSize: 500 }).then(setFuelRecords).catch(() => {});
+    }, [activeTab, equipment.id]);
 
     const [historyWarrantyFilter, setHistoryWarrantyFilter] = useState(false);
     const filteredHistory = useMemo(() => {
@@ -366,6 +386,22 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                         <div className="flex items-center gap-2 mt-2 md:mt-0">
                             <Button
                                 variant="secondary"
+                                onClick={async () => {
+                                    // Pre-fetch toll + fuel records if not already loaded
+                                    const [t, f] = await Promise.allSettled([
+                                        tollsApi.getByEquipment(equipment.id, 1, 500),
+                                        fuelApi.list({ assetId: equipment.id, pageSize: 500 }),
+                                    ]);
+                                    if (t.status === "fulfilled") setTollRecords(t.value);
+                                    if (f.status === "fulfilled") setFuelRecords(f.value);
+                                    setIsExpenseReportOpen(true);
+                                }}
+                                className="h-10 px-4 rounded-xl gap-2 font-bold text-xs uppercase tracking-wider text-slate-600 bg-slate-100 hover:bg-slate-200"
+                            >
+                                <FileText className="w-4 h-4" /> Expense Report
+                            </Button>
+                            <Button
+                                variant="secondary"
                                 onClick={() => setIsEditModalOpen(true)}
                                 className="h-10 px-4 rounded-xl gap-2 font-bold text-xs uppercase tracking-wider text-slate-600 bg-slate-100 hover:bg-slate-200"
                             >
@@ -412,8 +448,8 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                 )}
 
                 <div className="w-full min-w-0">
-                    <div className="flex p-1 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto">
-                        {(['dashboard', 'diagnostics', 'inspections', 'history', 'documents', 'ai', 'spend', 'warranty'] as const).map(tab => (
+                    <div className="flex flex-wrap gap-1 p-1 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                        {(['dashboard', 'diagnostics', 'inspections', 'history', 'documents', 'ai', 'spend', 'warranty', 'tolls', 'fuel'] as const).map(tab => (
                             <Button
                                 key={tab}
                                 variant={activeTab === tab ? "default" : "ghost"}
@@ -429,6 +465,8 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     {tab === 'ai' && <Sparkles className="w-3.5 h-3.5 hidden md:block" />}
                                     {tab === 'spend' && <Cpu className="w-3.5 h-3.5 hidden md:block" />}
                                     {tab === 'warranty' && <FileCheck className="w-3.5 h-3.5 hidden md:block" />}
+                                    {tab === 'tolls' && <Receipt className="w-3.5 h-3.5 hidden md:block" />}
+                                    {tab === 'fuel' && <Fuel className="w-3.5 h-3.5 hidden md:block" />}
                                     {tab}
                                 </span>
                             </Button>
@@ -990,6 +1028,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                     <div className="space-y-8 animate-in fade-in zoom-in duration-300">
                         <SpendAnalytics
                             data={equipmentHistory}
+                            tollRecords={tollRecords}
                             equipmentInServiceDate={equipment.inServiceDate}
                             onAddRecord={() => navigate('/app/work-orders')}
                         />
@@ -1178,9 +1217,31 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                     </div>
                 )
                 }
+
+                {activeTab === 'tolls' && (
+                    <TollsEquipmentTab equipment={equipment} />
+                )}
+
+                {activeTab === 'fuel' && (
+                    <div className="animate-in fade-in zoom-in duration-300">
+                        <FuelEquipmentTab
+                            equipment={equipment}
+                            onRecordsChange={setFuelRecords}
+                        />
+                    </div>
+                )}
             </div >
 
             {/* Dialogs */}
+            <ExpenseReportModal
+                open={isExpenseReportOpen}
+                onOpenChange={setIsExpenseReportOpen}
+                equipment={equipment}
+                workOrders={equipmentHistory}
+                tollRecords={tollRecords}
+                fuelRecords={fuelRecords}
+            />
+
             < AddWarrantyDialog
                 open={isAddWarrantyOpen}
                 onOpenChange={setIsAddWarrantyOpen}

@@ -18,9 +18,9 @@ import {
     Droplets,
     Receipt
 } from 'lucide-react';
-import { FuelRecord, FuelParsedData, Equipment } from '@/lib/types';
+import { FuelParsedData, Equipment } from '@/lib/types';
 import { parseFuelReceipt } from '@/lib/gemini';
-import { fuelApi } from '@/lib/fuelApi';
+import { fuelApi, FuelRecordDto } from '@/lib/fuelApi';
 import { equipmentApi, mapDtoToEquipment } from '@/lib/equipmentApi';
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,10 +29,11 @@ const FuelManager = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isParsing, setIsParsing] = useState(false);
-    const [records, setRecords] = useState<FuelRecord[]>([]);
+    const [records, setRecords] = useState<FuelRecordDto[]>([]);
     const [equipment, setEquipment] = useState<Equipment[]>([]);
     const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
     const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+    const [previewMime, setPreviewMime] = useState<string>("");
 
     const [formData, setFormData] = useState<Partial<FuelRecord>>({
         date: new Date().toISOString().split('T')[0],
@@ -73,6 +74,7 @@ const FuelManager = () => {
     const handleFileUpload = async (file: File) => {
         if (!file) return;
         setAttachedFiles([file]);
+        setPreviewMime(file.type);
 
         const reader = new FileReader();
         reader.onloadend = async () => {
@@ -96,7 +98,7 @@ const FuelManager = () => {
                         fuelType: result.fuelType || prev.fuelType,
                         gallons: result.gallons || prev.gallons,
                         unitPrice: result.unitPrice || prev.unitPrice,
-                        totalAmount: result.total || prev.total,
+                        totalAmount: result.total || prev.totalAmount,
                         odometer: result.odometer || prev.odometer,
                         state: result.state || prev.state,
                         assetId: matchedEquip?.id || prev.assetId
@@ -143,6 +145,7 @@ const FuelManager = () => {
         });
         setAttachedFiles([]);
         setReceiptPreview(null);
+        setPreviewMime("");
     };
 
     // Stats Calculation
@@ -390,11 +393,25 @@ const FuelManager = () => {
                             {/* Receipt Preview */}
                             <div className="hidden md:flex flex-1 bg-slate-50 items-center justify-center p-8 overflow-hidden">
                                 {receiptPreview ? (
-                                    <div className="w-full h-full bg-white rounded-[2rem] shadow-inner border border-slate-200 overflow-hidden relative">
-                                        <img src={receiptPreview} alt="Receipt Preview" className="w-full h-full object-contain p-4" />
+                                    <div className="w-full h-full bg-white rounded-[2rem] shadow-inner border border-slate-200 overflow-hidden relative flex items-center justify-center">
+                                        {previewMime === "application/pdf" ? (
+                                            <iframe
+                                                src={receiptPreview}
+                                                title="Receipt PDF"
+                                                className="w-full h-full rounded-[2rem]"
+                                                style={{ minHeight: 400 }}
+                                            />
+                                        ) : (
+                                            <img
+                                                src={receiptPreview}
+                                                alt="Receipt"
+                                                className="max-w-full max-h-full object-contain p-4"
+                                                style={{ display: "block" }}
+                                            />
+                                        )}
                                         <button
                                             type="button"
-                                            onClick={() => setReceiptPreview(null)}
+                                            onClick={() => { setReceiptPreview(null); setPreviewMime(""); }}
                                             className="absolute top-4 right-4 p-2 bg-white/90 backdrop-blur rounded-lg shadow text-slate-400 hover:text-rose-500"
                                         >
                                             <X className="w-4 h-4" />

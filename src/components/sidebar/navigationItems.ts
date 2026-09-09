@@ -15,7 +15,8 @@ import {
   Fuel,
   BarChart3,
   Store,
-  Plug
+  Plug,
+  Receipt
 } from "lucide-react";
 
 export interface NavigationItem {
@@ -73,6 +74,16 @@ export const navigationItems: NavigationConfig = [
     title: "Integrations",
     url: "/app/integrations",
     icon: Plug,
+  },
+  {
+    title: "Tolls",
+    url: "/app/tolls",
+    icon: Receipt,
+  },
+  {
+    title: "Fuel",
+    url: "/app/fuel",
+    icon: Fuel,
   },
 
 ];
