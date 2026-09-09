@@ -53,6 +53,7 @@ import EditDriverPage from "./pages/EditDriverPage";
 import SupportPage from "./pages/support/SupportPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
+import TollsPage from "./pages/TollsPage";
 
 import SettingsLayout from "./pages/settings/SettingsLayout";
 import AccountTab from "./pages/settings/tabs/AccountTab";
@@ -304,9 +305,11 @@ const App = () => (
                               <Route path="/vendor-analytics" element={<VendorAnalytics />} />
                               <Route path="/integrations" element={<IntegrationsPage />} />
                               <Route path="/operations/fuel" element={<FuelTracking />} />
+                              <Route path="/fuel" element={<FuelTracking />} />
                               <Route path="/ai-chat" element={<AIChatPage />} />
                               <Route path="/ai-chat" element={<AIChatPage />} />
                               <Route path="/support" element={<SupportPage />} />
+                              <Route path="/tolls" element={<TollsPage />} />
 
                               {/* Settings Routes */}
                               <Route path="/settings" element={<SettingsLayout />}>
