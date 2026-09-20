@@ -16,7 +16,8 @@ import {
     ArrowUpRight,
     TrendingDown,
     Droplets,
-    Receipt
+    Receipt,
+    Trash2
 } from 'lucide-react';
 import { FuelParsedData, Equipment } from '@/lib/types';
 import { parseFuelReceipt } from '@/lib/gemini';
@@ -148,6 +149,17 @@ const FuelManager = () => {
         setPreviewMime("");
     };
 
+    const handleDelete = async (id: string) => {
+        if (!window.confirm("Delete this fuel record?")) return;
+        try {
+            await fuelApi.remove(id);
+            setRecords(prev => prev.filter(r => r.id !== id));
+            toast({ title: "Fuel record deleted" });
+        } catch (err) {
+            toast({ title: "Delete failed", description: "Could not delete the fuel record.", variant: "destructive" });
+        }
+    };
+
     // Stats Calculation
     const totalSpend = records.reduce((sum, r) => sum + r.totalAmount, 0);
     const totalGallons = records.reduce((sum, r) => sum + r.gallons, 0);
@@ -223,6 +235,7 @@ const FuelManager = () => {
                             <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Type & Volume</th>
                             <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Unit Price</th>
                             <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Amount</th>
+                            <th className="px-8 py-5" />
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -262,6 +275,14 @@ const FuelManager = () => {
                                 </td>
                                 <td className="px-8 py-6 text-right font-mono font-bold text-slate-600">${r.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 3 })}</td>
                                 <td className="px-8 py-6 text-right font-mono font-black text-slate-900">${r.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                <td className="px-8 py-6 text-right">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }}
+                                        className="opacity-0 group-hover:opacity-100 p-2 rounded-xl hover:bg-rose-50 hover:text-rose-600 text-slate-300 transition-all"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
