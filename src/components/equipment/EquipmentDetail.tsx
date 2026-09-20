@@ -24,13 +24,17 @@ import {
     AlertCircle,
     ClipboardCheck,
     Receipt,
-    Fuel
+    Fuel,
+    DollarSign,
+    Wallet
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import AddWarrantyDialog from './AddWarrantyDialog';
 import TollsEquipmentTab from '@/components/tolls/TollsEquipmentTab';
 import FuelEquipmentTab from '@/components/fuel/FuelEquipmentTab';
+import SettlementsEquipmentTab from '@/components/settlements/SettlementsEquipmentTab';
+import ExpensesEquipmentTab from '@/components/expenses/ExpensesEquipmentTab';
 import { fuelApi, FuelRecordDto } from '@/lib/fuelApi';
 import ExpenseReportModal from './ExpenseReportModal';
 import EquipmentFormModal from './EquipmentFormModal';
@@ -200,7 +204,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     }, [sessions, isLoaded, equipment.id]);
 
     // Tab State
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'diagnostics' | 'inspections' | 'history' | 'documents' | 'ai' | 'spend' | 'warranty' | 'tolls' | 'fuel'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'diagnostics' | 'inspections' | 'history' | 'documents' | 'ai' | 'spend' | 'warranty' | 'tolls' | 'fuel' | 'expenses' | 'settlements'>('dashboard');
 
     // Diagnostics
     const [diagnostics, setDiagnostics] = useState<DiagnosticAlert[]>([]);
@@ -449,7 +453,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
 
                 <div className="w-full min-w-0">
                     <div className="flex flex-wrap gap-1 p-1 bg-white border border-slate-200 rounded-2xl shadow-sm">
-                        {(['dashboard', 'diagnostics', 'inspections', 'history', 'documents', 'ai', 'spend', 'warranty', 'tolls', 'fuel'] as const).map(tab => (
+                        {(['dashboard', 'diagnostics', 'inspections', 'history', 'documents', 'ai', 'spend', 'warranty', 'tolls', 'fuel', 'expenses', 'settlements'] as const).map(tab => (
                             <Button
                                 key={tab}
                                 variant={activeTab === tab ? "default" : "ghost"}
@@ -467,6 +471,8 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     {tab === 'warranty' && <FileCheck className="w-3.5 h-3.5 hidden md:block" />}
                                     {tab === 'tolls' && <Receipt className="w-3.5 h-3.5 hidden md:block" />}
                                     {tab === 'fuel' && <Fuel className="w-3.5 h-3.5 hidden md:block" />}
+                                    {tab === 'expenses' && <Wallet className="w-3.5 h-3.5 hidden md:block" />}
+                                    {tab === 'settlements' && <DollarSign className="w-3.5 h-3.5 hidden md:block" />}
                                     {tab}
                                 </span>
                             </Button>
@@ -1228,6 +1234,18 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                             equipment={equipment}
                             onRecordsChange={setFuelRecords}
                         />
+                    </div>
+                )}
+
+                {activeTab === 'expenses' && (
+                    <div className="animate-in fade-in zoom-in duration-300">
+                        <ExpensesEquipmentTab equipment={equipment} />
+                    </div>
+                )}
+
+                {activeTab === 'settlements' && (
+                    <div className="animate-in fade-in zoom-in duration-300">
+                        <SettlementsEquipmentTab equipment={equipment} />
                     </div>
                 )}
             </div >

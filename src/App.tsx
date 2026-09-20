@@ -54,6 +54,8 @@ import SupportPage from "./pages/support/SupportPage";
 import DiagnosticsPage from "./pages/DiagnosticsPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import TollsPage from "./pages/TollsPage";
+import SettlementsPage from "./pages/SettlementsPage";
+import SettlementDetailPage from "./pages/SettlementDetailPage";
 
 import SettingsLayout from "./pages/settings/SettingsLayout";
 import AccountTab from "./pages/settings/tabs/AccountTab";
@@ -310,6 +312,8 @@ const App = () => (
                               <Route path="/ai-chat" element={<AIChatPage />} />
                               <Route path="/support" element={<SupportPage />} />
                               <Route path="/tolls" element={<TollsPage />} />
+                              <Route path="/settlements" element={<SettlementsPage />} />
+                              <Route path="/settlements/:id" element={<SettlementDetailPage />} />
 
                               {/* Settings Routes */}
                               <Route path="/settings" element={<SettingsLayout />}>

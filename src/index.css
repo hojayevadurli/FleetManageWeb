@@ -250,6 +250,29 @@
   color: #1e293b;
 }
 
+/* Printable documents (e.g. Truck Owner Settlement export). Any page can opt in
+   by wrapping its printable content in <div id="printable-area">...</div> -
+   everything else (sidebar, topbar, buttons) is hidden for the print/PDF output. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-area,
+  #printable-area * {
+    visibility: visible;
+  }
+  #printable-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+}
+
 .pac-matched {
   font-weight: 600;
   color: #3b82f6;

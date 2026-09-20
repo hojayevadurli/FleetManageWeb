@@ -16,7 +16,8 @@ import {
   BarChart3,
   Store,
   Plug,
-  Receipt
+  Receipt,
+  DollarSign
 } from "lucide-react";
 
 export interface NavigationItem {
@@ -84,6 +85,11 @@ export const navigationItems: NavigationConfig = [
     title: "Fuel",
     url: "/app/fuel",
     icon: Fuel,
+  },
+  {
+    title: "Settlements",
+    url: "/app/settlements",
+    icon: DollarSign,
   },
 
 ];
