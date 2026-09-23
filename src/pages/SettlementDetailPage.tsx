@@ -14,9 +14,10 @@ import SettlementHeaderDialog from "@/components/settlements/SettlementHeaderDia
 import SettlementRowDialog, { RowSection } from "@/components/settlements/SettlementRowDialog";
 import SettlementPrintView from "@/components/settlements/SettlementPrintView";
 import ImportExpensesDialog from "@/components/settlements/ImportExpensesDialog";
+import ScanSettlementDialog from "@/components/settlements/ScanSettlementDialog";
 import { useAuth } from "@/components/auth/AuthContext";
 import {
-  ArrowLeft, Loader2, Pencil, Trash2, Plus, FileCheck, Info, Printer, Download,
+  ArrowLeft, Loader2, Pencil, Trash2, Plus, FileCheck, Info, Printer, Download, ScanLine,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
@@ -53,6 +54,7 @@ const SettlementDetailPage = () => {
 
   const [showEditHeader, setShowEditHeader] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showScan, setShowScan] = useState(false);
   const [rowDialog, setRowDialog] = useState<{ section: RowSection; row: any | null } | null>(null);
 
   const fetchAll = async () => {
@@ -173,6 +175,9 @@ const SettlementDetailPage = () => {
             {s.vendorName} · Unit {s.unitNumber} · {s.driverName}
           </p>
         </div>
+        <Button variant="secondary" onClick={() => setShowScan(true)} className="h-10 px-4 rounded-xl gap-2 font-bold text-xs uppercase tracking-wider text-slate-600 bg-slate-100 hover:bg-slate-200">
+          <ScanLine className="w-4 h-4" /> Scan PDF
+        </Button>
         <Button variant="secondary" onClick={() => setShowImport(true)} className="h-10 px-4 rounded-xl gap-2 font-bold text-xs uppercase tracking-wider text-slate-600 bg-slate-100 hover:bg-slate-200">
           <Download className="w-4 h-4" /> Pull Expenses
         </Button>
@@ -459,6 +464,13 @@ const SettlementDetailPage = () => {
       <ImportExpensesDialog
         open={showImport}
         onOpenChange={setShowImport}
+        settlement={s}
+        onImported={setSettlement}
+      />
+
+      <ScanSettlementDialog
+        open={showScan}
+        onOpenChange={setShowScan}
         settlement={s}
         onImported={setSettlement}
       />

@@ -3,6 +3,7 @@
  * The Gemini API key is NEVER exposed to the browser.
  */
 import { Equipment, WorkOrder, ReceiptParsedData, FuelParsedData, Warranty, DriverLicenseParsedData } from "./types";
+import { SettlementScanResult } from "./settlementsApi";
 
 const API_URL = import.meta.env.VITE_API_URL as string; // e.g. https://localhost:7297/api
 
@@ -189,6 +190,79 @@ export const parseFuelReceipt = async (
     };
   } catch (error) {
     console.warn("Fuel parsing error:", error);
+    return null;
+  }
+};
+
+// ─── Truck Owner Settlement ────────────────────────────────────────────
+
+export const parseSettlementDocument = async (
+  base64Data: string,
+  mimeType: string
+): Promise<SettlementScanResult | null> => {
+  try {
+    const blob = fileFromBase64(base64Data, mimeType);
+    const ext = mimeType.includes("png") ? "png" : mimeType.includes("pdf") ? "pdf" : "jpg";
+    const raw = await postFile("parse-settlement", blob, `settlement.${ext}`);
+    const parsed = safeJsonParse<any>(raw);
+    if (!parsed) return null;
+
+    const num = (v: any) => (v === null || v === undefined || v === "" ? undefined : Number(v));
+    const numOr0 = (v: any) => Number(v) || 0;
+
+    return {
+      billDate: parsed.billDate || undefined,
+      periodStart: parsed.periodStart || undefined,
+      periodEnd: parsed.periodEnd || undefined,
+      checkDate: parsed.checkDate || undefined,
+      vendorName: parsed.vendorName || undefined,
+      mcNumber: parsed.mcNumber || undefined,
+      externalId: parsed.externalId || undefined,
+      settlementNumber: parsed.settlementNumber || undefined,
+      driverName: parsed.driverName || undefined,
+      driverId: parsed.driverId || undefined,
+      unitNumber: parsed.unitNumber || undefined,
+      totalGrossBill: num(parsed.totalGrossBill),
+      deductions: num(parsed.deductions),
+      totalNetBill: num(parsed.totalNetBill),
+      loads: Array.isArray(parsed.loads) ? parsed.loads.map((l: any) => ({
+        loadNumber: l.loadNumber || undefined,
+        pickupLocation: l.pickupLocation || undefined,
+        deliveryLocation: l.deliveryLocation || undefined,
+        deliveryDate: l.deliveryDate || undefined,
+        loadedMiles: numOr0(l.loadedMiles),
+        emptyMiles: numOr0(l.emptyMiles),
+        totalMiles: numOr0(l.totalMiles),
+        grossAmount: numOr0(l.grossAmount),
+        paymentAmount: numOr0(l.paymentAmount),
+      })) : [],
+      tollTransactions: Array.isArray(parsed.tollTransactions) ? parsed.tollTransactions.map((t: any) => ({
+        type: t.type || "Toll",
+        driverNameRaw: t.driverName || undefined,
+        transactionDate: t.date || undefined,
+        description: t.description || undefined,
+        exitPlaza: t.exitPlaza || undefined,
+        city: t.city || undefined,
+        state: t.state || undefined,
+        totalAmount: numOr0(t.totalAmount),
+      })) : [],
+      billInformation: Array.isArray(parsed.billInformation) ? parsed.billInformation.map((b: any) => ({
+        nature: b.nature || "",
+        description: b.description || undefined,
+        quantity: numOr0(b.quantity) || 1,
+        rate: numOr0(b.rate),
+        totalAmount: numOr0(b.totalAmount),
+      })) : [],
+      deductionItems: Array.isArray(parsed.deductionItems) ? parsed.deductionItems.map((d: any) => ({
+        type: d.type || "",
+        description: d.description || undefined,
+        quantity: numOr0(d.quantity) || 1,
+        rate: numOr0(d.rate),
+        totalAmount: numOr0(d.totalAmount),
+      })) : [],
+    };
+  } catch (error) {
+    console.warn("Settlement parsing error:", error);
     return null;
   }
 };
