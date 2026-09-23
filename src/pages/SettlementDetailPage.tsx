@@ -17,7 +17,7 @@ import ImportExpensesDialog from "@/components/settlements/ImportExpensesDialog"
 import ScanSettlementDialog from "@/components/settlements/ScanSettlementDialog";
 import { useAuth } from "@/components/auth/AuthContext";
 import {
-  ArrowLeft, Loader2, Pencil, Trash2, Plus, FileCheck, Info, Printer, Download, ScanLine,
+  ArrowLeft, Loader2, Pencil, Trash2, Plus, FileCheck, Info, Printer, Download, ScanLine, RefreshCw,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
@@ -55,6 +55,7 @@ const SettlementDetailPage = () => {
   const [showEditHeader, setShowEditHeader] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showScan, setShowScan] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [rowDialog, setRowDialog] = useState<{ section: RowSection; row: any | null } | null>(null);
 
   const fetchAll = async () => {
@@ -99,6 +100,20 @@ const SettlementDetailPage = () => {
       : await api.add(settlement.id, payload);
     setSettlement(updated);
     toast({ title: row ? "Row updated" : "Row added" });
+  };
+
+  const handleSyncLinks = async () => {
+    if (!settlement) return;
+    setSyncing(true);
+    try {
+      const updated = await settlementsApi.syncLinks(settlement.id);
+      setSettlement(updated);
+      toast({ title: "Synced with Tolls / Fuel", description: "Any rows missing from the fleet-wide Tolls and Fuel tabs have been backfilled." });
+    } catch (err: any) {
+      toast({ title: "Sync failed", description: err?.response?.data?.error ?? err?.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleDeleteSettlement = async () => {
@@ -180,6 +195,9 @@ const SettlementDetailPage = () => {
         </Button>
         <Button variant="secondary" onClick={() => setShowImport(true)} className="h-10 px-4 rounded-xl gap-2 font-bold text-xs uppercase tracking-wider text-slate-600 bg-slate-100 hover:bg-slate-200">
           <Download className="w-4 h-4" /> Pull Expenses
+        </Button>
+        <Button variant="secondary" onClick={handleSyncLinks} disabled={syncing} className="h-10 px-4 rounded-xl gap-2 font-bold text-xs uppercase tracking-wider text-slate-600 bg-slate-100 hover:bg-slate-200">
+          <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> Sync to Fleet Records
         </Button>
         <Button variant="secondary" onClick={() => window.print()} className="h-10 px-4 rounded-xl gap-2 font-bold text-xs uppercase tracking-wider text-slate-600 bg-slate-100 hover:bg-slate-200">
           <Printer className="w-4 h-4" /> Export PDF

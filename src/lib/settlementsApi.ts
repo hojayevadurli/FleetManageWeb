@@ -323,4 +323,7 @@ export const settlementsApi = {
 
   importScan: (settlementId: string, req: SettlementScanImportRequest) =>
     api.post<SettlementDetail>(`/settlements/${settlementId}/import-scan`, req).then(r => r.data),
+
+  syncLinks: (settlementId: string) =>
+    api.post<SettlementDetail>(`/settlements/${settlementId}/sync-links`).then(r => r.data),
 };
