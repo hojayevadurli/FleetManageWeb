@@ -228,6 +228,42 @@ export interface SettlementImportRequest {
   workOrderIds: string[];
 }
 
+// ── Scan PDF (AI extraction) ────────────────────────────────────────────
+
+export interface SettlementScanResult {
+  billDate?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  checkDate?: string;
+  vendorName?: string;
+  mcNumber?: string;
+  externalId?: string;
+  settlementNumber?: string;
+  driverName?: string;
+  driverId?: string;
+  unitNumber?: string;
+  totalGrossBill?: number;
+  deductions?: number;
+  totalNetBill?: number;
+  loads: SettlementLoadInput[];
+  tollTransactions: SettlementTollInput[];
+  billInformation: SettlementBillInfoInput[];
+  deductionItems: SettlementDeductionInput[];
+}
+
+export interface SettlementScanImportRequest {
+  checkDate?: string;
+  externalId?: string;
+  settlementNumber?: string;
+  importedTotalGrossBill?: number;
+  importedDeductionsTotal?: number;
+  importedTotalNetBill?: number;
+  loads: SettlementLoadInput[];
+  tollTransactions: SettlementTollInput[];
+  billInfoItems: SettlementBillInfoInput[];
+  deductionItems: SettlementDeductionInput[];
+}
+
 export const settlementsApi = {
   list: (params?: { equipmentId?: string; truckOwnerId?: string; page?: number; pageSize?: number }) =>
     api.get<SettlementSummary[]>("/settlements", { params }).then(r => r.data),
@@ -284,4 +320,7 @@ export const settlementsApi = {
 
   import: (settlementId: string, req: SettlementImportRequest) =>
     api.post<SettlementDetail>(`/settlements/${settlementId}/import`, req).then(r => r.data),
+
+  importScan: (settlementId: string, req: SettlementScanImportRequest) =>
+    api.post<SettlementDetail>(`/settlements/${settlementId}/import-scan`, req).then(r => r.data),
 };
