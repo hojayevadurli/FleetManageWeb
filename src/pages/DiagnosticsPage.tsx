@@ -290,7 +290,7 @@ export default function DiagnosticsPage() {
                                     </div>
                                 )}
 
-                                {/* Divider grid */}
+                                {/* testDivider grid */}
                                 <div className="grid grid-cols-2 gap-4 pt-1">
                                     {selected.unitNumber && (
                                         <div className="bg-slate-50 rounded-xl p-4">
