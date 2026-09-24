@@ -548,19 +548,21 @@ export function DriverOverview({
                 {/* Right Column (1 span) - Summaries */}
                 <div className="space-y-6">
                     {/* Assigned Equipment Section */}
-                    {hasEquipment ? (
-                        <AssignedEquipmentSection
-                            driverId={localDriver.id}
-                            onChangeAssignment={onAssignEquipment}
-                            refreshKey={assignmentRefreshKey}
-                            onAssignmentEnded={onAssignmentEnded}
-                        />
-                    ) : (
+                    {!hasEquipment && (
                         <EquipmentAssignmentCTA
                             driverId={localDriver.id}
                             onAssignClick={onAssignEquipment || (() => { })}
                         />
                     )}
+                    {/* Always mounted so past assignment history stays visible even with
+                        no current active assignment - it renders nothing if there's truly
+                        no assignment history at all. */}
+                    <AssignedEquipmentSection
+                        driverId={localDriver.id}
+                        onChangeAssignment={onAssignEquipment}
+                        refreshKey={assignmentRefreshKey}
+                        onAssignmentEnded={onAssignmentEnded}
+                    />
                 </div>
             </div>
 
