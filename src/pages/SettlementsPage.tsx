@@ -23,7 +23,7 @@ const SettlementsPage = () => {
     setLoading(true);
     try {
       const [list, equipment, operators] = await Promise.all([
-        settlementsApi.list(),
+        settlementsApi.list({ pageSize: 500 }),
         equipmentApi.list(),
         operatorsApi.getAll(1, 500),
       ]);
@@ -67,6 +67,10 @@ const SettlementsPage = () => {
     );
   }
 
+  const totalNetBill = settlements.reduce((sum, s) => sum + s.totalNetBill, 0);
+  const totalOtherExpenses = settlements.reduce((sum, s) => sum + s.otherExpensesTotal, 0);
+  const totalAdjustedNetPay = settlements.reduce((sum, s) => sum + s.adjustedNetPay, 0);
+
   return (
     <Page>
       <PageHeader title="Truck Owner Settlements" subtitle="Per-unit driver settlements, deductions, and adjusted net pay">
@@ -77,6 +81,29 @@ const SettlementsPage = () => {
           <Plus className="w-4 h-4" /> New Settlement
         </Button>
       </PageHeader>
+
+      {settlements.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Settlements</p>
+            <p className="text-3xl font-black text-slate-900">{settlements.length}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Total Net Bill</p>
+            <p className="text-3xl font-black text-slate-900">${totalNetBill.toFixed(2)}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Other Expenses</p>
+            <p className="text-3xl font-black text-amber-600">${totalOtherExpenses.toFixed(2)}</p>
+          </div>
+          <div className="bg-slate-900 rounded-2xl shadow-sm p-5">
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Total Adjusted Net Pay</p>
+            <p className={`text-3xl font-black ${totalAdjustedNetPay < 0 ? "text-rose-400" : "text-white"}`}>
+              ${totalAdjustedNetPay.toFixed(2)}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {settlements.length > 0 ? (
