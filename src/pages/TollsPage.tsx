@@ -3,6 +3,7 @@ import { Page } from "@/components/layout/Page";
 import { PageHeader } from "@/components/layout/Page";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { tollsApi, TollRecord, TollSummary } from "@/lib/tollsApi";
 import { equipmentApi } from "@/lib/equipmentApi";
@@ -20,6 +21,7 @@ const PERIOD_OPTIONS = [
   { label: "Last 30 days",  value: "30" },
   { label: "Last 90 days",  value: "90" },
   { label: "Last year",     value: "365" },
+  { label: "Custom range",  value: "custom" },
 ];
 
 const TollsPage = () => {
@@ -28,15 +30,26 @@ const TollsPage = () => {
   const [recentRecords, setRecentRecords] = useState<TollRecord[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [days, setDays] = useState("30");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [showCalculator, setShowCalculator] = useState(false);
 
+  const isCustom = days === "custom";
+  const customRangeReady = isCustom && !!customFrom && !!customTo;
+  const periodLabel = customRangeReady
+    ? `${format(parseISO(customFrom), "MMM d, yyyy")} – ${format(parseISO(customTo), "MMM d, yyyy")}`
+    : `Last ${days} days`;
+
   const fetchData = async () => {
+    if (isCustom && !customRangeReady) return; // wait until both dates are picked
     setLoading(true);
     try {
       const [dtos, sum] = await Promise.all([
         equipmentApi.list(),
-        tollsApi.getSummary(Number(days)),
+        isCustom
+          ? tollsApi.getSummary(0, { from: customFrom, to: customTo })
+          : tollsApi.getSummary(Number(days)),
       ]);
       setEquipment(dtos.map(mapDtoToEquipment));
       setSummary(sum);
@@ -56,7 +69,7 @@ const TollsPage = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, [days]);
+  useEffect(() => { fetchData(); }, [days, customFrom, customTo]);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Delete this toll record?")) return;
@@ -93,6 +106,26 @@ const TollsPage = () => {
               ))}
             </SelectContent>
           </Select>
+          {isCustom && (
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={e => setCustomFrom(e.target.value)}
+                max={customTo || undefined}
+                className="h-10 w-[150px] bg-white border-slate-200 text-sm"
+              />
+              <span className="text-slate-400 text-sm">to</span>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={e => setCustomTo(e.target.value)}
+                min={customFrom || undefined}
+                max={new Date().toISOString().slice(0, 10)}
+                className="h-10 w-[150px] bg-white border-slate-200 text-sm"
+              />
+            </div>
+          )}
           <Button
             onClick={() => setShowCalculator(true)}
             className="bg-blue-600 text-white h-10 px-5 rounded-lg flex items-center gap-2 font-bold hover:bg-blue-700"
@@ -108,7 +141,7 @@ const TollsPage = () => {
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
             <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Total Tolls Paid</p>
             <p className="text-3xl font-black text-slate-900">${summary.totalCostCash.toFixed(2)}</p>
-            <p className="text-xs text-slate-400 mt-1">Last {days} days</p>
+            <p className="text-xs text-slate-400 mt-1">{periodLabel}</p>
           </div>
           {summary.totalCostEzPass != null && (
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
@@ -143,7 +176,7 @@ const TollsPage = () => {
           <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
             <Truck className="w-4 h-4 text-slate-400" />
             <h3 className="font-black text-slate-900">By Unit</h3>
-            <span className="ml-auto text-xs text-slate-400">Last {days} days</span>
+            <span className="ml-auto text-xs text-slate-400">{periodLabel}</span>
           </div>
           {summary && summary.byUnit.length > 0 ? (
             <div className="divide-y divide-slate-50">
