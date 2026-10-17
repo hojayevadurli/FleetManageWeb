@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Page } from "@/components/layout/Page";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -37,7 +37,20 @@ const rowApi: Record<RowSection, { add: any; update: any; del: any }> = {
 const SettlementDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+
+  // Settlements can be opened either from the global Settlements list or from an
+  // asset's own Settlements tab - "back" (and post-delete) should return to whichever
+  // one actually linked here, not always default to the list.
+  const backTo = (location.state as any)?.backTo as { path: string; equipmentId?: string } | undefined;
+  const goBack = () => {
+    if (backTo?.path === "/app/equipment" && backTo.equipmentId) {
+      navigate(backTo.path, { state: { openEquipmentId: backTo.equipmentId } });
+    } else {
+      navigate("/app/settlements");
+    }
+  };
   const { user } = useAuth();
   const companyName =
     (user as any)?.companyName || (user as any)?.CompanyName ||
@@ -122,7 +135,7 @@ const SettlementDetailPage = () => {
     try {
       await settlementsApi.remove(settlement.id);
       toast({ title: "Settlement deleted" });
-      navigate("/app/settlements");
+      goBack();
     } catch (err: any) {
       toast({ title: "Delete failed", description: err?.response?.data?.error ?? err?.message, variant: "destructive" });
     }
@@ -181,7 +194,7 @@ const SettlementDetailPage = () => {
   return (
     <Page>
       <div className="flex items-center gap-3 mb-6">
-        <Button variant="outline" size="icon" onClick={() => navigate("/app/settlements")} className="h-10 w-10 rounded-2xl border-slate-200 shadow-sm shrink-0">
+        <Button variant="outline" size="icon" onClick={goBack} className="h-10 w-10 rounded-2xl border-slate-200 shadow-sm shrink-0">
           <ArrowLeft className="w-4 h-4 text-slate-400" />
         </Button>
         <div className="flex-1 min-w-0">

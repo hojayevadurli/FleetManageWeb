@@ -46,7 +46,7 @@ const SettlementsEquipmentTab = ({ equipment }: Props) => {
 
   const handleCreate = async (dto: any) => {
     const created = await settlementsApi.create(dto);
-    navigate(`/app/settlements/${created.id}`);
+    navigate(`/app/settlements/${created.id}`, { state: { backTo: { path: "/app/equipment", equipmentId: equipment.id } } });
   };
 
   const handleDelete = async (e: React.MouseEvent, s: SettlementSummary) => {
@@ -112,7 +112,7 @@ const SettlementsEquipmentTab = ({ equipment }: Props) => {
             {settlements.map(s => (
               <button
                 key={s.id}
-                onClick={() => navigate(`/app/settlements/${s.id}`)}
+                onClick={() => navigate(`/app/settlements/${s.id}`, { state: { backTo: { path: "/app/equipment", equipmentId: equipment.id } } })}
                 className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 transition-colors text-left group"
               >
                 <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">

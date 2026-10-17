@@ -52,42 +52,60 @@ const RemindersEquipmentTab = ({ equipment }: Props) => {
     }
   };
 
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
   const handleComplete = async (r: Reminder) => {
+    if (pendingId) return;
+    setPendingId(r.id);
     try {
       await remindersApi.complete(r.id);
-      fetchData();
+      await fetchData();
       toast({ title: "Reminder completed" });
     } catch {
       toast({ title: "Failed to complete", variant: "destructive" });
+    } finally {
+      setPendingId(null);
     }
   };
 
   const handleDismiss = async (r: Reminder) => {
+    if (pendingId) return;
+    setPendingId(r.id);
     try {
       const updated = await remindersApi.dismiss(r.id);
       setReminders(prev => prev.map(x => x.id === updated.id ? updated : x));
     } catch {
       toast({ title: "Failed to dismiss", variant: "destructive" });
+    } finally {
+      setPendingId(null);
     }
   };
 
   const handleReopen = async (r: Reminder) => {
+    if (pendingId) return;
+    setPendingId(r.id);
     try {
       const updated = await remindersApi.reopen(r.id);
       setReminders(prev => prev.map(x => x.id === updated.id ? updated : x));
     } catch {
       toast({ title: "Failed to reopen", variant: "destructive" });
+    } finally {
+      setPendingId(null);
     }
   };
 
   const handleDelete = async (r: Reminder) => {
+    if (pendingId) return;
     if (!window.confirm(`Delete reminder "${r.title}"?`)) return;
+    setPendingId(r.id);
     try {
       await remindersApi.remove(r.id);
       setReminders(prev => prev.filter(x => x.id !== r.id));
       toast({ title: "Reminder deleted" });
     } catch {
       toast({ title: "Delete failed", variant: "destructive" });
+    } finally {
+      setPendingId(null);
     }
   };
 
@@ -119,6 +137,7 @@ const RemindersEquipmentTab = ({ equipment }: Props) => {
         <ReminderList
           reminders={reminders}
           showUnitColumn={false}
+          pendingId={pendingId}
           onEdit={(r) => setDialogState({ open: true, initial: r })}
           onComplete={handleComplete}
           onDismiss={handleDismiss}

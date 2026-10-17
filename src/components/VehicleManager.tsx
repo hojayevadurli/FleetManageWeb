@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { equipmentApi, mapDtoToEquipment, EquipmentCreatePayload } from "@/lib/equipmentApi";
 import { fleetCategoriesApi, FleetCategory } from "@/lib/fleetCategoriesApi";
@@ -16,6 +16,7 @@ import { Page } from "@/components/layout/Page";
 
 const VehicleManager = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
   const initialStatus = queryParams.get('status') ? parseInt(queryParams.get('status')!) as EquipmentOperationalStatus : null;
 
@@ -53,6 +54,18 @@ const VehicleManager = () => {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  // Deep-link support: a page that navigated here wanting a specific unit's detail
+  // view open (e.g. "back" from a settlement opened via an asset's Settlements tab)
+  // passes { state: { openEquipmentId } }. Once the list has loaded, open that unit
+  // and clear the state so it doesn't keep reopening on remount/refresh.
+  useEffect(() => {
+    const openId = (location.state as any)?.openEquipmentId;
+    if (!openId || equipmentList.length === 0) return;
+    const match = equipmentList.find(v => v.id === openId);
+    if (match) openEquipmentDetail(match);
+    navigate(location.pathname + location.search, { replace: true, state: {} });
+  }, [equipmentList, location.state, location.pathname, location.search, navigate, openEquipmentDetail]);
 
   const fetchEquipment = useCallback(async () => {
     try {
