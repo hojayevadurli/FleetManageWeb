@@ -23,6 +23,7 @@ const VehicleManager = () => {
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+  const [selectedEquipmentTab, setSelectedEquipmentTab] = useState<string | undefined>(undefined);
   const [equipmentWorkOrders, setEquipmentWorkOrders] = useState<WorkOrder[]>([]);
 
   // Cache for mapping logic
@@ -38,8 +39,9 @@ const VehicleManager = () => {
   // ever landed on this page (e.g. back to Settlements), which feels broken. Pushing
   // a same-URL history entry on open, and listening for popstate to close the detail
   // in place, makes Back (and the in-page "X") behave one step at a time.
-  const openEquipmentDetail = useCallback((v: Equipment) => {
+  const openEquipmentDetail = useCallback((v: Equipment, tab?: string) => {
     window.history.pushState({ equipmentDetail: true }, "");
+    setSelectedEquipmentTab(tab);
     setSelectedEquipment(v);
   }, []);
 
@@ -56,14 +58,16 @@ const VehicleManager = () => {
   }, []);
 
   // Deep-link support: a page that navigated here wanting a specific unit's detail
-  // view open (e.g. "back" from a settlement opened via an asset's Settlements tab)
-  // passes { state: { openEquipmentId } }. Once the list has loaded, open that unit
-  // and clear the state so it doesn't keep reopening on remount/refresh.
+  // view open on a specific tab (e.g. "back" from a settlement opened via an asset's
+  // Settlements tab) passes { state: { openEquipmentId, openEquipmentTab } }. Once the
+  // list has loaded, open that unit on that tab and clear the state so it doesn't keep
+  // reopening on remount/refresh.
   useEffect(() => {
     const openId = (location.state as any)?.openEquipmentId;
     if (!openId || equipmentList.length === 0) return;
+    const openTab = (location.state as any)?.openEquipmentTab;
     const match = equipmentList.find(v => v.id === openId);
-    if (match) openEquipmentDetail(match);
+    if (match) openEquipmentDetail(match, openTab);
     navigate(location.pathname + location.search, { replace: true, state: {} });
   }, [equipmentList, location.state, location.pathname, location.search, navigate, openEquipmentDetail]);
 
@@ -427,6 +431,7 @@ const VehicleManager = () => {
         onRefresh={handleRefreshEquipment}
         onDelete={handleDeleteEquipment}
         initialAiOpen={false}
+        initialTab={selectedEquipmentTab as any}
       />
     );
   }

@@ -43,10 +43,10 @@ const SettlementDetailPage = () => {
   // Settlements can be opened either from the global Settlements list or from an
   // asset's own Settlements tab - "back" (and post-delete) should return to whichever
   // one actually linked here, not always default to the list.
-  const backTo = (location.state as any)?.backTo as { path: string; equipmentId?: string } | undefined;
+  const backTo = (location.state as any)?.backTo as { path: string; equipmentId?: string; tab?: string } | undefined;
   const goBack = () => {
     if (backTo?.path === "/app/equipment" && backTo.equipmentId) {
-      navigate(backTo.path, { state: { openEquipmentId: backTo.equipmentId } });
+      navigate(backTo.path, { state: { openEquipmentId: backTo.equipmentId, openEquipmentTab: backTo.tab } });
     } else {
       navigate("/app/settlements");
     }

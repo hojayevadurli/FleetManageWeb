@@ -70,6 +70,8 @@ interface ChatSession {
     messages: ExtendedChatMessage[];
 }
 
+type EquipmentDetailTab = 'dashboard' | 'diagnostics' | 'inspections' | 'reminders' | 'history' | 'documents' | 'ai' | 'spend' | 'warranty' | 'tolls' | 'fuel' | 'expenses' | 'settlements';
+
 interface EquipmentDetailProps {
     equipment: Equipment;
     workOrders: WorkOrder[];
@@ -79,9 +81,10 @@ interface EquipmentDetailProps {
     onRefresh?: () => Promise<void>;
     onDelete?: () => Promise<void>;
     initialAiOpen?: boolean;
+    initialTab?: EquipmentDetailTab;
 }
 
-const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders, onBack, onUpdateStatus, onUpdate, onRefresh, onDelete, initialAiOpen }) => {
+const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders, onBack, onUpdateStatus, onUpdate, onRefresh, onDelete, initialAiOpen, initialTab }) => {
     const navigate = useNavigate();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAddWarrantyOpen, setIsAddWarrantyOpen] = useState(false);
@@ -206,7 +209,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     }, [sessions, isLoaded, equipment.id]);
 
     // Tab State
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'diagnostics' | 'inspections' | 'reminders' | 'history' | 'documents' | 'ai' | 'spend' | 'warranty' | 'tolls' | 'fuel' | 'expenses' | 'settlements'>('dashboard');
+    const [activeTab, setActiveTab] = useState<EquipmentDetailTab>(initialTab ?? 'dashboard');
 
     // Diagnostics
     const [diagnostics, setDiagnostics] = useState<DiagnosticAlert[]>([]);
