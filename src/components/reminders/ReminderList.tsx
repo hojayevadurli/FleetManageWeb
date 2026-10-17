@@ -5,6 +5,7 @@ import { format, parseISO } from "date-fns";
 interface Props {
   reminders: Reminder[];
   showUnitColumn?: boolean;
+  pendingId?: string | null; // id of a reminder with a status action in-flight - disables its buttons
   onEdit: (r: Reminder) => void;
   onComplete: (r: Reminder) => void;
   onDismiss: (r: Reminder) => void;
@@ -18,7 +19,7 @@ const STATUS_STYLE: Record<string, string> = {
   Dismissed: "bg-slate-100 text-slate-500",
 };
 
-const ReminderList = ({ reminders, showUnitColumn = true, onEdit, onComplete, onDismiss, onReopen, onDelete }: Props) => {
+const ReminderList = ({ reminders, showUnitColumn = true, pendingId, onEdit, onComplete, onDismiss, onReopen, onDelete }: Props) => {
   if (reminders.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -39,8 +40,10 @@ const ReminderList = ({ reminders, showUnitColumn = true, onEdit, onComplete, on
             ? r.dueAtOdometer - r.currentOdometer
             : null;
 
+          const isPending = pendingId === r.id;
+
           return (
-            <div key={r.id} className={`px-5 py-4 flex items-start gap-3 hover:bg-slate-50 transition-colors group ${r.isOverdue ? "bg-rose-50/40" : ""}`}>
+            <div key={r.id} className={`px-5 py-4 flex items-start gap-3 hover:bg-slate-50 transition-colors group ${r.isOverdue ? "bg-rose-50/40" : ""} ${isPending ? "opacity-60 pointer-events-none" : ""}`}>
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${r.isOverdue ? "bg-rose-100 text-rose-500" : "bg-blue-50 text-blue-500"}`}>
                 {r.isOverdue ? <AlertTriangle className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
               </div>
@@ -50,23 +53,23 @@ const ReminderList = ({ reminders, showUnitColumn = true, onEdit, onComplete, on
                   <div className="flex items-center gap-1 shrink-0">
                     {r.status === "Open" && (
                       <>
-                        <button onClick={() => onComplete(r)} title="Mark complete" className="p-1.5 rounded hover:bg-emerald-50 hover:text-emerald-600 text-slate-400 transition-all">
+                        <button disabled={isPending} onClick={() => onComplete(r)} title="Mark complete" className="p-1.5 rounded hover:bg-emerald-50 hover:text-emerald-600 text-slate-400 transition-all disabled:cursor-not-allowed">
                           <Check className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => onDismiss(r)} title="Dismiss" className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-slate-100 text-slate-400 transition-all">
+                        <button disabled={isPending} onClick={() => onDismiss(r)} title="Dismiss" className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-slate-100 text-slate-400 transition-all disabled:cursor-not-allowed">
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </>
                     )}
                     {r.status !== "Open" && (
-                      <button onClick={() => onReopen(r)} title="Reopen" className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-blue-50 hover:text-blue-600 text-slate-400 transition-all">
+                      <button disabled={isPending} onClick={() => onReopen(r)} title="Reopen" className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-blue-50 hover:text-blue-600 text-slate-400 transition-all disabled:cursor-not-allowed">
                         <RotateCcw className="w-3.5 h-3.5" />
                       </button>
                     )}
-                    <button onClick={() => onEdit(r)} title="Edit" className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-all">
+                    <button disabled={isPending} onClick={() => onEdit(r)} title="Edit" className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-all disabled:cursor-not-allowed">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => onDelete(r)} title="Delete" className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-rose-50 hover:text-rose-600 text-slate-400 transition-all">
+                    <button disabled={isPending} onClick={() => onDelete(r)} title="Delete" className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-rose-50 hover:text-rose-600 text-slate-400 transition-all disabled:cursor-not-allowed">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
