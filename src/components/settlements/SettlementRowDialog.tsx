@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import {
   DEDUCTION_TYPES, BILL_INFO_NATURES, OTHER_EXPENSE_TYPES,
 } from "@/lib/settlementsApi";
+import ComboboxInput from "@/components/common/ComboboxInput";
 
 export type RowSection = "load" | "toll" | "billInfo" | "deduction" | "expense";
 
@@ -269,18 +270,12 @@ const SettlementRowDialog = ({ open, onOpenChange, section, initial, defaultEqui
           {section === "billInfo" && (
             <>
               {field("Nature", (
-                <>
-                  <Input
-                    list="bill-info-natures"
-                    className="h-10 bg-white border-slate-200"
-                    value={form.nature ?? ""}
-                    onChange={set("nature")}
-                    placeholder="e.g. Driver Pay, Total Gross"
-                  />
-                  <datalist id="bill-info-natures">
-                    {BILL_INFO_NATURES.map(n => <option key={n} value={n} />)}
-                  </datalist>
-                </>
+                <ComboboxInput
+                  value={form.nature ?? ""}
+                  onChange={set("nature")}
+                  suggestions={BILL_INFO_NATURES}
+                  placeholder="e.g. Driver Pay, Total Gross"
+                />
               ))}
               {field("Description", textInput("description"))}
               <div className="grid grid-cols-3 gap-3">
@@ -294,18 +289,12 @@ const SettlementRowDialog = ({ open, onOpenChange, section, initial, defaultEqui
           {section === "deduction" && (
             <>
               {field("Type", (
-                <>
-                  <Input
-                    list="deduction-types"
-                    className="h-10 bg-white border-slate-200"
-                    value={form.type ?? ""}
-                    onChange={set("type")}
-                    placeholder="e.g. Trailer Rental, Tolls"
-                  />
-                  <datalist id="deduction-types">
-                    {DEDUCTION_TYPES.map(t => <option key={t} value={t} />)}
-                  </datalist>
-                </>
+                <ComboboxInput
+                  value={form.type ?? ""}
+                  onChange={set("type")}
+                  suggestions={DEDUCTION_TYPES}
+                  placeholder="e.g. Trailer Rental, Tolls"
+                />
               ))}
               {field("Description", textInput("description", "e.g. Trailer rental, Dispatch Fee"))}
               <div className="flex items-center gap-2 pt-1">
@@ -334,18 +323,12 @@ const SettlementRowDialog = ({ open, onOpenChange, section, initial, defaultEqui
               <div className="grid grid-cols-2 gap-3">
                 {field("Date", textInput("expenseDate", "", "date"))}
                 {field("Type", (
-                  <>
-                    <Input
-                      list="expense-types"
-                      className="h-10 bg-white border-slate-200"
-                      value={form.type ?? ""}
-                      onChange={set("type")}
-                      placeholder="e.g. Fuel, Parking, Other"
-                    />
-                    <datalist id="expense-types">
-                      {OTHER_EXPENSE_TYPES.map(t => <option key={t} value={t} />)}
-                    </datalist>
-                  </>
+                  <ComboboxInput
+                    value={form.type ?? ""}
+                    onChange={set("type")}
+                    suggestions={OTHER_EXPENSE_TYPES}
+                    placeholder="e.g. Fuel, Parking, Other"
+                  />
                 ))}
               </div>
               {form.type?.trim().toLowerCase() === "fuel" && (

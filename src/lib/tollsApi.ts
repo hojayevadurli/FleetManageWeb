@@ -96,8 +96,9 @@ export const tollsApi = {
     return res.data;
   },
 
-  async getSummary(days = 30): Promise<TollSummary> {
-    const res = await api.get<TollSummary>("/tolls/summary", { params: { days } });
+  async getSummary(days = 30, range?: { from: string; to: string }): Promise<TollSummary> {
+    const params = range ? { from: range.from, to: range.to } : { days };
+    const res = await api.get<TollSummary>("/tolls/summary", { params });
     return res.data;
   },
 

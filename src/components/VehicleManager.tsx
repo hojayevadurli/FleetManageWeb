@@ -31,6 +31,29 @@ const VehicleManager = () => {
 
   const { toast } = useToast();
 
+  // Opening an asset's detail view doesn't change the URL - it's local state on the
+  // same /app/equipment route. Without this, the browser's Back button skips right
+  // past "close detail, show list" and pops the history entry from BEFORE the user
+  // ever landed on this page (e.g. back to Settlements), which feels broken. Pushing
+  // a same-URL history entry on open, and listening for popstate to close the detail
+  // in place, makes Back (and the in-page "X") behave one step at a time.
+  const openEquipmentDetail = useCallback((v: Equipment) => {
+    window.history.pushState({ equipmentDetail: true }, "");
+    setSelectedEquipment(v);
+  }, []);
+
+  const closeEquipmentDetail = useCallback(() => {
+    // Consume the pushed history entry so Back/X stay in sync; the popstate
+    // listener below will actually clear selectedEquipment.
+    window.history.back();
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => setSelectedEquipment(null);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const fetchEquipment = useCallback(async () => {
     try {
       setLoading(true);
@@ -372,7 +395,7 @@ const VehicleManager = () => {
     try {
       await equipmentApi.delete(selectedEquipment.id);
       setEquipmentList(prev => prev.filter(e => e.id !== selectedEquipment.id));
-      setSelectedEquipment(null);
+      closeEquipmentDetail();
       toast({ title: "Asset Deleted", description: "Equipment removed successfully." });
     } catch (err: any) {
       console.error("Delete failed", err);
@@ -385,7 +408,7 @@ const VehicleManager = () => {
       <EquipmentDetail
         equipment={selectedEquipment}
         workOrders={equipmentWorkOrders}
-        onBack={() => setSelectedEquipment(null)}
+        onBack={closeEquipmentDetail}
         onUpdate={handleUpdateEquipment}
         onUpdateStatus={handleUpdateStatus}
         onRefresh={handleRefreshEquipment}
@@ -416,7 +439,7 @@ const VehicleManager = () => {
           initialStatusFilter={initialStatus || 'ALL'}
           onSelect={(e) => {
             const v = equipmentList.find(veh => veh.id === e.id);
-            if (v) setSelectedEquipment(v);
+            if (v) openEquipmentDetail(v);
           }}
           onAddEquipment={handleAddEquipment}
           onNewWorkOrder={(unitId) => console.log("New WO for", unitId)}

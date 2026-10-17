@@ -288,6 +288,26 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
         setLoading(true);
 
         // Validate required fields
+        if (!formData.firstName || formData.firstName.trim() === '') {
+            toast({
+                title: "Validation Error",
+                description: "First Name is required.",
+                variant: "destructive"
+            });
+            setLoading(false);
+            return;
+        }
+
+        if (!formData.lastName || formData.lastName.trim() === '') {
+            toast({
+                title: "Validation Error",
+                description: "Last Name is required.",
+                variant: "destructive"
+            });
+            setLoading(false);
+            return;
+        }
+
         if (!formData.phone || formData.phone.trim() === '') {
             toast({
                 title: "Validation Error",
@@ -457,9 +477,15 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
                 navigate(`/app/drivers/${newOperator.id}`);
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            toast({ title: "Operation Failed", variant: "destructive", description: "Could not save driver. Check connection." });
+            // Surface ASP.NET Core's ValidationProblemDetails ({ errors: { Field: ["msg"] } })
+            // as a readable message instead of a generic failure toast.
+            const validationErrors = error?.response?.data?.errors;
+            const description = validationErrors
+                ? Object.values(validationErrors).flat().join(" ")
+                : error?.response?.data?.title || "Could not save driver. Check connection.";
+            toast({ title: "Operation Failed", variant: "destructive", description });
         } finally {
             setLoading(false);
         }
@@ -467,9 +493,9 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
 
     // Helper for AI Indicator — rendered as a function call, NOT a component,
     // to avoid remounting on every parent re-render.
-    const renderLabelWithAi = (htmlFor: string | undefined, label: string, fieldName: string) => (
+    const renderLabelWithAi = (htmlFor: string | undefined, label: string, fieldName: string, required?: boolean) => (
         <Label htmlFor={htmlFor} className="flex justify-between items-center group">
-            {label}
+            <span>{label} {required && <span className="text-red-500">*</span>}</span>
             {aiFilledFields.has(fieldName) && (
                 <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
                     <Sparkles className="h-2 w-2" />
@@ -589,12 +615,12 @@ export function DriverForm({ mode, initialData, onSubmit, onCancel, onLicenseUpl
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Row 1: First Name and Last Name */}
                         <div className="space-y-2">
-                            {renderLabelWithAi("firstName", "First Name", "firstName")}
-                            {renderField("firstName", formData.firstName, "e.g. John")}
+                            {renderLabelWithAi("firstName", "First Name", "firstName", true)}
+                            {renderField("firstName", formData.firstName, "e.g. John", "text", undefined, true)}
                         </div>
                         <div className="space-y-2">
-                            {renderLabelWithAi("lastName", "Last Name", "lastName")}
-                            {renderField("lastName", formData.lastName, "e.g. Doe")}
+                            {renderLabelWithAi("lastName", "Last Name", "lastName", true)}
+                            {renderField("lastName", formData.lastName, "e.g. Doe", "text", undefined, true)}
                         </div>
 
                         {/* Row 2: Date of Birth and Internal Driver ID */}
