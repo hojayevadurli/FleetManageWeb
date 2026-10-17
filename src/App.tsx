@@ -55,6 +55,7 @@ import DiagnosticsPage from "./pages/DiagnosticsPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import TollsPage from "./pages/TollsPage";
 import SettlementsPage from "./pages/SettlementsPage";
+import RemindersPage from "./pages/RemindersPage";
 import SettlementDetailPage from "./pages/SettlementDetailPage";
 
 import SettingsLayout from "./pages/settings/SettingsLayout";
@@ -313,6 +314,7 @@ const App = () => (
                               <Route path="/support" element={<SupportPage />} />
                               <Route path="/tolls" element={<TollsPage />} />
                               <Route path="/settlements" element={<SettlementsPage />} />
+                              <Route path="/reminders" element={<RemindersPage />} />
                               <Route path="/settlements/:id" element={<SettlementDetailPage />} />
 
                               {/* Settings Routes */}

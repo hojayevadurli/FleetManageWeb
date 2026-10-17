@@ -17,7 +17,8 @@ import {
   Store,
   Plug,
   Receipt,
-  DollarSign
+  DollarSign,
+  Bell
 } from "lucide-react";
 
 export interface NavigationItem {
@@ -58,6 +59,11 @@ export const navigationItems: NavigationConfig = [
     title: "Service",
     url: "/app/service",
     icon: ClipboardList,
+  },
+  {
+    title: "Reminders",
+    url: "/app/reminders",
+    icon: Bell,
   },
   /* temporarily disable predictions menu
   {

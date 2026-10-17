@@ -26,7 +26,8 @@ import {
     Receipt,
     Fuel,
     DollarSign,
-    Wallet
+    Wallet,
+    Bell
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ import TollsEquipmentTab from '@/components/tolls/TollsEquipmentTab';
 import FuelEquipmentTab from '@/components/fuel/FuelEquipmentTab';
 import SettlementsEquipmentTab from '@/components/settlements/SettlementsEquipmentTab';
 import ExpensesEquipmentTab from '@/components/expenses/ExpensesEquipmentTab';
+import RemindersEquipmentTab from '@/components/reminders/RemindersEquipmentTab';
 import { fuelApi, FuelRecordDto } from '@/lib/fuelApi';
 import ExpenseReportModal from './ExpenseReportModal';
 import EquipmentFormModal from './EquipmentFormModal';
@@ -204,7 +206,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
     }, [sessions, isLoaded, equipment.id]);
 
     // Tab State
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'diagnostics' | 'inspections' | 'history' | 'documents' | 'ai' | 'spend' | 'warranty' | 'tolls' | 'fuel' | 'expenses' | 'settlements'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'diagnostics' | 'inspections' | 'reminders' | 'history' | 'documents' | 'ai' | 'spend' | 'warranty' | 'tolls' | 'fuel' | 'expenses' | 'settlements'>('dashboard');
 
     // Diagnostics
     const [diagnostics, setDiagnostics] = useState<DiagnosticAlert[]>([]);
@@ -453,7 +455,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
 
                 <div className="w-full min-w-0">
                     <div className="flex flex-wrap gap-1 p-1 bg-white border border-slate-200 rounded-2xl shadow-sm">
-                        {(['dashboard', 'diagnostics', 'inspections', 'history', 'documents', 'ai', 'spend', 'warranty', 'tolls', 'fuel', 'expenses', 'settlements'] as const).map(tab => (
+                        {(['dashboard', 'diagnostics', 'inspections', 'reminders', 'history', 'documents', 'ai', 'spend', 'warranty', 'tolls', 'fuel', 'expenses', 'settlements'] as const).map(tab => (
                             <Button
                                 key={tab}
                                 variant={activeTab === tab ? "default" : "ghost"}
@@ -464,6 +466,7 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                     {tab === 'dashboard' && <Container className="w-3.5 h-3.5 hidden md:block" />}
                                     {tab === 'diagnostics' && <AlertCircle className="w-3.5 h-3.5 hidden md:block" />}
                                     {tab === 'inspections' && <ClipboardCheck className="w-3.5 h-3.5 hidden md:block" />}
+                                    {tab === 'reminders' && <Bell className="w-3.5 h-3.5 hidden md:block" />}
                                     {tab === 'history' && <History className="w-3.5 h-3.5 hidden md:block" />}
                                     {tab === 'documents' && <FileText className="w-3.5 h-3.5 hidden md:block" />}
                                     {tab === 'ai' && <Sparkles className="w-3.5 h-3.5 hidden md:block" />}
@@ -964,6 +967,12 @@ const EquipmentDetail: React.FC<EquipmentDetailProps> = ({ equipment, workOrders
                                 <p className="text-slate-500 text-xs mt-1">Inspection reports will populate automatically once operators submit them via Motive App.</p>
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'reminders' && (
+                    <div className="animate-in fade-in zoom-in duration-300">
+                        <RemindersEquipmentTab equipment={equipment} />
                     </div>
                 )}
 
